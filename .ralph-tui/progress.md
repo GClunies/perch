@@ -20,3 +20,14 @@ after each iteration and it's included in prompts for context.
   - Integration tests with real git repos are simple via `tmp_path` + subprocess calls
 ---
 
+## 2026-03-16 - perch-54y.2
+- Added `_get_syntax_theme()` method to `FileViewer` — returns `"monokai"` for dark themes, `"default"` for light
+- Updated `Syntax()` call in `load_file()` to use `theme=self._get_syntax_theme()`
+- Added `watch_theme()` watcher to `PerchApp` — re-renders file viewer when theme changes
+- Files changed: `src/perch/widgets/file_viewer.py`, `src/perch/app.py`
+- **Learnings:**
+  - Textual's `watch_<reactive>` methods auto-fire when a reactive attribute changes; `theme` is reactive on `App`
+  - `self.app.current_theme.dark` is the canonical way to check light/dark mode from a widget
+  - Wrapping theme check in try/except handles the case where the widget isn't yet mounted
+---
+

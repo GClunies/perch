@@ -3,10 +3,10 @@
   "sessionId": "9e4aaf80-c013-42c3-ad69-a858c611341c",
   "status": "running",
   "startedAt": "2026-03-16T20:45:15.616Z",
-  "updatedAt": "2026-03-16T21:27:37.010Z",
-  "currentIteration": 0,
+  "updatedAt": "2026-03-16T21:29:19.141Z",
+  "currentIteration": 1,
   "maxIterations": 100,
-  "tasksCompleted": 0,
+  "tasksCompleted": 1,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -17,8 +17,8 @@
       {
         "id": "perch-54y.1",
         "title": "US-001: Git Service — Diff and Status Dict Functions",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-54y.2",
@@ -76,7 +76,18 @@
       }
     ]
   },
-  "iterations": [],
+  "iterations": [
+    {
+      "iteration": 1,
+      "status": "completed",
+      "taskId": "perch-54y.1",
+      "taskTitle": "US-001: Git Service — Diff and Status Dict Functions",
+      "taskCompleted": true,
+      "durationMs": 215688,
+      "startedAt": "2026-03-16T21:24:01.054Z",
+      "endedAt": "2026-03-16T21:27:36.742Z"
+    }
+  ],
   "skippedTaskIds": [],
   "cwd": "/Users/gclunies/.worktrunk/worktrees/perch.mvp",
   "activeTaskIds": [],

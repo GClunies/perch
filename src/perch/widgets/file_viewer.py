@@ -51,6 +51,15 @@ class FileViewer(VerticalScroll):
         self._content = Static("No file selected", id="file-content")
         self._current_path: Path | None = None
 
+    def _get_syntax_theme(self) -> str:
+        """Return a Pygments theme appropriate for the current app theme."""
+        try:
+            if self.app.current_theme.dark:
+                return "monokai"
+            return "default"
+        except Exception:
+            return "monokai"
+
     def compose(self):
         yield self._content
 
@@ -80,6 +89,7 @@ class FileViewer(VerticalScroll):
             lexer,
             line_numbers=True,
             word_wrap=False,
+            theme=self._get_syntax_theme(),
         )
 
         if truncated:

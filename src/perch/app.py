@@ -45,6 +45,15 @@ class PerchApp(App):
         except (RuntimeError, FileNotFoundError):
             pass
 
+    def watch_theme(self, _value: str | None = None) -> None:
+        """Re-render the file viewer when the app theme changes."""
+        try:
+            viewer = self.query_one(FileViewer)
+        except Exception:
+            return
+        if viewer._current_path is not None:
+            viewer.load_file(viewer._current_path)
+
     def on_mount(self) -> None:
         if self._branch:
             self.title = f"perch — {self._branch}"
