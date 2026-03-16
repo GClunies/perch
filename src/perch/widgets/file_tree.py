@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Iterable
 
 from rich.style import Style
 from rich.text import Text
+from textual import work
 from textual.widgets import DirectoryTree
 from textual.widgets._tree import TreeNode
 
@@ -42,6 +44,46 @@ class WorktreeFileTree(DirectoryTree):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._git_status: dict[str, str] = {}
+        self._stop_watching = threading.Event()
+
+    def on_mount(self) -> None:
+        self._watch_filesystem()
+
+    def on_unmount(self) -> None:
+        self._stop_watching.set()
+
+    @work(thread=True)
+    def _watch_filesystem(self) -> None:
+        """Watch the worktree for filesystem changes and refresh git status."""
+        from perch.services.git import get_status_dict
+
+        # Initial status refresh
+        try:
+            status = get_status_dict(Path(self.path))
+            self.app.call_from_thread(self._apply_git_status, status)
+        except RuntimeError:
+            return
+
+        # Watch for changes and re-fetch status on each change set
+        try:
+            import watchfiles
+
+            for _changes in watchfiles.watch(
+                self.path,
+                stop_event=self._stop_watching,
+            ):
+                try:
+                    status = get_status_dict(Path(self.path))
+                    self.app.call_from_thread(self._apply_git_status, status)
+                except RuntimeError:
+                    pass
+        except Exception:
+            pass
+
+    def _apply_git_status(self, status: dict[str, str]) -> None:
+        """Apply fetched git status and re-render the tree."""
+        self._git_status = status
+        self.root.refresh()
 
     def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
         return [

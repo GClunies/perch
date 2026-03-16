@@ -76,3 +76,18 @@ after each iteration and it's included in prompts for context.
   - `root.refresh()` triggers re-render of the entire tree after status update
 ---
 
+## 2026-03-16 - perch-54y.6
+- Added `watchfiles>=1.0.0` to project dependencies
+- Moved git status refresh logic from `app.py` into `WorktreeFileTree` widget for self-contained lifecycle
+- Added `_watch_filesystem()` background worker using `watchfiles.watch()` with `stop_event` for clean shutdown
+- Initial status fetch happens in the same worker before entering the watch loop
+- Watcher starts on `on_mount()`, stops on `on_unmount()` via `threading.Event`
+- Removed `_refresh_file_tree_status` and `_apply_file_tree_status` from `app.py` (no longer needed)
+- Files changed: `pyproject.toml`, `src/perch/widgets/file_tree.py`, `src/perch/app.py`
+- **Learnings:**
+  - `watchfiles.watch()` accepts a `stop_event` (threading.Event) for clean shutdown from background threads
+  - `watchfiles.DefaultFilter` already excludes `.git`, `__pycache__`, `node_modules`, etc. — no custom filter needed
+  - Default debounce is 1600ms which batches rapid filesystem changes nicely
+  - Moving watching logic into the widget itself (vs. app) gives cleaner lifecycle management via `on_mount`/`on_unmount`
+---
+

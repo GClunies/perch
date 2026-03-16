@@ -3,10 +3,10 @@
   "sessionId": "9e4aaf80-c013-42c3-ad69-a858c611341c",
   "status": "running",
   "startedAt": "2026-03-16T20:45:15.616Z",
-  "updatedAt": "2026-03-16T21:38:59.326Z",
-  "currentIteration": 4,
+  "updatedAt": "2026-03-16T21:41:53.590Z",
+  "currentIteration": 5,
   "maxIterations": 100,
-  "tasksCompleted": 4,
+  "tasksCompleted": 5,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -41,8 +41,8 @@
       {
         "id": "perch-54y.5",
         "title": "US-005: File Tree — Git Status Indicators",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-54y.6",
@@ -116,6 +116,16 @@
       "durationMs": 296176,
       "startedAt": "2026-03-16T21:31:57.004Z",
       "endedAt": "2026-03-16T21:36:53.180Z"
+    },
+    {
+      "iteration": 5,
+      "status": "completed",
+      "taskId": "perch-54y.5",
+      "taskTitle": "US-005: File Tree — Git Status Indicators",
+      "taskCompleted": true,
+      "durationMs": 122407,
+      "startedAt": "2026-03-16T21:36:56.613Z",
+      "endedAt": "2026-03-16T21:38:59.020Z"
     }
   ],
   "skippedTaskIds": [],

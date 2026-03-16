@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "textual>=1.0.0",
     "rich>=13.0.0",
+    "watchfiles>=1.0.0",
 ]
 
 [project.scripts]
