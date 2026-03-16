@@ -21,6 +21,7 @@ packages = ["src/perch"]
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    "pytest-asyncio>=0.24.0",
     "ruff>=0.8.0",
     "ty>=0.0.1a1",
 ]
@@ -31,3 +32,4 @@ src = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"

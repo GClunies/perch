@@ -12,6 +12,7 @@ after each iteration and it's included in prompts for context.
 - **Quality gates**: `uv run pytest`, `uv run ruff check`, `uv run ty check`
 - **Service layer**: Pure Python in `services/`, no Textual deps; expose `parse_*` functions for unit-testable parsing separate from subprocess calls
 - **Models**: Plain dataclasses in `models.py`, no framework deps
+- **Async tests**: Use `pytest-asyncio` with `asyncio_mode = "auto"` in `pyproject.toml`; Textual's `run_test()` provides `pilot` for simulating key presses and querying widgets
 
 ---
 
@@ -67,5 +68,21 @@ after each iteration and it's included in prompts for context.
   - `ty` requires explicit `__init__` signatures matching the parent class — `**kwargs: object` fails type checking against typed parent params
   - `Syntax.guess_lexer(str(path))` detects language from file extension; `Syntax(code, lexer, line_numbers=True)` renders with line numbers
   - `rich.console.Group` composes multiple renderables (e.g., Syntax + truncation warning) into one
+---
+
+## 2026-03-16 - perch-14u.4
+- Implemented tabbed right pane with tree-to-viewer wiring for US-004
+- Files modified:
+  - `src/perch/app.py` — replaced right-pane `Static` with `TabbedContent` (Files/Git/PR tabs), added `on_tree_node_highlighted` handler, tab switching via `action_show_tab`, and pane focus cycling
+  - `src/perch/app.tcss` — removed right-pane border (TabbedContent has own styling), added `.placeholder` style
+  - `pyproject.toml` — added `pytest-asyncio` dev dependency, `asyncio_mode = "auto"` config
+- Files created:
+  - `tests/test_app.py` — 10 async tests covering layout composition, tab switching, and quit binding
+- **Learnings:**
+  - `TabbedContent` tab switching: set `active` reactive to the `TabPane` id (e.g., `"tab-files"`)
+  - `on_tree_node_highlighted` fires on cursor movement in `DirectoryTree` — node data has `.path` attribute via `DirEntry`
+  - Async Textual tests require `pytest-asyncio`; use `async with App().run_test() as pilot` pattern
+  - Override default `tab`/`shift+tab` bindings at App level to customize focus cycling between panes
+  - `Static` widget in Textual 1.x doesn't expose `.renderable` — test for widget existence rather than content strings
 ---
 
