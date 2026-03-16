@@ -1,0 +1,119 @@
+from perch.models import Commit, GitFile, GitStatusData
+from perch.services.git import parse_log, parse_status
+
+
+class TestParseStatus:
+    def test_empty(self) -> None:
+        assert parse_status("") == GitStatusData()
+
+    def test_untracked_files(self) -> None:
+        raw = "?? new_file.py\n?? docs/readme.md\n"
+        result = parse_status(raw)
+        assert result.untracked == [
+            GitFile(path="new_file.py", status="untracked", staged=False),
+            GitFile(path="docs/readme.md", status="untracked", staged=False),
+        ]
+        assert result.staged == []
+        assert result.unstaged == []
+
+    def test_staged_modified(self) -> None:
+        raw = "M  src/app.py\n"
+        result = parse_status(raw)
+        assert result.staged == [
+            GitFile(path="src/app.py", status="modified", staged=True),
+        ]
+        assert result.unstaged == []
+
+    def test_unstaged_modified(self) -> None:
+        raw = " M src/app.py\n"
+        result = parse_status(raw)
+        assert result.unstaged == [
+            GitFile(path="src/app.py", status="modified", staged=False),
+        ]
+        assert result.staged == []
+
+    def test_both_staged_and_unstaged(self) -> None:
+        # File is modified in index AND has further unstaged modifications
+        raw = "MM src/app.py\n"
+        result = parse_status(raw)
+        assert result.staged == [
+            GitFile(path="src/app.py", status="modified", staged=True),
+        ]
+        assert result.unstaged == [
+            GitFile(path="src/app.py", status="modified", staged=False),
+        ]
+
+    def test_staged_added(self) -> None:
+        raw = "A  new_file.py\n"
+        result = parse_status(raw)
+        assert result.staged == [
+            GitFile(path="new_file.py", status="added", staged=True),
+        ]
+
+    def test_staged_deleted(self) -> None:
+        raw = "D  old_file.py\n"
+        result = parse_status(raw)
+        assert result.staged == [
+            GitFile(path="old_file.py", status="deleted", staged=True),
+        ]
+
+    def test_staged_renamed(self) -> None:
+        raw = "R  old.py -> new.py\n"
+        result = parse_status(raw)
+        assert result.staged == [
+            GitFile(path="old.py -> new.py", status="renamed", staged=True),
+        ]
+
+    def test_mixed_statuses(self) -> None:
+        raw = (
+            "M  staged.py\n"
+            " M unstaged.py\n"
+            "?? untracked.py\n"
+            "A  added.py\n"
+            "D  deleted.py\n"
+        )
+        result = parse_status(raw)
+        assert len(result.staged) == 3  # M, A, D
+        assert len(result.unstaged) == 1
+        assert len(result.untracked) == 1
+
+    def test_short_lines_ignored(self) -> None:
+        raw = "X\nAB\n?? ok.py\n"
+        result = parse_status(raw)
+        assert len(result.untracked) == 1
+
+
+class TestParseLog:
+    def test_empty(self) -> None:
+        assert parse_log("") == []
+
+    def test_single_commit(self) -> None:
+        raw = "abc1234\x1fFix the bug\x1fAlice\x1f2 hours ago\n"
+        result = parse_log(raw)
+        assert result == [
+            Commit(
+                hash="abc1234",
+                message="Fix the bug",
+                author="Alice",
+                relative_time="2 hours ago",
+            ),
+        ]
+
+    def test_multiple_commits(self) -> None:
+        raw = (
+            "abc1234\x1fFirst commit\x1fAlice\x1f3 days ago\n"
+            "def5678\x1fSecond commit\x1fBob\x1f1 day ago\n"
+        )
+        result = parse_log(raw)
+        assert len(result) == 2
+        assert result[0].hash == "abc1234"
+        assert result[1].author == "Bob"
+
+    def test_malformed_lines_skipped(self) -> None:
+        raw = (
+            "abc1234\x1fGood commit\x1fAlice\x1f1 hour ago\n"
+            "bad line with no separators\n"
+            "def5678\x1fAnother good one\x1fBob\x1f2 hours ago\n"
+        )
+        result = parse_log(raw)
+        assert len(result) == 2
