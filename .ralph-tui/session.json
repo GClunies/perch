@@ -3,10 +3,10 @@
   "sessionId": "754cca3d-b476-454a-8c3f-349fc72b30a1",
   "status": "running",
   "startedAt": "2026-03-16T10:52:51.540Z",
-  "updatedAt": "2026-03-16T10:56:53.081Z",
-  "currentIteration": 1,
+  "updatedAt": "2026-03-16T10:59:07.385Z",
+  "currentIteration": 2,
   "maxIterations": 10,
-  "tasksCompleted": 1,
+  "tasksCompleted": 2,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -47,8 +47,8 @@
       {
         "id": "perch-14u.6",
         "title": "US-006: Data Models and Git Service Layer",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-14u.7",
@@ -98,6 +98,16 @@
       "durationMs": 106200,
       "startedAt": "2026-03-16T10:53:26.772Z",
       "endedAt": "2026-03-16T10:55:12.972Z"
+    },
+    {
+      "iteration": 2,
+      "status": "completed",
+      "taskId": "perch-14u.6",
+      "taskTitle": "US-006: Data Models and Git Service Layer",
+      "taskCompleted": true,
+      "durationMs": 94300,
+      "startedAt": "2026-03-16T10:55:17.512Z",
+      "endedAt": "2026-03-16T10:56:51.812Z"
     }
   ],
   "skippedTaskIds": [],

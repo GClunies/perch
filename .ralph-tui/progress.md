@@ -44,3 +44,14 @@ after each iteration and it's included in prompts for context.
   - Using `\x1f` (unit separator) as git log field delimiter avoids collisions with commit message content
 ---
 
+## 2026-03-16 - perch-14u.3
+- Implemented WorktreeFileTree widget for US-003
+- Files created:
+  - `src/perch/widgets/file_tree.py` — `WorktreeFileTree(DirectoryTree)` with `filter_paths()` excluding noise dirs
+  - `tests/test_file_tree.py` — 10 tests covering filtering logic
+- **Learnings:**
+  - Textual's `DirectoryTree.filter_paths()` receives `Iterable[Path]` and returns `Iterable[Path]` — straightforward override
+  - For glob-like patterns (e.g. `*.egg-info`), use `str.endswith()` in the filter rather than putting glob patterns in the exclusion set
+  - Constructing `WorktreeFileTree("/tmp")` in tests triggers an unawaited coroutine warning from `watch_path` — harmless in sync test context
+---
+
