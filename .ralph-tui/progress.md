@@ -86,3 +86,18 @@ after each iteration and it's included in prompts for context.
   - `Static` widget in Textual 1.x doesn't expose `.renderable` — test for widget existence rather than content strings
 ---
 
+## 2026-03-16 - perch-14u.10
+- Implemented fuzzy file search modal for US-010
+- Files created:
+  - `src/perch/widgets/file_search.py` — `FileSearchScreen(ModalScreen)` with `collect_files()`, `fuzzy_score()`, `Input` + `ListView` live filtering
+  - `tests/test_file_search.py` — 19 tests covering file collection exclusions and fuzzy scoring algorithm
+- Files modified:
+  - `src/perch/app.py` — added `Ctrl+P` binding, `action_file_search()`, `_on_file_selected()` callback to load file in viewer
+- **Learnings:**
+  - `ModalScreen[T]` is generic over the dismiss result type — `ModalScreen[str | None]` for returning a file path or None
+  - `push_screen(screen, callback)` takes an optional callback for handling dismiss results — cleaner than message passing
+  - Extract `collect_files()` and `fuzzy_score()` as pure functions outside the widget for easy unit testing (same pattern as service layer)
+  - `ListItem(Label(path), name=path)` stores the path in `.name` for retrieval on selection
+  - `ListView.highlighted_child` gives the currently highlighted item for Enter key handling
+---
+

@@ -3,6 +3,7 @@ from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.widgets import Static, TabbedContent, TabPane
 
+from perch.widgets.file_search import FileSearchScreen
 from perch.widgets.file_tree import WorktreeFileTree
 from perch.widgets.file_viewer import FileViewer
 
@@ -17,6 +18,7 @@ class PerchApp(App):
         ("3", "show_tab('tab-pr')", "PR"),
         ("tab", "focus_next_pane", "Next Pane"),
         ("shift+tab", "focus_prev_pane", "Prev Pane"),
+        ("ctrl+p", "file_search", "Search Files"),
     ]
 
     def __init__(self, worktree_path: Path, editor: str | None = None) -> None:
@@ -58,3 +60,14 @@ class PerchApp(App):
     def action_focus_prev_pane(self) -> None:
         """Move focus to the other pane (reverse direction)."""
         self.action_focus_next_pane()
+
+    def action_file_search(self) -> None:
+        """Open the fuzzy file search modal."""
+        self.push_screen(FileSearchScreen(self.worktree_path), self._on_file_selected)
+
+    def _on_file_selected(self, result: str | None) -> None:
+        """Handle the result from the file search modal."""
+        if result is not None:
+            path = self.worktree_path / result
+            if path.is_file():
+                self.query_one(FileViewer).load_file(path)
