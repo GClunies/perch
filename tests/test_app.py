@@ -8,6 +8,7 @@ from textual.widgets import TabbedContent, TabPane
 from perch.app import PerchApp
 from perch.widgets.file_tree import WorktreeFileTree
 from perch.widgets.file_viewer import FileViewer
+from perch.widgets.git_status import GitStatusPanel
 from perch.widgets.pr_context import PRContextPanel
 
 
@@ -47,12 +48,11 @@ class TestPerchAppCompose:
             tree = pilot.app.query_one(WorktreeFileTree)
             assert tree is not None
 
-    async def test_git_tab_has_placeholder(self, worktree: Path) -> None:
-        """Git tab should contain a placeholder widget."""
+    async def test_git_tab_has_status_panel(self, worktree: Path) -> None:
+        """Git tab should contain a GitStatusPanel widget."""
         async with PerchApp(worktree).run_test() as pilot:
-            pane = pilot.app.query_one("#tab-git", TabPane)
-            placeholders = pane.query(".placeholder")
-            assert len(placeholders) == 1
+            panel = pilot.app.query_one(GitStatusPanel)
+            assert panel is not None
 
     async def test_pr_tab_has_context_panel(self, worktree: Path) -> None:
         """PR tab should contain a PRContextPanel widget."""

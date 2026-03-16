@@ -131,3 +131,17 @@ after each iteration and it's included in prompts for context.
   - Editor commands like `cursor` and `code` accept `(folder, file)` args to open the project with the file selected
 ---
 
+## 2026-03-16 - perch-14u.7
+- Implemented GitStatusPanel widget for US-007
+- Files created:
+  - `src/perch/widgets/git_status.py` — `GitStatusPanel(VerticalScroll)` with collapsible Unstaged/Staged/Untracked sections, DataTable for commits, 5s auto-refresh, `r` key manual refresh
+  - `tests/test_git_status.py` — 6 tests covering `_render_file_list` helper
+- Files modified:
+  - `src/perch/app.py` — replaced Git tab placeholder with `GitStatusPanel`, removed unused `Static` import
+  - `tests/test_app.py` — updated Git tab test to check for `GitStatusPanel` instead of placeholder
+- **Learnings:**
+  - Same pattern as `PRContextPanel` works well: `@work(thread=True)` for background refresh, `call_from_thread` for UI updates
+  - Extract `_render_file_list` as a pure helper for unit testing styled file lists without needing a running app
+  - Lazy imports of service functions inside `@work` methods keeps the widget module free of subprocess concerns at import time
+---
+

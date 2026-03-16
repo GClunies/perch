@@ -3,10 +3,10 @@
   "sessionId": "754cca3d-b476-454a-8c3f-349fc72b30a1",
   "status": "running",
   "startedAt": "2026-03-16T10:52:51.540Z",
-  "updatedAt": "2026-03-16T11:14:05.060Z",
-  "currentIteration": 7,
+  "updatedAt": "2026-03-16T11:16:39.135Z",
+  "currentIteration": 8,
   "maxIterations": 10,
-  "tasksCompleted": 7,
+  "tasksCompleted": 8,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -59,8 +59,8 @@
       {
         "id": "perch-14u.8",
         "title": "US-008: Editor Integration",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-14u.9",
@@ -158,6 +158,16 @@
       "durationMs": 193378,
       "startedAt": "2026-03-16T11:09:02.808Z",
       "endedAt": "2026-03-16T11:12:16.186Z"
+    },
+    {
+      "iteration": 8,
+      "status": "completed",
+      "taskId": "perch-14u.8",
+      "taskTitle": "US-008: Editor Integration",
+      "taskCompleted": true,
+      "durationMs": 102866,
+      "startedAt": "2026-03-16T11:12:20.798Z",
+      "endedAt": "2026-03-16T11:14:03.664Z"
     }
   ],
   "skippedTaskIds": [],

@@ -1,12 +1,13 @@
 from pathlib import Path
 
 from textual.app import App, ComposeResult
-from textual.widgets import Static, TabbedContent, TabPane
+from textual.widgets import TabbedContent, TabPane
 
 from perch.services.editor import open_file
 from perch.widgets.file_search import FileSearchScreen
 from perch.widgets.file_tree import WorktreeFileTree
 from perch.widgets.file_viewer import FileViewer
+from perch.widgets.git_status import GitStatusPanel
 from perch.widgets.pr_context import PRContextPanel
 
 
@@ -35,7 +36,7 @@ class PerchApp(App):
             with TabPane("Files", id="tab-files"):
                 yield WorktreeFileTree(self.worktree_path)
             with TabPane("Git", id="tab-git"):
-                yield Static("Coming soon", classes="placeholder")
+                yield GitStatusPanel(self.worktree_path)
             with TabPane("PR", id="tab-pr"):
                 yield PRContextPanel(self.worktree_path)
 
