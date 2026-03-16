@@ -3,10 +3,10 @@
   "sessionId": "9e4aaf80-c013-42c3-ad69-a858c611341c",
   "status": "running",
   "startedAt": "2026-03-16T20:45:15.616Z",
-  "updatedAt": "2026-03-16T21:31:54.680Z",
-  "currentIteration": 2,
+  "updatedAt": "2026-03-16T21:36:53.695Z",
+  "currentIteration": 3,
   "maxIterations": 100,
-  "tasksCompleted": 2,
+  "tasksCompleted": 3,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -29,8 +29,8 @@
       {
         "id": "perch-54y.3",
         "title": "US-003: File Viewer — Unified Diff View",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-54y.4",
@@ -96,6 +96,16 @@
       "durationMs": 98623,
       "startedAt": "2026-03-16T21:27:40.281Z",
       "endedAt": "2026-03-16T21:29:18.904Z"
+    },
+    {
+      "iteration": 3,
+      "status": "completed",
+      "taskId": "perch-54y.3",
+      "taskTitle": "US-003: File Viewer — Unified Diff View",
+      "taskCompleted": true,
+      "durationMs": 152942,
+      "startedAt": "2026-03-16T21:29:21.500Z",
+      "endedAt": "2026-03-16T21:31:54.442Z"
     }
   ],
   "skippedTaskIds": [],

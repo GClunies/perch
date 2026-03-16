@@ -46,3 +46,20 @@ after each iteration and it's included in prompts for context.
   - Pre-existing flaky test: `test_splitter_width_is_one` intermittently fails; `test_has_tabbed_content` fails due to `GitStatusPanel` `#git-header` query in non-git worktree
 ---
 
+## 2026-03-16 - perch-54y.4
+- Added `_diff_layout: str = "unified"` attribute and `s` key binding to toggle between unified and side-by-side diff
+- Added `parse_diff_sides()` module-level function to split unified diff into left/right panel text with blank-line padding for alignment
+- Added `#diff-container` (Horizontal) with `#diff-left` and `#diff-right` (VerticalScroll) children in `compose()`
+- Added `_show_content_view()` and `_show_side_by_side_view()` helper methods to toggle display between content and diff container
+- Updated `_load_diff()` to dispatch to side-by-side or unified based on `_diff_layout`
+- `load_file()` resets `_diff_layout` to "unified" when navigating to a new file
+- Added CSS for `#diff-container`, `#diff-left`, `#diff-right` to `app.tcss`
+- Added 8 tests for `parse_diff_sides` in `test_file_viewer.py`
+- Files changed: `src/perch/widgets/file_viewer.py`, `src/perch/app.tcss`, `tests/test_file_viewer.py`
+- **Learnings:**
+  - Textual `compose()` supports `with Container():` context manager syntax for nesting widgets
+  - Side-by-side diff panels scroll independently (each is its own `VerticalScroll`), which is simpler than synced scrolling
+  - `parse_diff_sides` pads with empty strings so both sides always have the same line count for visual alignment
+  - `display = False` / `display = True` is the standard Textual pattern for showing/hiding widgets
+---
+

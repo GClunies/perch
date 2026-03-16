@@ -14,6 +14,17 @@
     height: 100%;
 }
 
+#diff-container {
+    display: none;
+    layout: horizontal;
+    height: 1fr;
+}
+
+#diff-left, #diff-right {
+    width: 1fr;
+    height: 100%;
+}
+
 .placeholder {
     padding: 1 2;
     color: $text-muted;
