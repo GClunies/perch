@@ -118,3 +118,16 @@ after each iteration and it's included in prompts for context.
   - Same service layer pattern works well: `parse_*` functions for pure JSON parsing, `get_*` wrappers for subprocess calls
 ---
 
+## 2026-03-16 - perch-14u.8
+- Implemented editor integration for US-008
+- Files created:
+  - `src/perch/services/editor.py` — `resolve_editor(cli_editor)` with priority chain (CLI → $EDITOR → "cursor"), `open_file(editor, file_path, worktree_root)` using `subprocess.Popen` non-blocking
+  - `tests/test_editor_service.py` — 7 tests covering resolution priority and Popen invocation
+- Files modified:
+  - `src/perch/app.py` — added `e` keybinding mapped to `action_open_editor`, which reads `FileViewer._current_path` and calls `open_file`
+- **Learnings:**
+  - `subprocess.Popen` with `start_new_session=True` detaches the editor process from the TUI so it doesn't block
+  - The `FileViewer._current_path` attribute already tracks the currently displayed file — no need for separate state tracking in the app
+  - Editor commands like `cursor` and `code` accept `(folder, file)` args to open the project with the file selected
+---
+

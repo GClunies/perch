@@ -3,10 +3,10 @@
   "sessionId": "754cca3d-b476-454a-8c3f-349fc72b30a1",
   "status": "running",
   "startedAt": "2026-03-16T10:52:51.540Z",
-  "updatedAt": "2026-03-16T11:12:17.447Z",
-  "currentIteration": 6,
+  "updatedAt": "2026-03-16T11:14:05.060Z",
+  "currentIteration": 7,
   "maxIterations": 10,
-  "tasksCompleted": 6,
+  "tasksCompleted": 7,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -65,8 +65,8 @@
       {
         "id": "perch-14u.9",
         "title": "US-009: GitHub Service and PR Context Panel",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-14u.10",
@@ -148,6 +148,16 @@
       "durationMs": 148498,
       "startedAt": "2026-03-16T11:06:29.535Z",
       "endedAt": "2026-03-16T11:08:58.033Z"
+    },
+    {
+      "iteration": 7,
+      "status": "completed",
+      "taskId": "perch-14u.9",
+      "taskTitle": "US-009: GitHub Service and PR Context Panel",
+      "taskCompleted": true,
+      "durationMs": 193378,
+      "startedAt": "2026-03-16T11:09:02.808Z",
+      "endedAt": "2026-03-16T11:12:16.186Z"
     }
   ],
   "skippedTaskIds": [],

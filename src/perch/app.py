@@ -3,6 +3,7 @@ from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.widgets import Static, TabbedContent, TabPane
 
+from perch.services.editor import open_file
 from perch.widgets.file_search import FileSearchScreen
 from perch.widgets.file_tree import WorktreeFileTree
 from perch.widgets.file_viewer import FileViewer
@@ -20,6 +21,7 @@ class PerchApp(App):
         ("tab", "focus_next_pane", "Next Pane"),
         ("shift+tab", "focus_prev_pane", "Prev Pane"),
         ("ctrl+p", "file_search", "Search Files"),
+        ("e", "open_editor", "Open in Editor"),
     ]
 
     def __init__(self, worktree_path: Path, editor: str | None = None) -> None:
@@ -72,3 +74,9 @@ class PerchApp(App):
             path = self.worktree_path / result
             if path.is_file():
                 self.query_one(FileViewer).load_file(path)
+
+    def action_open_editor(self) -> None:
+        """Open the currently highlighted file in the external editor."""
+        viewer = self.query_one(FileViewer)
+        if viewer._current_path is not None:
+            open_file(self.editor, viewer._current_path, self.worktree_path)
