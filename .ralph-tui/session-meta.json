@@ -1,14 +1,14 @@
 {
-  "id": "754cca3d-b476-454a-8c3f-349fc72b30a1",
+  "id": "9e4aaf80-c013-42c3-ad69-a858c611341c",
   "status": "running",
-  "startedAt": "2026-03-16T10:52:48.680Z",
-  "updatedAt": "2026-03-16T15:21:46.489Z",
+  "startedAt": "2026-03-16T20:45:13.742Z",
+  "updatedAt": "2026-03-16T20:45:13.742Z",
   "agentPlugin": "claude",
-  "trackerPlugin": "beads-bv",
-  "epicId": "perch-14u",
-  "currentIteration": 11,
-  "maxIterations": 12,
+  "trackerPlugin": "beads-rust",
+  "epicId": "perch-54y",
+  "currentIteration": 0,
+  "maxIterations": 100,
   "totalTasks": 0,
-  "tasksCompleted": 11,
+  "tasksCompleted": 0,
   "cwd": "/Users/gclunies/.worktrunk/worktrees/perch.mvp"
 }

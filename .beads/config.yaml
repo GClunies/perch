@@ -9,7 +9,7 @@
 # issue-prefix: ""
 
 # Use no-db mode: JSONL-only, no Dolt database
-# When true, bd will use .beads/issues.jsonl as the source of truth
+# When true, br will use .beads/issues.jsonl as the source of truth
 no-db: true
 
 # Enable JSON output by default

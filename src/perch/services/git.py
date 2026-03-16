@@ -83,6 +83,40 @@ def parse_status(raw: str) -> GitStatusData:
     return GitStatusData(unstaged=unstaged, staged=staged, untracked=untracked)
 
 
+def get_diff(root: Path, path: str, staged: bool = False) -> str:
+    """Return raw unified diff text for *path* relative to *root*.
+
+    If *staged* is True, uses ``--cached`` to show the staged diff.
+    Returns an empty string when there are no changes.
+    """
+    args = ["diff", "--no-color"]
+    if staged:
+        args.append("--cached")
+    args.extend(["--", path])
+    result = _run_git(args, cwd=root)
+    if result.returncode != 0:
+        raise RuntimeError(f"git diff failed: {result.stderr.strip()}")
+    return result.stdout
+
+
+def get_status_dict(root: Path) -> dict[str, str]:
+    """Return a flat ``{relative_path: status_label}`` dict for O(1) lookup.
+
+    Wraps :func:`get_status` and flattens all categories into a single dict.
+    For files that appear in both staged and unstaged, the unstaged status wins
+    (since it reflects the working-tree state the user sees).
+    """
+    status_data = get_status(root)
+    result: dict[str, str] = {}
+    for gf in status_data.staged:
+        result[gf.path] = gf.status
+    for gf in status_data.unstaged:
+        result[gf.path] = gf.status
+    for gf in status_data.untracked:
+        result[gf.path] = gf.status
+    return result
+
+
 _LOG_SEP = "\x1f"  # unit separator — unlikely in commit data
 _LOG_FORMAT = f"%h{_LOG_SEP}%s{_LOG_SEP}%an{_LOG_SEP}%cr"
 

@@ -3,13 +3,10 @@
 # See: ralph-tui config help
 
 configVersion = "2.1"
-tracker = "beads-bv"
+tracker = "beads-rust"
 agent = "claude"
-maxIterations = 10
+maxIterations = 100
 autoCommit = true
 
 [trackerOptions]
-beadsDir = ".beads"
-labels = ""
-
 [agentOptions]

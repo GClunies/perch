@@ -1,5 +1,7 @@
+from pathlib import Path
+
 from perch.models import Commit, GitFile, GitStatusData
-from perch.services.git import parse_log, parse_status
+from perch.services.git import get_diff, get_status_dict, parse_log, parse_status
 
 
 class TestParseStatus:
@@ -117,3 +119,118 @@ class TestParseLog:
         )
         result = parse_log(raw)
         assert len(result) == 2
+
+
+class TestGetDiff:
+    """Tests for get_diff() using a real temp git repo."""
+
+    def _make_repo(self, tmp_path: Path) -> Path:
+        """Create a minimal git repo and return its root."""
+        import subprocess
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        subprocess.run(["git", "init"], cwd=root, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=root,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=root,
+            capture_output=True,
+            check=True,
+        )
+        # Initial commit so HEAD exists
+        (root / "README.md").write_text("initial\n")
+        subprocess.run(["git", "add", "."], cwd=root, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "init"],
+            cwd=root,
+            capture_output=True,
+            check=True,
+        )
+        return root
+
+    def test_modified_file_diff(self, tmp_path: Path) -> None:
+        root = self._make_repo(tmp_path)
+        (root / "README.md").write_text("changed\n")
+        result = get_diff(root, "README.md")
+        assert "-initial" in result
+        assert "+changed" in result
+
+    def test_staged_file_diff(self, tmp_path: Path) -> None:
+        import subprocess
+
+        root = self._make_repo(tmp_path)
+        (root / "README.md").write_text("staged change\n")
+        subprocess.run(
+            ["git", "add", "README.md"], cwd=root, capture_output=True, check=True
+        )
+        result = get_diff(root, "README.md", staged=True)
+        assert "-initial" in result
+        assert "+staged change" in result
+
+    def test_empty_diff_clean_file(self, tmp_path: Path) -> None:
+        root = self._make_repo(tmp_path)
+        result = get_diff(root, "README.md")
+        assert result == ""
+
+
+class TestGetStatusDict:
+    """Tests for get_status_dict() using a real temp git repo."""
+
+    def _make_repo(self, tmp_path: Path) -> Path:
+        """Create a minimal git repo and return its root."""
+        import subprocess
+
+        root = tmp_path / "repo"
+        root.mkdir()
+        subprocess.run(["git", "init"], cwd=root, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=root,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test"],
+            cwd=root,
+            capture_output=True,
+            check=True,
+        )
+        (root / "README.md").write_text("initial\n")
+        subprocess.run(["git", "add", "."], cwd=root, capture_output=True, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "init"],
+            cwd=root,
+            capture_output=True,
+            check=True,
+        )
+        return root
+
+    def test_mixed_statuses(self, tmp_path: Path) -> None:
+        import subprocess
+
+        root = self._make_repo(tmp_path)
+        # Modified (unstaged)
+        (root / "README.md").write_text("modified\n")
+        # Added + staged
+        (root / "new.py").write_text("new\n")
+        subprocess.run(
+            ["git", "add", "new.py"], cwd=root, capture_output=True, check=True
+        )
+        # Untracked
+        (root / "untracked.txt").write_text("untracked\n")
+
+        result = get_status_dict(root)
+        assert result["README.md"] == "modified"
+        assert result["new.py"] == "added"
+        assert result["untracked.txt"] == "untracked"
+
+    def test_empty_status(self, tmp_path: Path) -> None:
+        root = self._make_repo(tmp_path)
+        result = get_status_dict(root)
+        assert result == {}

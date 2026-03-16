@@ -1,0 +1,679 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "generated_at": "2026-03-16T14:11:58.06801-07:00",
+    "phase2_ready": true,
+    "issue_count": 11,
+    "compute_time_ms": 0
+  },
+  "quick_ref": {
+    "open_count": 11,
+    "actionable_count": 4,
+    "blocked_count": 7,
+    "in_progress_count": 0,
+    "top_picks": [
+      {
+        "id": "perch-54y.1",
+        "title": "US-001: Git Service — Diff and Status Dict Functions",
+        "score": 0.4023845772427882,
+        "reasons": [
+          "🔓 Unblocks 1 item(s): perch-54y.5",
+          "📊 High centrality in dependency graph (PageRank: 100%)",
+          "⚡ Low effort, high impact - good starting point",
+          "✅ Currently unclaimed - available for work",
+          "🚨 High priority (P1) - prioritize this work"
+        ],
+        "unblocks": 1
+      },
+      {
+        "id": "perch-54y.7",
+        "title": "US-007: Git Tab — Interactive ListView Sections",
+        "score": 0.35578828562661363,
+        "reasons": [
+          "🔓 Unblocks 1 item(s): perch-54y.9",
+          "📊 High centrality in dependency graph (PageRank: 73%)",
+          "⚡ Low effort, high impact - good starting point",
+          "✅ Currently unclaimed - available for work"
+        ],
+        "unblocks": 1
+      },
+      {
+        "id": "perch-54y.2",
+        "title": "US-002: File Viewer — Theme-Aware Syntax Highlighting",
+        "score": 0.255923249590693,
+        "reasons": [
+          "📊 High centrality in dependency graph (PageRank: 57%)",
+          "✅ Currently unclaimed - available for work",
+          "🚨 High priority (P1) - prioritize this work"
+        ],
+        "unblocks": 0
+      }
+    ]
+  },
+  "recommendations": [
+    {
+      "id": "perch-54y.3",
+      "title": "US-003: File Viewer — Unified Diff View",
+      "type": "task",
+      "status": "open",
+      "priority": 2,
+      "labels": null,
+      "score": 0.4685197145237231,
+      "breakdown": {
+        "pagerank": 0.1570513669556997,
+        "betweenness": 0.2,
+        "blocker_ratio": 0.08666666666666667,
+        "staleness": 0.00003399404079861111,
+        "priority_boost": 0.05,
+        "time_to_impact": 0.04725,
+        "urgency": 0.00014761549148885057,
+        "risk": 0.006999999999999999,
+        "pagerank_norm": 0.7138698497986351,
+        "betweenness_norm": 1,
+        "blocker_ratio_norm": 0.6666666666666666,
+        "staleness_norm": 0.0006798808159722222,
+        "priority_boost_norm": 0.5,
+        "time_to_impact_norm": 0.4725,
+        "urgency_norm": 0.0014761549148885056,
+        "risk_norm": 0.06999999999999999,
+        "time_to_impact_explanation": "Deep in critical path (depth 3), median estimate 60m",
+        "risk_explanation": "Low risk - stable dependency structure",
+        "risk_signals": {
+          "fan_variance": 0.16666666666666666,
+          "activity_churn": 0,
+          "cross_repo_risk": 0,
+          "status_risk": 0.1,
+          "composite_risk": 0.06999999999999999,
+          "explanation": "Low risk - stable dependency structure"
+        }
+      },
+      "action": "Work on perch-54y.1 first to unblock this",
+      "reasons": [
+        "🔓 Unblocks 1 item(s): perch-54y.4",
+        "🔀 Critical path bottleneck (betweenness: 100%)",
+        "📊 High centrality in dependency graph (PageRank: 71%)",
+        "⚡ Low effort, high impact - good starting point",
+        "✅ Currently unclaimed - available for work",
+        "⏳ Blocked by 2 items - need to clear dependencies"
+      ],
+      "unblocks_ids": [
+        "perch-54y.4"
+      ],
+      "blocked_by": [
+        "perch-54y.1",
+        "perch-54y.2"
+      ]
+    },
+    {
+      "id": "perch-54y.1",
+      "title": "US-001: Git Service — Diff and Status Dict Functions",
+      "type": "task",
+      "status": "open",
+      "priority": 1,
+      "labels": null,
+      "score": 0.4023845772427882,
+      "breakdown": {
+        "pagerank": 0.22,
+        "betweenness": 0,
+        "blocker_ratio": 0.08666666666666667,
+        "staleness": 0.00003463222575231482,
+        "priority_boost": 0.07500000000000001,
+        "time_to_impact": 0.05425,
+        "urgency": 0.00014820374615533984,
+        "risk": 0.0020000000000000005,
+        "pagerank_norm": 1,
+        "betweenness_norm": 0,
+        "blocker_ratio_norm": 0.6666666666666666,
+        "staleness_norm": 0.0006926445150462964,
+        "priority_boost_norm": 0.75,
+        "time_to_impact_norm": 0.5425,
+        "urgency_norm": 0.0014820374615533982,
+        "risk_norm": 0.020000000000000004,
+        "time_to_impact_explanation": "Deep in critical path (depth 4), median estimate 60m",
+        "risk_explanation": "Low risk - stable dependency structure",
+        "risk_signals": {
+          "fan_variance": 0,
+          "activity_churn": 0,
+          "cross_repo_risk": 0,
+          "status_risk": 0.1,
+          "composite_risk": 0.020000000000000004,
+          "explanation": "Low risk - stable dependency structure"
+        }
+      },
+      "action": "Quick win - start here for fast progress",
+      "reasons": [
+        "🔓 Unblocks 1 item(s): perch-54y.5",
+        "📊 High centrality in dependency graph (PageRank: 100%)",
+        "⚡ Low effort, high impact - good starting point",
+        "✅ Currently unclaimed - available for work",
+        "🚨 High priority (P1) - prioritize this work"
+      ],
+      "unblocks_ids": [
+        "perch-54y.5"
+      ]
+    },
+    {
+      "id": "perch-54y.7",
+      "title": "US-007: Git Tab — Interactive ListView Sections",
+      "type": "task",
+      "status": "open",
+      "priority": 2,
+      "labels": null,
+      "score": 0.35578828562661363,
+      "breakdown": {
+        "pagerank": 0.1608493752577726,
+        "betweenness": 0,
+        "blocker_ratio": 0.13,
+        "staleness": 0.0000342766082175926,
+        "priority_boost": 0.05,
+        "time_to_impact": 0.04025,
+        "urgency": 0.00014668416532002127,
+        "risk": 0.0020000000000000005,
+        "pagerank_norm": 0.7311335238989664,
+        "betweenness_norm": 0,
+        "blocker_ratio_norm": 1,
+        "staleness_norm": 0.0006855321643518519,
+        "priority_boost_norm": 0.5,
+        "time_to_impact_norm": 0.40249999999999997,
+        "urgency_norm": 0.0014668416532002126,
+        "risk_norm": 0.020000000000000004,
+        "time_to_impact_explanation": "On dependency chain (depth 2), median estimate 60m",
+        "risk_explanation": "Low risk - stable dependency structure",
+        "risk_signals": {
+          "fan_variance": 0,
+          "activity_churn": 0,
+          "cross_repo_risk": 0,
+          "status_risk": 0.1,
+          "composite_risk": 0.020000000000000004,
+          "explanation": "Low risk - stable dependency structure"
+        }
+      },
+      "action": "Quick win - start here for fast progress",
+      "reasons": [
+        "🔓 Unblocks 1 item(s): perch-54y.9",
+        "📊 High centrality in dependency graph (PageRank: 73%)",
+        "⚡ Low effort, high impact - good starting point",
+        "✅ Currently unclaimed - available for work"
+      ],
+      "unblocks_ids": [
+        "perch-54y.9"
+      ]
+    },
+    {
+      "id": "perch-54y.2",
+      "title": "US-002: File Viewer — Theme-Aware Syntax Highlighting",
+      "type": "task",
+      "status": "open",
+      "priority": 1,
+      "labels": null,
+      "score": 0.255923249590693,
+      "breakdown": {
+        "pagerank": 0.12632039081997887,
+        "betweenness": 0,
+        "blocker_ratio": 0.043333333333333335,
+        "staleness": 0.00003455937644675926,
+        "priority_boost": 0.07500000000000001,
+        "time_to_impact": 0.05425,
+        "urgency": 0.00014789245929165974,
+        "risk": 0.0020000000000000005,
+        "pagerank_norm": 0.5741835946362676,
+        "betweenness_norm": 0,
+        "blocker_ratio_norm": 0.3333333333333333,
+        "staleness_norm": 0.0006911875289351852,
+        "priority_boost_norm": 0.75,
+        "time_to_impact_norm": 0.5425,
+        "urgency_norm": 0.0014789245929165973,
+        "risk_norm": 0.020000000000000004,
+        "time_to_impact_explanation": "Deep in critical path (depth 4), median estimate 60m",
+        "risk_explanation": "Low risk - stable dependency structure",
+        "risk_signals": {
+          "fan_variance": 0,
+          "activity_churn": 0,
+          "cross_repo_risk": 0,
+          "status_risk": 0.1,
+          "composite_risk": 0.020000000000000004,
+          "explanation": "Low risk - stable dependency structure"
+        }
+      },
+      "action": "Start work on this issue",
+      "reasons": [
+        "📊 High centrality in dependency graph (PageRank: 57%)",
+        "✅ Currently unclaimed - available for work",
+        "🚨 High priority (P1) - prioritize this work"
+      ]
+    },
+    {
+      "id": "perch-54y.5",
+      "title": "US-005: File Tree — Git Status Indicators",
+      "type": "task",
+      "status": "open",
+      "priority": 2,
+      "labels": null,
+      "score": 0.2534474635164322,
+      "breakdown": {
+        "pagerank": 0.11021156236568912,
+        "betweenness": 0.03333333333333333,
+        "blocker_ratio": 0.043333333333333335,
+        "staleness": 0.00003396278566743828,
+        "priority_boost": 0.05,
+        "time_to_impact": 0.04025,
+        "urgency": 0.0001471375775170647,
+        "risk": 0.0020000000000000005,
+        "pagerank_norm": 0.5009616471167687,
+        "betweenness_norm": 0.16666666666666666,
+        "blocker_ratio_norm": 0.3333333333333333,
+        "staleness_norm": 0.0006792557133487655,
+        "priority_boost_norm": 0.5,
+        "time_to_impact_norm": 0.40249999999999997,
+        "urgency_norm": 0.0014713757751706469,
+        "risk_norm": 0.020000000000000004,
+        "time_to_impact_explanation": "On dependency chain (depth 2), median estimate 60m",
+        "risk_explanation": "Low risk - stable dependency structure",
+        "risk_signals": {
+          "fan_variance": 0,
+          "activity_churn": 0,
+          "cross_repo_risk": 0,
+          "status_risk": 0.1,
+          "composite_risk": 0.020000000000000004,
+          "explanation": "Low risk - stable dependency structure"
+        }
+      },
+      "action": "Work on perch-54y.1 first to unblock this",
+      "reasons": [
+        "🔓 Unblocks 1 item(s): perch-54y.6",
+        "📊 High centrality in dependency graph (PageRank: 50%)",
+        "✅ Currently unclaimed - available for work",
+        "⏳ Blocked by perch-54y.1 - complete that first"
+      ],
+      "unblocks_ids": [
+        "perch-54y.6"
+      ],
+      "blocked_by": [
+        "perch-54y.1"
+      ]
+    },
+    {
+      "id": "perch-54y.4",
+      "title": "US-004: File Viewer — Side-by-Side Diff Layout",
+      "type": "task",
+      "status": "open",
+      "priority": 2,
+      "labels": null,
+      "score": 0.2404929942460483,
+      "breakdown": {
+        "pagerank": 0.08489265591964738,
+        "betweenness": 0.1,
+        "blocker_ratio": 0.043333333333333335,
+        "staleness": 0.00003397924716435185,
+        "priority_boost": 0.05,
+        "time_to_impact": 0.04025,
+        "urgency": 0.0001473571612527036,
+        "risk": 0.0020000000000000005,
+        "pagerank_norm": 0.38587570872566995,
+        "betweenness_norm": 0.5,
+        "blocker_ratio_norm": 0.3333333333333333,
+        "staleness_norm": 0.000679584943287037,
+        "priority_boost_norm": 0.5,
+        "time_to_impact_norm": 0.40249999999999997,
+        "urgency_norm": 0.001473571612527036,
+        "risk_norm": 0.020000000000000004,
+        "time_to_impact_explanation": "On dependency chain (depth 2), median estimate 60m",
+        "risk_explanation": "Low risk - stable dependency structure",
+        "risk_signals": {
+          "fan_variance": 0,
+          "activity_churn": 0,
+          "cross_repo_risk": 0,
+          "status_risk": 0.1,
+          "composite_risk": 0.020000000000000004,
+          "explanation": "Low risk - stable dependency structure"
+        }
+      },
+      "action": "Work on perch-54y.3 first to unblock this",
+      "reasons": [
+        "📊 High centrality in dependency graph (PageRank: 39%)",
+        "✅ Currently unclaimed - available for work",
+        "⏳ Blocked by perch-54y.3 - complete that first"
+      ],
+      "blocked_by": [
+        "perch-54y.3"
+      ]
+    },
+    {
+      "id": "perch-54y",
+      "title": "File Viewer, File Tree, and Git Tab Enhancements",
+      "type": "epic",
+      "status": "open",
+      "priority": 2,
+      "labels": null,
+      "score": 0.12325670927853183,
+      "breakdown": {
+        "pagerank": 0.059573749473605664,
+        "betweenness": 0,
+        "blocker_ratio": 0,
+        "staleness": 0.00003488025000000001,
+        "priority_boost": 0.05,
+        "time_to_impact": 0.033249999999999995,
+        "urgency": 0.00014926354525532926,
+        "risk": 0.0020000000000000005,
+        "pagerank_norm": 0.2707897703345712,
+        "betweenness_norm": 0,
+        "blocker_ratio_norm": 0,
+        "staleness_norm": 0.0006976050000000001,
+        "priority_boost_norm": 0.5,
+        "time_to_impact_norm": 0.33249999999999996,
+        "urgency_norm": 0.0014926354525532926,
+        "risk_norm": 0.020000000000000004,
+        "time_to_impact_explanation": "On dependency chain (depth 1), median estimate 60m",
+        "risk_explanation": "Low risk - stable dependency structure",
+        "risk_signals": {
+          "fan_variance": 0,
+          "activity_churn": 0,
+          "cross_repo_risk": 0,
+          "status_risk": 0.1,
+          "composite_risk": 0.020000000000000004,
+          "explanation": "Low risk - stable dependency structure"
+        }
+      },
+      "action": "Start work on this issue",
+      "reasons": [
+        "✅ Currently unclaimed - available for work"
+      ]
+    },
+    {
+      "id": "perch-54y.6",
+      "title": "US-006: File Tree — Filesystem Watching for Auto-Refresh",
+      "type": "task",
+      "status": "open",
+      "priority": 2,
+      "labels": null,
+      "score": 0.10875347294143471,
+      "breakdown": {
+        "pagerank": 0.059573749473605664,
+        "betweenness": 0,
+        "blocker_ratio": 0,
+        "staleness": 0.00003395350162037037,
+        "priority_boost": 0.05,
+        "time_to_impact": 0.033249999999999995,
+        "urgency": 0.0001469276133535813,
+        "risk": 0.0020000000000000005,
+        "pagerank_norm": 0.2707897703345712,
+        "betweenness_norm": 0,
+        "blocker_ratio_norm": 0,
+        "staleness_norm": 0.0006790700324074073,
+        "priority_boost_norm": 0.5,
+        "time_to_impact_norm": 0.33249999999999996,
+        "urgency_norm": 0.0014692761335358129,
+        "risk_norm": 0.020000000000000004,
+        "time_to_impact_explanation": "On dependency chain (depth 1), median estimate 60m",
+        "risk_explanation": "Low risk - stable dependency structure",
+        "risk_signals": {
+          "fan_variance": 0,
+          "activity_churn": 0,
+          "cross_repo_risk": 0,
+          "status_risk": 0.1,
+          "composite_risk": 0.020000000000000004,
+          "explanation": "Low risk - stable dependency structure"
+        }
+      },
+      "action": "Work on perch-54y.5 first to unblock this",
+      "reasons": [
+        "✅ Currently unclaimed - available for work",
+        "⏳ Blocked by perch-54y.5 - complete that first"
+      ],
+      "blocked_by": [
+        "perch-54y.5"
+      ]
+    },
+    {
+      "id": "perch-54y.9",
+      "title": "US-009: Git Tab — Refresh Stability",
+      "type": "task",
+      "status": "open",
+      "priority": 3,
+      "labels": null,
+      "score": 0.09600320942285756,
+      "breakdown": {
+        "pagerank": 0.059573749473605664,
+        "betweenness": 0,
+        "blocker_ratio": 0,
+        "staleness": 0.00003391228871527778,
+        "priority_boost": 0.025,
+        "time_to_impact": 0.033249999999999995,
+        "urgency": 0.00014635001625102896,
+        "risk": 0.0020000000000000005,
+        "pagerank_norm": 0.2707897703345712,
+        "betweenness_norm": 0,
+        "blocker_ratio_norm": 0,
+        "staleness_norm": 0.0006782457743055556,
+        "priority_boost_norm": 0.25,
+        "time_to_impact_norm": 0.33249999999999996,
+        "urgency_norm": 0.0014635001625102895,
+        "risk_norm": 0.020000000000000004,
+        "time_to_impact_explanation": "On dependency chain (depth 1), median estimate 60m",
+        "risk_explanation": "Low risk - stable dependency structure",
+        "risk_signals": {
+          "fan_variance": 0,
+          "activity_churn": 0,
+          "cross_repo_risk": 0,
+          "status_risk": 0.1,
+          "composite_risk": 0.020000000000000004,
+          "explanation": "Low risk - stable dependency structure"
+        }
+      },
+      "action": "Work on perch-54y.7 first to unblock this",
+      "reasons": [
+        "✅ Currently unclaimed - available for work",
+        "⏳ Blocked by perch-54y.7 - complete that first"
+      ],
+      "blocked_by": [
+        "perch-54y.7"
+      ]
+    },
+    {
+      "id": "perch-54y.8",
+      "title": "US-008: Git Tab — File Selection Links to File Viewer",
+      "type": "task",
+      "status": "open",
+      "priority": 3,
+      "labels": null,
+      "score": 0.09225313641757722,
+      "breakdown": {
+        "pagerank": 0.059573749473605664,
+        "betweenness": 0,
+        "blocker_ratio": 0,
+        "staleness": 0.00003392302914737654,
+        "priority_boost": 0.025,
+        "time_to_impact": 0.033249999999999995,
+        "urgency": 0.0001465093873499357,
+        "risk": 0.005000000000000001,
+        "pagerank_norm": 0.2707897703345712,
+        "betweenness_norm": 0,
+        "blocker_ratio_norm": 0,
+        "staleness_norm": 0.0006784605829475308,
+        "priority_boost_norm": 0.25,
+        "time_to_impact_norm": 0.33249999999999996,
+        "urgency_norm": 0.0014650938734993568,
+        "risk_norm": 0.05,
+        "time_to_impact_explanation": "On dependency chain (depth 1), median estimate 60m",
+        "risk_explanation": "Low risk - stable dependency structure",
+        "risk_signals": {
+          "fan_variance": 0.1,
+          "activity_churn": 0,
+          "cross_repo_risk": 0,
+          "status_risk": 0.1,
+          "composite_risk": 0.05,
+          "explanation": "Low risk - stable dependency structure"
+        }
+      },
+      "action": "Work on perch-54y.3 first to unblock this",
+      "reasons": [
+        "✅ Currently unclaimed - available for work",
+        "⏳ Blocked by 2 items - need to clear dependencies"
+      ],
+      "blocked_by": [
+        "perch-54y.3",
+        "perch-54y.7"
+      ]
+    }
+  ],
+  "quick_wins": [
+    {
+      "id": "perch-54y.5",
+      "title": "US-005: File Tree — Git Status Indicators",
+      "score": 0.6000000000000001,
+      "reason": "Unblocks 1 items",
+      "unblocks_ids": [
+        "perch-54y.6"
+      ]
+    },
+    {
+      "id": "perch-54y.1",
+      "title": "US-001: Git Service — Diff and Status Dict Functions",
+      "score": 0.5,
+      "reason": "Unblocks 1 items, high priority",
+      "unblocks_ids": [
+        "perch-54y.5"
+      ]
+    },
+    {
+      "id": "perch-54y",
+      "title": "File Viewer, File Tree, and Git Tab Enhancements",
+      "score": 0.4,
+      "reason": "Low complexity"
+    },
+    {
+      "id": "perch-54y.10",
+      "title": "US-010: CSS and Command Palette Updates",
+      "score": 0.4,
+      "reason": "Low complexity"
+    },
+    {
+      "id": "perch-54y.3",
+      "title": "US-003: File Viewer — Unified Diff View",
+      "score": 0.4,
+      "reason": "Unblocks 1 items",
+      "unblocks_ids": [
+        "perch-54y.4"
+      ]
+    }
+  ],
+  "blockers_to_clear": [
+    {
+      "id": "perch-54y.1",
+      "title": "US-001: Git Service — Diff and Status Dict Functions",
+      "unblocks_count": 1,
+      "unblocks_ids": [
+        "perch-54y.5"
+      ],
+      "actionable": true
+    },
+    {
+      "id": "perch-54y.3",
+      "title": "US-003: File Viewer — Unified Diff View",
+      "unblocks_count": 1,
+      "unblocks_ids": [
+        "perch-54y.4"
+      ],
+      "actionable": false,
+      "blocked_by": [
+        "perch-54y.1",
+        "perch-54y.2"
+      ]
+    },
+    {
+      "id": "perch-54y.5",
+      "title": "US-005: File Tree — Git Status Indicators",
+      "unblocks_count": 1,
+      "unblocks_ids": [
+        "perch-54y.6"
+      ],
+      "actionable": false,
+      "blocked_by": [
+        "perch-54y.1"
+      ]
+    },
+    {
+      "id": "perch-54y.7",
+      "title": "US-007: Git Tab — Interactive ListView Sections",
+      "unblocks_count": 1,
+      "unblocks_ids": [
+        "perch-54y.9"
+      ],
+      "actionable": true
+    }
+  ],
+  "project_health": {
+    "counts": {
+      "total": 11,
+      "open": 11,
+      "closed": 0,
+      "blocked": 7,
+      "actionable": 4,
+      "by_status": {
+        "open": 11
+      },
+      "by_type": {
+        "epic": 1,
+        "task": 10
+      },
+      "by_priority": {
+        "1": 2,
+        "2": 6,
+        "3": 3
+      }
+    },
+    "graph": {
+      "node_count": 11,
+      "edge_count": 10,
+      "density": 0.09090909090909091,
+      "has_cycles": false,
+      "phase2_ready": true
+    },
+    "velocity": {
+      "closed_last_7_days": 0,
+      "closed_last_30_days": 0,
+      "avg_days_to_close": 0,
+      "weekly": [
+        {
+          "week_start": "2026-03-16T00:00:00Z",
+          "closed": 0
+        },
+        {
+          "week_start": "2026-03-09T00:00:00Z",
+          "closed": 0
+        },
+        {
+          "week_start": "2026-03-02T00:00:00Z",
+          "closed": 0
+        },
+        {
+          "week_start": "2026-02-23T00:00:00Z",
+          "closed": 0
+        },
+        {
+          "week_start": "2026-02-16T00:00:00Z",
+          "closed": 0
+        },
+        {
+          "week_start": "2026-02-09T00:00:00Z",
+          "closed": 0
+        },
+        {
+          "week_start": "2026-02-02T00:00:00Z",
+          "closed": 0
+        },
+        {
+          "week_start": "2026-01-26T00:00:00Z",
+          "closed": 0
+        }
+      ]
+    }
+  },
+  "commands": {
+    "claim_top": "CI=1 br update perch-54y.3 --status in_progress --json",
+    "show_top": "CI=1 br show perch-54y.3 --json",
+    "list_ready": "CI=1 br ready --json",
+    "list_blocked": "CI=1 br blocked --json",
+    "refresh_triage": "bv --robot-triage"
+  }
+}
