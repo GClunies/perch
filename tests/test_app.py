@@ -8,6 +8,7 @@ from textual.widgets import TabbedContent, TabPane
 from perch.app import PerchApp
 from perch.widgets.file_tree import WorktreeFileTree
 from perch.widgets.file_viewer import FileViewer
+from perch.widgets.pr_context import PRContextPanel
 
 
 @pytest.fixture
@@ -53,12 +54,11 @@ class TestPerchAppCompose:
             placeholders = pane.query(".placeholder")
             assert len(placeholders) == 1
 
-    async def test_pr_tab_has_placeholder(self, worktree: Path) -> None:
-        """PR tab should contain a placeholder widget."""
+    async def test_pr_tab_has_context_panel(self, worktree: Path) -> None:
+        """PR tab should contain a PRContextPanel widget."""
         async with PerchApp(worktree).run_test() as pilot:
-            pane = pilot.app.query_one("#tab-pr", TabPane)
-            placeholders = pane.query(".placeholder")
-            assert len(placeholders) == 1
+            panel = pilot.app.query_one(PRContextPanel)
+            assert panel is not None
 
 
 class TestTabSwitching:

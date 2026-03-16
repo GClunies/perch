@@ -6,6 +6,7 @@ from textual.widgets import Static, TabbedContent, TabPane
 from perch.widgets.file_search import FileSearchScreen
 from perch.widgets.file_tree import WorktreeFileTree
 from perch.widgets.file_viewer import FileViewer
+from perch.widgets.pr_context import PRContextPanel
 
 
 class PerchApp(App):
@@ -34,7 +35,7 @@ class PerchApp(App):
             with TabPane("Git", id="tab-git"):
                 yield Static("Coming soon", classes="placeholder")
             with TabPane("PR", id="tab-pr"):
-                yield Static("Coming soon", classes="placeholder")
+                yield PRContextPanel(self.worktree_path)
 
     def on_tree_node_highlighted(self, event) -> None:
         """Update the file viewer when a tree node is highlighted (cursor moves)."""

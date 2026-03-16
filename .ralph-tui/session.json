@@ -3,10 +3,10 @@
   "sessionId": "754cca3d-b476-454a-8c3f-349fc72b30a1",
   "status": "running",
   "startedAt": "2026-03-16T10:52:51.540Z",
-  "updatedAt": "2026-03-16T11:08:59.297Z",
-  "currentIteration": 5,
+  "updatedAt": "2026-03-16T11:12:17.447Z",
+  "currentIteration": 6,
   "maxIterations": 10,
-  "tasksCompleted": 5,
+  "tasksCompleted": 6,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -71,8 +71,8 @@
       {
         "id": "perch-14u.10",
         "title": "US-010: Fuzzy File Search Modal",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-14u.11",
@@ -138,6 +138,16 @@
       "durationMs": 260423,
       "startedAt": "2026-03-16T11:02:04.337Z",
       "endedAt": "2026-03-16T11:06:24.760Z"
+    },
+    {
+      "iteration": 6,
+      "status": "completed",
+      "taskId": "perch-14u.10",
+      "taskTitle": "US-010: Fuzzy File Search Modal",
+      "taskCompleted": true,
+      "durationMs": 148498,
+      "startedAt": "2026-03-16T11:06:29.535Z",
+      "endedAt": "2026-03-16T11:08:58.033Z"
     }
   ],
   "skippedTaskIds": [],

@@ -101,3 +101,20 @@ after each iteration and it's included in prompts for context.
   - `ListView.highlighted_child` gives the currently highlighted item for Enter key handling
 ---
 
+## 2026-03-16 - perch-14u.9
+- Implemented GitHub service layer and PR context panel widget for US-009
+- Files created:
+  - `src/perch/services/github.py` — `get_pr_context`, `get_checks` + `parse_pr_view`/`parse_checks` for unit-testable parsing
+  - `src/perch/widgets/pr_context.py` — `PRContextPanel(VerticalScroll)` with collapsible Reviews/Comments/CI Checks sections, auto-refresh every 30s, Enter to open check links
+  - `tests/test_github_service.py` — 14 tests covering PR view and checks JSON parsing
+- Files modified:
+  - `src/perch/models.py` — added `PRReview`, `PRComment`, `CICheck`, `PRContext` dataclasses
+  - `src/perch/app.py` — replaced PR tab placeholder with `PRContextPanel`
+  - `tests/test_app.py` — updated PR tab test to check for `PRContextPanel` instead of placeholder
+- **Learnings:**
+  - `textual.work` import is `from textual import work`, not `from textual.work import work`
+  - `gh pr view --json` returns `reviewDecision` as `null` (not empty string) when no reviews — need `or ""` fallback
+  - `gh pr checks --json` workflow field can be either a dict `{"name": "..."}` or a plain string depending on check type
+  - Same service layer pattern works well: `parse_*` functions for pure JSON parsing, `get_*` wrappers for subprocess calls
+---
+
