@@ -161,3 +161,18 @@ after each iteration and it's included in prompts for context.
   - Screen default layout is `vertical` — must explicitly set `Screen { layout: horizontal; }` for side-by-side panes
 ---
 
+## 2026-03-16 - perch-14u.11
+- Implemented command palette with custom DiscoveryCommandProvider for US-011
+- Files created:
+  - `src/perch/commands.py` — `DiscoveryCommandProvider(Provider)` with `discover()` and `search()` methods, `COMMANDS` list of all app commands with display names, hotkeys, and action names
+  - `tests/test_commands.py` — 5 tests covering COMMANDS list structure, action coverage, and Provider subclassing
+- Files modified:
+  - `src/perch/app.py` — added `COMMANDS = App.COMMANDS | {DiscoveryCommandProvider}`, added `ctrl+shift+p` binding for `command_palette` action
+  - `tests/test_app.py` — added `TestCommandPalette` class with 2 tests for provider registration and binding existence
+- **Learnings:**
+  - Textual's `App.COMMANDS` is a set (not list); extend with `App.COMMANDS | {MyProvider}` to keep built-in system commands
+  - `Provider.matcher()` returns a `Matcher` with `.match()` (returns score) and `.highlight()` (returns styled text) — use in `search()` for fuzzy matching
+  - `App.run_action(action_str)` is the correct async method for executing actions by name (not `App.action()`)
+  - `App.BINDINGS` entries are tuples `(key, action, description)`, not `Binding` objects — access `.key` only after instantiation
+---
+

@@ -6,6 +6,7 @@ import pytest
 from textual.widgets import TabbedContent, TabPane
 
 from perch.app import PerchApp
+from perch.commands import DiscoveryCommandProvider
 from perch.widgets.file_tree import WorktreeFileTree
 from perch.widgets.file_viewer import FileViewer
 from perch.widgets.git_status import GitStatusPanel
@@ -84,6 +85,19 @@ class TestTabSwitching:
             await pilot.press("3")
             await pilot.pause()
             assert pilot.app.query_one(TabbedContent).active == "tab-pr"
+
+
+class TestCommandPalette:
+    """Tests for the command palette integration."""
+
+    def test_discovery_provider_registered(self) -> None:
+        """PerchApp.COMMANDS should include DiscoveryCommandProvider."""
+        assert DiscoveryCommandProvider in PerchApp.COMMANDS
+
+    def test_ctrl_shift_p_binding_exists(self) -> None:
+        """App should have a ctrl+shift+p binding for command_palette."""
+        binding_keys = [b[0] if isinstance(b, tuple) else b.key for b in PerchApp.BINDINGS]
+        assert "ctrl+shift+p" in binding_keys
 
 
 class TestQuitBinding:

@@ -3,10 +3,10 @@
   "sessionId": "754cca3d-b476-454a-8c3f-349fc72b30a1",
   "status": "running",
   "startedAt": "2026-03-16T10:52:51.540Z",
-  "updatedAt": "2026-03-16T11:25:19.337Z",
-  "currentIteration": 9,
+  "updatedAt": "2026-03-16T14:58:14.679Z",
+  "currentIteration": 10,
   "maxIterations": 10,
-  "tasksCompleted": 9,
+  "tasksCompleted": 10,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -41,8 +41,8 @@
       {
         "id": "perch-14u.5",
         "title": "US-005: Draggable Splitter",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-14u.6",
@@ -178,6 +178,16 @@
       "durationMs": 149544,
       "startedAt": "2026-03-16T11:14:08.311Z",
       "endedAt": "2026-03-16T11:16:37.855Z"
+    },
+    {
+      "iteration": 10,
+      "status": "completed",
+      "taskId": "perch-14u.5",
+      "taskTitle": "US-005: Draggable Splitter",
+      "taskCompleted": true,
+      "durationMs": 515682,
+      "startedAt": "2026-03-16T11:16:42.465Z",
+      "endedAt": "2026-03-16T11:25:18.147Z"
     }
   ],
   "skippedTaskIds": [],

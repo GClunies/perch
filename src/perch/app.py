@@ -3,6 +3,7 @@ from pathlib import Path
 from textual.app import App, ComposeResult
 from textual.widgets import TabbedContent, TabPane
 
+from perch.commands import DiscoveryCommandProvider
 from perch.services.editor import open_file
 from perch.widgets.file_search import FileSearchScreen
 from perch.widgets.file_tree import WorktreeFileTree
@@ -14,6 +15,7 @@ from perch.widgets.splitter import DraggableSplitter
 
 class PerchApp(App):
     CSS_PATH = "app.tcss"
+    COMMANDS = App.COMMANDS | {DiscoveryCommandProvider}
 
     BINDINGS = [
         ("q", "quit", "Quit"),
@@ -23,6 +25,7 @@ class PerchApp(App):
         ("tab", "focus_next_pane", "Next Pane"),
         ("shift+tab", "focus_prev_pane", "Prev Pane"),
         ("ctrl+p", "file_search", "Search Files"),
+        ("ctrl+shift+p", "command_palette", "Command Palette"),
         ("e", "open_editor", "Open in Editor"),
         ("left_square_bracket", "shrink_left_pane", "Shrink Left"),
         ("right_square_bracket", "grow_left_pane", "Grow Left"),
