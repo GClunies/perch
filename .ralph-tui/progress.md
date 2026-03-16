@@ -55,3 +55,17 @@ after each iteration and it's included in prompts for context.
   - Constructing `WorktreeFileTree("/tmp")` in tests triggers an unawaited coroutine warning from `watch_path` — harmless in sync test context
 ---
 
+## 2026-03-16 - perch-14u.2
+- Implemented FileViewer widget with syntax highlighting for US-002
+- Files created:
+  - `src/perch/widgets/file_viewer.py` — `FileViewer(VerticalScroll)` with `load_file()`, binary detection, 10K line cap, `Syntax` highlighting
+  - `tests/test_file_viewer.py` — 11 tests covering `is_binary()` and `read_file_content()` helpers
+- Files modified:
+  - `src/perch/app.py` — replaced left-pane `Static` placeholder with `FileViewer`
+- **Learnings:**
+  - Extract pure helper functions (`is_binary`, `read_file_content`) from the widget for easy unit testing — same pattern as service layer
+  - `ty` requires explicit `__init__` signatures matching the parent class — `**kwargs: object` fails type checking against typed parent params
+  - `Syntax.guess_lexer(str(path))` detects language from file extension; `Syntax(code, lexer, line_numbers=True)` renders with line numbers
+  - `rich.console.Group` composes multiple renderables (e.g., Syntax + truncation warning) into one
+---
+
