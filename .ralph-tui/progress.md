@@ -105,3 +105,16 @@ after each iteration and it's included in prompts for context.
   - Section headers as `Static` with a CSS class are simpler than `Collapsible(collapsed=False)` for always-visible sections
 ---
 
+## 2026-03-16 - perch-54y.8
+- Added `GitStatusPanel.FileSelected(Message)` custom message with `path: str` and `staged: bool` attributes
+- Added `on_list_view_selected()` handler in `GitStatusPanel` that posts `FileSelected` message, determining `staged` from parent ListView id
+- Added `on_git_status_panel_file_selected()` handler in `app.py` that opens selected file in viewer
+- Deleted files show "File deleted — showing diff" header with diff content, or "no diff available" if no diff exists
+- Files changed: `src/perch/widgets/git_status.py`, `src/perch/app.py`
+- **Learnings:**
+  - Textual auto-routes messages via `on_<widget_class>_<message_name>` naming convention — `on_git_status_panel_file_selected` in app catches `GitStatusPanel.FileSelected`
+  - `ListItem.name` stores the file path set during `_make_list_item()`, so the selection handler can retrieve it without extra data structures
+  - `item.parent` gives the `ListView` container, and checking its `id` distinguishes staged from unstaged/untracked sections
+  - For deleted files, directly setting viewer internal state (`_diff_mode`, `_current_path`) and rendering diff inline avoids needing a separate "deleted file viewer" widget
+---
+

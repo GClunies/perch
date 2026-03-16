@@ -7,6 +7,7 @@ from pathlib import Path
 from rich.text import Text
 from textual import work
 from textual.containers import VerticalScroll
+from textual.message import Message
 from textual.widgets import Collapsible, DataTable, Label, ListItem, ListView, Static
 
 from perch.models import GitFile, GitStatusData
@@ -47,6 +48,14 @@ def _make_list_item(f: GitFile) -> ListItem:
 
 class GitStatusPanel(VerticalScroll):
     """Displays git status: unstaged/staged/untracked files and recent commits."""
+
+    class FileSelected(Message):
+        """Posted when a file is selected in the git status panel."""
+
+        def __init__(self, path: str, staged: bool) -> None:
+            super().__init__()
+            self.path = path
+            self.staged = staged
 
     BINDINGS = [
         ("r", "refresh", "Refresh"),
@@ -150,6 +159,21 @@ class GitStatusPanel(VerticalScroll):
                 c.author,
                 Text(c.relative_time, style="dim"),
             )
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        """Handle file selection in any of the ListViews."""
+        item = event.item
+        if item.name is None:
+            return
+        # Determine if selected from the staged list
+        staged = False
+        try:
+            parent_lv = item.parent
+            if parent_lv is not None and parent_lv.id == "git-staged":
+                staged = True
+        except Exception:
+            pass
+        self.post_message(self.FileSelected(path=item.name, staged=staged))
 
     def action_refresh(self) -> None:
         self._do_refresh()

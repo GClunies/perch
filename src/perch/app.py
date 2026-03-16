@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from rich.syntax import Syntax
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Footer, Header, TabbedContent, TabPane
@@ -77,6 +78,48 @@ class PerchApp(App):
                 with TabPane("PR", id="tab-pr"):
                     yield PRContextPanel(self.worktree_path)
         yield Footer()
+
+    def on_git_status_panel_file_selected(
+        self, event: GitStatusPanel.FileSelected
+    ) -> None:
+        """Handle file selection in the git tab — open in file viewer."""
+        file_path = self.worktree_path / event.path
+        viewer = self.query_one(FileViewer)
+        if file_path.is_file():
+            viewer.load_file(file_path)
+        else:
+            # File was deleted — show message and offer diff view
+            viewer._current_path = file_path
+            viewer.worktree_root = self.worktree_path
+            viewer._diff_mode = True
+            viewer._diff_layout = "unified"
+            viewer._show_content_view()
+            from perch.services.git import get_diff
+
+            rel_path = event.path
+            try:
+                diff_text = get_diff(
+                    self.worktree_path, rel_path, staged=event.staged
+                )
+            except RuntimeError:
+                diff_text = ""
+            from rich.console import Group
+            from rich.text import Text
+
+            if diff_text:
+                syntax = Syntax(
+                    diff_text,
+                    "diff",
+                    line_numbers=True,
+                    word_wrap=False,
+                    theme=viewer._get_syntax_theme(),
+                )
+                header = Text("File deleted — showing diff\n", style="bold red")
+                viewer._content.update(Group(header, syntax))
+            else:
+                viewer._content.update(
+                    Text("File deleted — no diff available", style="bold red")
+                )
 
     def on_tree_node_highlighted(self, event) -> None:
         """Update the file viewer when a tree node is highlighted (cursor moves)."""
