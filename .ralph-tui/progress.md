@@ -176,3 +176,16 @@ after each iteration and it's included in prompts for context.
   - `App.BINDINGS` entries are tuples `(key, action, description)`, not `Binding` objects — access `.key` only after instantiation
 ---
 
+## 2026-03-16 - perch-14u.12
+- Implemented Header, Footer, edge case handling, and layout polish for US-012
+- Files modified:
+  - `src/perch/app.py` — added `Header` and `Footer` widgets, wrapped panes in `Horizontal` container, added `on_mount` to set title (branch + path) and sub_title, added `_branch` detection with graceful fallback for non-git repos
+  - `src/perch/app.tcss` — removed `Screen { layout: horizontal; }`, added `#main-content { layout: horizontal; height: 1fr; }` for the new `Horizontal` container
+  - `tests/test_app.py` — added tests for Header/Footer presence, title/sub_title content
+- **Learnings:**
+  - When adding Header/Footer to a Textual app that previously used `Screen { layout: horizontal; }`, wrap the horizontal panes in a `Horizontal` container and let Screen use its default vertical layout
+  - Textual's `Header` widget displays `app.title` and `app.sub_title` — set these in `on_mount` for dynamic content
+  - `get_worktree_root` raises `RuntimeError` when not in a git repo; `FileNotFoundError` when `git` is not installed — catch both for graceful degradation
+  - Existing `GitStatusPanel` and `PRContextPanel` already handle non-git and missing-`gh` edge cases in their `_do_refresh` workers — no additional widget changes needed
+---
+

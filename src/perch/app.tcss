@@ -1,5 +1,6 @@
-Screen {
+#main-content {
     layout: horizontal;
+    height: 1fr;
 }
 
 #left-pane {

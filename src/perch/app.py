@@ -1,7 +1,8 @@
 from pathlib import Path
 
 from textual.app import App, ComposeResult
-from textual.widgets import TabbedContent, TabPane
+from textual.containers import Horizontal
+from textual.widgets import Footer, Header, TabbedContent, TabPane
 
 from perch.commands import DiscoveryCommandProvider
 from perch.services.editor import open_file
@@ -35,17 +36,35 @@ class PerchApp(App):
         super().__init__()
         self.worktree_path = worktree_path
         self.editor = editor
+        self._branch: str | None = None
+        try:
+            from perch.services.git import get_current_branch, get_worktree_root
+
+            git_root = get_worktree_root(worktree_path)
+            self._branch = get_current_branch(git_root)
+        except (RuntimeError, FileNotFoundError):
+            pass
+
+    def on_mount(self) -> None:
+        if self._branch:
+            self.title = f"perch — {self._branch}"
+        else:
+            self.title = "perch"
+        self.sub_title = str(self.worktree_path)
 
     def compose(self) -> ComposeResult:
-        yield FileViewer(id="left-pane")
-        yield DraggableSplitter()
-        with TabbedContent(id="right-pane"):
-            with TabPane("Files", id="tab-files"):
-                yield WorktreeFileTree(self.worktree_path)
-            with TabPane("Git", id="tab-git"):
-                yield GitStatusPanel(self.worktree_path)
-            with TabPane("PR", id="tab-pr"):
-                yield PRContextPanel(self.worktree_path)
+        yield Header()
+        with Horizontal(id="main-content"):
+            yield FileViewer(id="left-pane")
+            yield DraggableSplitter()
+            with TabbedContent(id="right-pane"):
+                with TabPane("Files", id="tab-files"):
+                    yield WorktreeFileTree(self.worktree_path)
+                with TabPane("Git", id="tab-git"):
+                    yield GitStatusPanel(self.worktree_path)
+                with TabPane("PR", id="tab-pr"):
+                    yield PRContextPanel(self.worktree_path)
+        yield Footer()
 
     def on_tree_node_highlighted(self, event) -> None:
         """Update the file viewer when a tree node is highlighted (cursor moves)."""

@@ -3,10 +3,10 @@
   "sessionId": "754cca3d-b476-454a-8c3f-349fc72b30a1",
   "status": "running",
   "startedAt": "2026-03-16T10:52:51.540Z",
-  "updatedAt": "2026-03-16T14:58:14.679Z",
-  "currentIteration": 10,
+  "updatedAt": "2026-03-16T15:25:45.330Z",
+  "currentIteration": 11,
   "maxIterations": 10,
-  "tasksCompleted": 10,
+  "tasksCompleted": 11,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -77,8 +77,8 @@
       {
         "id": "perch-14u.11",
         "title": "US-011: Command Palette",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-14u.12",
@@ -188,6 +188,16 @@
       "durationMs": 515682,
       "startedAt": "2026-03-16T11:16:42.465Z",
       "endedAt": "2026-03-16T11:25:18.147Z"
+    },
+    {
+      "iteration": 11,
+      "status": "completed",
+      "taskId": "perch-14u.11",
+      "taskTitle": "US-011: Command Palette",
+      "taskCompleted": true,
+      "durationMs": 236715,
+      "startedAt": "2026-03-16T14:54:16.823Z",
+      "endedAt": "2026-03-16T14:58:13.538Z"
     }
   ],
   "skippedTaskIds": [],

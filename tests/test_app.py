@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-from textual.widgets import TabbedContent, TabPane
+from textual.widgets import Footer, Header, TabbedContent, TabPane
 
 from perch.app import PerchApp
 from perch.commands import DiscoveryCommandProvider
@@ -24,6 +24,28 @@ def worktree(tmp_path: Path) -> Path:
 
 class TestPerchAppCompose:
     """Tests for the app layout and widget composition."""
+
+    async def test_has_header(self, worktree: Path) -> None:
+        """App should have a Header widget."""
+        async with PerchApp(worktree).run_test() as pilot:
+            header = pilot.app.query_one(Header)
+            assert header is not None
+
+    async def test_has_footer(self, worktree: Path) -> None:
+        """App should have a Footer widget."""
+        async with PerchApp(worktree).run_test() as pilot:
+            footer = pilot.app.query_one(Footer)
+            assert footer is not None
+
+    async def test_title_without_git(self, worktree: Path) -> None:
+        """Title should be 'perch' when not in a git repo."""
+        async with PerchApp(worktree).run_test() as pilot:
+            assert pilot.app.title == "perch"
+
+    async def test_sub_title_shows_path(self, worktree: Path) -> None:
+        """Sub-title should show the worktree path."""
+        async with PerchApp(worktree).run_test() as pilot:
+            assert pilot.app.sub_title == str(worktree)
 
     async def test_has_file_viewer(self, worktree: Path) -> None:
         """App should have a FileViewer as the left pane."""

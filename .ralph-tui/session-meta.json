@@ -2,13 +2,13 @@
   "id": "754cca3d-b476-454a-8c3f-349fc72b30a1",
   "status": "running",
   "startedAt": "2026-03-16T10:52:48.680Z",
-  "updatedAt": "2026-03-16T14:54:15.028Z",
+  "updatedAt": "2026-03-16T15:21:46.489Z",
   "agentPlugin": "claude",
   "trackerPlugin": "beads-bv",
   "epicId": "perch-14u",
-  "currentIteration": 10,
-  "maxIterations": 11,
+  "currentIteration": 11,
+  "maxIterations": 12,
   "totalTasks": 0,
-  "tasksCompleted": 10,
+  "tasksCompleted": 11,
   "cwd": "/Users/gclunies/.worktrunk/worktrees/perch.mvp"
 }
