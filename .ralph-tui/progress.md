@@ -31,3 +31,18 @@ after each iteration and it's included in prompts for context.
   - Wrapping theme check in try/except handles the case where the widget isn't yet mounted
 ---
 
+## 2026-03-16 - perch-54y.3
+- Added `worktree_root: Path | None = None` param to `FileViewer.__init__()`, app passes it in `compose()`
+- Added `_diff_mode: bool = False` attribute and `d` key binding to toggle diff view
+- Added `_load_diff()` method — gets relative path, calls `get_diff()`, renders with `Syntax("diff")` lexer
+- Shows "No changes" message for clean files
+- `load_file()` resets `_diff_mode` when navigating to a new file
+- `watch_theme()` in app.py respects diff mode during re-render
+- Files changed: `src/perch/widgets/file_viewer.py`, `src/perch/app.py`
+- **Learnings:**
+  - Textual `Binding("d", "action_name", "Label", show=False)` keeps binding off the footer
+  - `rich.syntax.Syntax` with `"diff"` lexer handles `+`/`-` line coloring automatically (green/red)
+  - Lazy import of `get_diff` inside `_load_diff()` avoids circular import issues
+  - Pre-existing flaky test: `test_splitter_width_is_one` intermittently fails; `test_has_tabbed_content` fails due to `GitStatusPanel` `#git-header` query in non-git worktree
+---
+

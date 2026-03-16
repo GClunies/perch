@@ -7,6 +7,7 @@ from pathlib import Path
 from rich.console import Group
 from rich.syntax import Syntax
 from rich.text import Text
+from textual.binding import Binding
 from textual.containers import VerticalScroll
 from textual.widgets import Static
 
@@ -40,9 +41,14 @@ def read_file_content(path: Path) -> tuple[str, bool]:
 class FileViewer(VerticalScroll):
     """Displays file content with syntax highlighting and line numbers."""
 
+    BINDINGS = [
+        Binding("d", "toggle_diff", "Toggle Diff", show=False),
+    ]
+
     def __init__(
         self,
         *,
+        worktree_root: Path | None = None,
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
@@ -50,6 +56,8 @@ class FileViewer(VerticalScroll):
         super().__init__(name=name, id=id, classes=classes)
         self._content = Static("No file selected", id="file-content")
         self._current_path: Path | None = None
+        self.worktree_root: Path | None = worktree_root
+        self._diff_mode: bool = False
 
     def _get_syntax_theme(self) -> str:
         """Return a Pygments theme appropriate for the current app theme."""
@@ -66,6 +74,7 @@ class FileViewer(VerticalScroll):
     def load_file(self, path: Path) -> None:
         """Load and display a file with syntax highlighting."""
         self._current_path = path
+        self._diff_mode = False
 
         if not path.is_file():
             self._content.update("Not a file")
@@ -102,3 +111,46 @@ class FileViewer(VerticalScroll):
             self._content.update(syntax)
 
         self.scroll_home(animate=False)
+
+    def _load_diff(self) -> None:
+        """Load and display the diff for the current file."""
+        if self._current_path is None or self.worktree_root is None:
+            self._content.update(Text("No file selected", style="dim italic"))
+            return
+
+        from perch.services.git import get_diff
+
+        try:
+            rel_path = str(self._current_path.relative_to(self.worktree_root))
+        except ValueError:
+            self._content.update(Text("File not in worktree", style="dim italic"))
+            return
+
+        try:
+            diff_text = get_diff(self.worktree_root, rel_path)
+        except RuntimeError as e:
+            self._content.update(f"Error getting diff: {e}")
+            return
+
+        if not diff_text:
+            self._content.update(Text("No changes", style="dim italic"))
+        else:
+            syntax = Syntax(
+                diff_text,
+                "diff",
+                line_numbers=True,
+                word_wrap=False,
+                theme=self._get_syntax_theme(),
+            )
+            self._content.update(syntax)
+        self.scroll_home(animate=False)
+
+    def action_toggle_diff(self) -> None:
+        """Toggle between normal file view and diff view."""
+        if self._current_path is None:
+            return
+        self._diff_mode = not self._diff_mode
+        if self._diff_mode:
+            self._load_diff()
+        else:
+            self.load_file(self._current_path)

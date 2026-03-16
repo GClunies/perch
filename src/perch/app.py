@@ -52,7 +52,10 @@ class PerchApp(App):
         except Exception:
             return
         if viewer._current_path is not None:
-            viewer.load_file(viewer._current_path)
+            if viewer._diff_mode:
+                viewer._load_diff()
+            else:
+                viewer.load_file(viewer._current_path)
 
     def on_mount(self) -> None:
         if self._branch:
@@ -64,7 +67,7 @@ class PerchApp(App):
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="main-content"):
-            yield FileViewer(id="left-pane")
+            yield FileViewer(worktree_root=self.worktree_path, id="left-pane")
             yield DraggableSplitter()
             with TabbedContent(id="right-pane"):
                 with TabPane("Files", id="tab-files"):

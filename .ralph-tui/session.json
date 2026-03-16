@@ -3,10 +3,10 @@
   "sessionId": "9e4aaf80-c013-42c3-ad69-a858c611341c",
   "status": "running",
   "startedAt": "2026-03-16T20:45:15.616Z",
-  "updatedAt": "2026-03-16T21:29:19.141Z",
-  "currentIteration": 1,
+  "updatedAt": "2026-03-16T21:31:54.680Z",
+  "currentIteration": 2,
   "maxIterations": 100,
-  "tasksCompleted": 1,
+  "tasksCompleted": 2,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -23,8 +23,8 @@
       {
         "id": "perch-54y.2",
         "title": "US-002: File Viewer — Theme-Aware Syntax Highlighting",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-54y.3",
@@ -86,6 +86,16 @@
       "durationMs": 215688,
       "startedAt": "2026-03-16T21:24:01.054Z",
       "endedAt": "2026-03-16T21:27:36.742Z"
+    },
+    {
+      "iteration": 2,
+      "status": "completed",
+      "taskId": "perch-54y.2",
+      "taskTitle": "US-002: File Viewer — Theme-Aware Syntax Highlighting",
+      "taskCompleted": true,
+      "durationMs": 98623,
+      "startedAt": "2026-03-16T21:27:40.281Z",
+      "endedAt": "2026-03-16T21:29:18.904Z"
     }
   ],
   "skippedTaskIds": [],
