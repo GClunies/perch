@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "sessionId": "754cca3d-b476-454a-8c3f-349fc72b30a1",
+  "status": "running",
+  "startedAt": "2026-03-16T10:52:51.540Z",
+  "updatedAt": "2026-03-16T10:55:14.244Z",
+  "currentIteration": 0,
+  "maxIterations": 10,
+  "tasksCompleted": 0,
+  "isPaused": false,
+  "agentPlugin": "claude",
+  "trackerState": {
+    "plugin": "beads-bv",
+    "epicId": "perch-14u",
+    "totalTasks": 12,
+    "tasks": [
+      {
+        "id": "perch-14u.1",
+        "title": "US-001: Project Scaffolding and Basic App Shell",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-14u.2",
+        "title": "US-002: File Viewer with Syntax Highlighting",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-14u.3",
+        "title": "US-003: File Tree with Directory Filtering",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-14u.4",
+        "title": "US-004: Tabbed Right Pane with Tree-to-Viewer Wiring",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-14u.5",
+        "title": "US-005: Draggable Splitter",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-14u.6",
+        "title": "US-006: Data Models and Git Service Layer",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-14u.7",
+        "title": "US-007: Git Status Panel Widget",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-14u.8",
+        "title": "US-008: Editor Integration",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-14u.9",
+        "title": "US-009: GitHub Service and PR Context Panel",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-14u.10",
+        "title": "US-010: Fuzzy File Search Modal",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-14u.11",
+        "title": "US-011: Command Palette",
+        "status": "open",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-14u.12",
+        "title": "US-012: Polish — Header, Footer, Edge Cases, and Packaging",
+        "status": "open",
+        "completedInSession": false
+      }
+    ]
+  },
+  "iterations": [],
+  "skippedTaskIds": [],
+  "cwd": "/Users/gclunies/.worktrunk/worktrees/perch.mvp",
+  "activeTaskIds": [],
+  "subagentPanelVisible": false
+}

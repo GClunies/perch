@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "perch"
+version = "0.1.0"
+description = "A vantage point for agentic workflows"
+requires-python = ">=3.12"
+dependencies = [
+    "textual>=1.0.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+perch = "perch.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/perch"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.8.0",
+    "ty>=0.0.1a1",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

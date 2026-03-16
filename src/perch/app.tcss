@@ -1,0 +1,11 @@
+#left-pane {
+    width: 60%;
+    height: 100%;
+    border: solid green;
+}
+
+#right-pane {
+    width: 1fr;
+    height: 100%;
+    border: solid blue;
+}
