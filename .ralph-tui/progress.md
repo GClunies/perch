@@ -91,3 +91,17 @@ after each iteration and it's included in prompts for context.
   - Moving watching logic into the widget itself (vs. app) gives cleaner lifecycle management via `on_mount`/`on_unmount`
 ---
 
+## 2026-03-16 - perch-54y.7
+- Replaced `Collapsible` + `Label` with `Static` section headers + `ListView`/`ListItem` for Unstaged, Staged, and Untracked file sections
+- Added `_make_list_item()` helper to create `ListItem` with styled status + path and `name=f.path`
+- Commits section remains unchanged (`Collapsible` + `DataTable`)
+- Added CSS: `GitStatusPanel ListView { height: auto; max-height: 15; }`, `GitStatusPanel ListItem { height: 1; }`, `.section-header` styling
+- `_show_not_git_repo` updated to hide `ListView` widgets and section headers instead of `Collapsible`
+- Files changed: `src/perch/widgets/git_status.py`, `src/perch/app.tcss`
+- **Learnings:**
+  - `ListView.clear()` removes all items; `ListView.append()` adds items — simpler than recreating the widget
+  - `ListItem(Label(text), name=path)` stores the file path in `.name` for later retrieval when handling selection
+  - `_render_file_list` is still exported for backward compat with existing tests but no longer used by the widget itself
+  - Section headers as `Static` with a CSS class are simpler than `Collapsible(collapsed=False)` for always-visible sections
+---
+

@@ -3,10 +3,10 @@
   "sessionId": "9e4aaf80-c013-42c3-ad69-a858c611341c",
   "status": "running",
   "startedAt": "2026-03-16T20:45:15.616Z",
-  "updatedAt": "2026-03-16T21:41:53.590Z",
-  "currentIteration": 5,
+  "updatedAt": "2026-03-16T21:44:06.825Z",
+  "currentIteration": 6,
   "maxIterations": 100,
-  "tasksCompleted": 5,
+  "tasksCompleted": 6,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -47,8 +47,8 @@
       {
         "id": "perch-54y.6",
         "title": "US-006: File Tree — Filesystem Watching for Auto-Refresh",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-54y.7",
@@ -126,6 +126,16 @@
       "durationMs": 122407,
       "startedAt": "2026-03-16T21:36:56.613Z",
       "endedAt": "2026-03-16T21:38:59.020Z"
+    },
+    {
+      "iteration": 6,
+      "status": "completed",
+      "taskId": "perch-54y.6",
+      "taskTitle": "US-006: File Tree — Filesystem Watching for Auto-Refresh",
+      "taskCompleted": true,
+      "durationMs": 171386,
+      "startedAt": "2026-03-16T21:39:01.974Z",
+      "endedAt": "2026-03-16T21:41:53.360Z"
     }
   ],
   "skippedTaskIds": [],

@@ -7,7 +7,7 @@ from pathlib import Path
 from rich.text import Text
 from textual import work
 from textual.containers import VerticalScroll
-from textual.widgets import Collapsible, DataTable, Label, Static
+from textual.widgets import Collapsible, DataTable, Label, ListItem, ListView, Static
 
 from perch.models import GitFile, GitStatusData
 
@@ -36,6 +36,15 @@ def _render_file_list(files: list[GitFile]) -> Text:
     return text
 
 
+def _make_list_item(f: GitFile) -> ListItem:
+    """Create a ListItem for a GitFile entry with styled status + path."""
+    style = _STATUS_STYLES.get(f.status, "")
+    text = Text()
+    text.append(f"{f.status:<12}", style=style)
+    text.append(f" {f.path}")
+    return ListItem(Label(text), name=f.path)
+
+
 class GitStatusPanel(VerticalScroll):
     """Displays git status: unstaged/staged/untracked files and recent commits."""
 
@@ -56,9 +65,12 @@ class GitStatusPanel(VerticalScroll):
 
     def compose(self):
         yield Static("Loading git status...", id="git-header")
-        yield Collapsible(Label(""), title="Unstaged Changes", id="git-unstaged")
-        yield Collapsible(Label(""), title="Staged Changes", id="git-staged")
-        yield Collapsible(Label(""), title="Untracked Files", id="git-untracked")
+        yield Static("Unstaged Changes", classes="section-header")
+        yield ListView(id="git-unstaged")
+        yield Static("Staged Changes", classes="section-header")
+        yield ListView(id="git-staged")
+        yield Static("Untracked Files", classes="section-header")
+        yield ListView(id="git-untracked")
         yield Collapsible(
             DataTable(id="commits-table"),
             title="Recent Commits",
@@ -89,36 +101,42 @@ class GitStatusPanel(VerticalScroll):
         header.update(
             Text("Not a git repository", style="bold red")
         )
-        for cid in ("git-unstaged", "git-staged", "git-untracked", "git-commits"):
-            self.query_one(f"#{cid}", Collapsible).display = False
+        for cid in ("git-unstaged", "git-staged", "git-untracked"):
+            self.query_one(f"#{cid}", ListView).display = False
+        self.query_one("#git-commits", Collapsible).display = False
+        for sh in self.query(".section-header"):
+            sh.display = False
 
     def _update_display(self, status: GitStatusData, commits: list) -> None:
         header = self.query_one("#git-header", Static)
         header.update("")
 
         # Unstaged
-        section = self.query_one("#git-unstaged", Collapsible)
-        section.display = True
+        lv = self.query_one("#git-unstaged", ListView)
+        lv.clear()
         if status.unstaged:
-            section.query_one(Label).update(_render_file_list(status.unstaged))
+            for f in status.unstaged:
+                lv.append(_make_list_item(f))
         else:
-            section.query_one(Label).update(Text("No unstaged changes", style="dim"))
+            lv.append(ListItem(Label(Text("No unstaged changes", style="dim"))))
 
         # Staged
-        section = self.query_one("#git-staged", Collapsible)
-        section.display = True
+        lv = self.query_one("#git-staged", ListView)
+        lv.clear()
         if status.staged:
-            section.query_one(Label).update(_render_file_list(status.staged))
+            for f in status.staged:
+                lv.append(_make_list_item(f))
         else:
-            section.query_one(Label).update(Text("No staged changes", style="dim"))
+            lv.append(ListItem(Label(Text("No staged changes", style="dim"))))
 
         # Untracked
-        section = self.query_one("#git-untracked", Collapsible)
-        section.display = True
+        lv = self.query_one("#git-untracked", ListView)
+        lv.clear()
         if status.untracked:
-            section.query_one(Label).update(_render_file_list(status.untracked))
+            for f in status.untracked:
+                lv.append(_make_list_item(f))
         else:
-            section.query_one(Label).update(Text("No untracked files", style="dim"))
+            lv.append(ListItem(Label(Text("No untracked files", style="dim"))))
 
         # Commits
         commits_section = self.query_one("#git-commits", Collapsible)
