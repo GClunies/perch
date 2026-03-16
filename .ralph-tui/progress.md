@@ -118,3 +118,15 @@ after each iteration and it's included in prompts for context.
   - For deleted files, directly setting viewer internal state (`_diff_mode`, `_current_path`) and rendering diff inline avoids needing a separate "deleted file viewer" widget
 ---
 
+## 2026-03-16 - perch-54y.9
+- Added `_save_cursor_state()` and `_restore_cursor_state()` methods to `GitStatusPanel` for preserving ListView cursor position across refreshes
+- Extracted `_update_list_view()` helper that wraps save/clear/repopulate/restore cycle for each section
+- Cursor restoration prefers matching by file name (handles list reordering), falls back to clamped index
+- Files changed: `src/perch/widgets/git_status.py`
+- **Learnings:**
+  - `ListView.index` is the cursor position; reading it before `clear()` and setting it after `append()` preserves position
+  - `lv.children[i]` gives the `ListItem` at index `i`; `ListItem.name` stores the file path set during creation
+  - Matching by name first (then falling back to clamped index) handles the case where items are reordered or removed
+  - Pre-existing flaky test `test_has_tabbed_content` still fails (non-git worktree issue) — unrelated to this change
+---
+

@@ -116,36 +116,63 @@ class GitStatusPanel(VerticalScroll):
         for sh in self.query(".section-header"):
             sh.display = False
 
+    def _save_cursor_state(
+        self, lv: ListView
+    ) -> tuple[int, str | None]:
+        """Save the current cursor index and selected file name for a ListView."""
+        index = lv.index or 0
+        selected_name: str | None = None
+        if lv.index is not None and 0 <= lv.index < len(lv):
+            item = lv.children[lv.index]
+            if isinstance(item, ListItem) and item.name is not None:
+                selected_name = item.name
+        return index, selected_name
+
+    def _restore_cursor_state(
+        self, lv: ListView, saved_index: int, saved_name: str | None
+    ) -> None:
+        """Restore cursor position, preferring the previously selected file name."""
+        if len(lv) == 0:
+            return
+        # Try to find the previously selected file by name
+        if saved_name is not None:
+            for i, child in enumerate(lv.children):
+                if isinstance(child, ListItem) and child.name == saved_name:
+                    lv.index = i
+                    return
+        # Fall back to saved index, clamped to valid range
+        lv.index = min(saved_index, len(lv) - 1)
+
+    def _update_list_view(
+        self,
+        lv_id: str,
+        files: list[GitFile],
+        empty_message: str,
+    ) -> None:
+        """Update a ListView, preserving cursor position across refresh."""
+        lv = self.query_one(f"#{lv_id}", ListView)
+        saved_index, saved_name = self._save_cursor_state(lv)
+        lv.clear()
+        if files:
+            for f in files:
+                lv.append(_make_list_item(f))
+        else:
+            lv.append(ListItem(Label(Text(empty_message, style="dim"))))
+        self._restore_cursor_state(lv, saved_index, saved_name)
+
     def _update_display(self, status: GitStatusData, commits: list) -> None:
         header = self.query_one("#git-header", Static)
         header.update("")
 
-        # Unstaged
-        lv = self.query_one("#git-unstaged", ListView)
-        lv.clear()
-        if status.unstaged:
-            for f in status.unstaged:
-                lv.append(_make_list_item(f))
-        else:
-            lv.append(ListItem(Label(Text("No unstaged changes", style="dim"))))
-
-        # Staged
-        lv = self.query_one("#git-staged", ListView)
-        lv.clear()
-        if status.staged:
-            for f in status.staged:
-                lv.append(_make_list_item(f))
-        else:
-            lv.append(ListItem(Label(Text("No staged changes", style="dim"))))
-
-        # Untracked
-        lv = self.query_one("#git-untracked", ListView)
-        lv.clear()
-        if status.untracked:
-            for f in status.untracked:
-                lv.append(_make_list_item(f))
-        else:
-            lv.append(ListItem(Label(Text("No untracked files", style="dim"))))
+        self._update_list_view(
+            "git-unstaged", status.unstaged, "No unstaged changes"
+        )
+        self._update_list_view(
+            "git-staged", status.staged, "No staged changes"
+        )
+        self._update_list_view(
+            "git-untracked", status.untracked, "No untracked files"
+        )
 
         # Commits
         commits_section = self.query_one("#git-commits", Collapsible)

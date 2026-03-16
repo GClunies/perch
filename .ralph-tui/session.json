@@ -3,10 +3,10 @@
   "sessionId": "9e4aaf80-c013-42c3-ad69-a858c611341c",
   "status": "running",
   "startedAt": "2026-03-16T20:45:15.616Z",
-  "updatedAt": "2026-03-16T21:46:21.485Z",
-  "currentIteration": 7,
+  "updatedAt": "2026-03-16T21:48:00.930Z",
+  "currentIteration": 8,
   "maxIterations": 100,
-  "tasksCompleted": 7,
+  "tasksCompleted": 8,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -59,8 +59,8 @@
       {
         "id": "perch-54y.8",
         "title": "US-008: Git Tab — File Selection Links to File Viewer",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-54y.9",
@@ -146,6 +146,16 @@
       "durationMs": 130643,
       "startedAt": "2026-03-16T21:41:55.944Z",
       "endedAt": "2026-03-16T21:44:06.587Z"
+    },
+    {
+      "iteration": 8,
+      "status": "completed",
+      "taskId": "perch-54y.8",
+      "taskTitle": "US-008: Git Tab — File Selection Links to File Viewer",
+      "taskCompleted": true,
+      "durationMs": 131721,
+      "startedAt": "2026-03-16T21:44:09.535Z",
+      "endedAt": "2026-03-16T21:46:21.256Z"
     }
   ],
   "skippedTaskIds": [],
