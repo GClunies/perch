@@ -9,6 +9,7 @@ from perch.widgets.file_tree import WorktreeFileTree
 from perch.widgets.file_viewer import FileViewer
 from perch.widgets.git_status import GitStatusPanel
 from perch.widgets.pr_context import PRContextPanel
+from perch.widgets.splitter import DraggableSplitter
 
 
 class PerchApp(App):
@@ -23,6 +24,8 @@ class PerchApp(App):
         ("shift+tab", "focus_prev_pane", "Prev Pane"),
         ("ctrl+p", "file_search", "Search Files"),
         ("e", "open_editor", "Open in Editor"),
+        ("left_square_bracket", "shrink_left_pane", "Shrink Left"),
+        ("right_square_bracket", "grow_left_pane", "Grow Left"),
     ]
 
     def __init__(self, worktree_path: Path, editor: str | None = None) -> None:
@@ -32,6 +35,7 @@ class PerchApp(App):
 
     def compose(self) -> ComposeResult:
         yield FileViewer(id="left-pane")
+        yield DraggableSplitter()
         with TabbedContent(id="right-pane"):
             with TabPane("Files", id="tab-files"):
                 yield WorktreeFileTree(self.worktree_path)
@@ -81,3 +85,11 @@ class PerchApp(App):
         viewer = self.query_one(FileViewer)
         if viewer._current_path is not None:
             open_file(self.editor, viewer._current_path, self.worktree_path)
+
+    def action_shrink_left_pane(self) -> None:
+        """Shrink the left pane by 2 columns."""
+        self.query_one(DraggableSplitter).resize_left_pane(-2)
+
+    def action_grow_left_pane(self) -> None:
+        """Grow the left pane by 2 columns."""
+        self.query_one(DraggableSplitter).resize_left_pane(2)

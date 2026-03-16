@@ -145,3 +145,19 @@ after each iteration and it's included in prompts for context.
   - Lazy imports of service functions inside `@work` methods keeps the widget module free of subprocess concerns at import time
 ---
 
+## 2026-03-16 - perch-14u.5
+- Implemented DraggableSplitter widget for US-005
+- Files created:
+  - `src/perch/widgets/splitter.py` — `DraggableSplitter(Widget)` with mouse drag capture, hover/drag highlight, `resize_left_pane(delta)` method, min width enforcement
+  - `tests/test_splitter.py` — 9 tests covering composition, clamping logic, and keyboard resize
+- Files modified:
+  - `src/perch/app.py` — added `DraggableSplitter` between FileViewer and TabbedContent, added `[`/`]` keybindings mapped to `action_shrink_left_pane`/`action_grow_left_pane`
+  - `src/perch/app.tcss` — added `Screen { layout: horizontal; }` to ensure side-by-side layout
+- **Learnings:**
+  - `widget.size.width` returns content area (excludes borders/padding); `widget.outer_size.width` includes borders — use `outer_size` when reading current width for resize calculations since `styles.width` sets the outer width
+  - Textual key names for `[`/`]` are `left_square_bracket`/`right_square_bracket` — use these in both BINDINGS and `pilot.press()`
+  - `DraggableSplitter` DEFAULT_CSS handles width (1 col), hover styling, and drag styling via `-dragging` class
+  - `capture_mouse()` / `release_mouse()` in Textual allows a widget to receive all mouse events during drag
+  - Screen default layout is `vertical` — must explicitly set `Screen { layout: horizontal; }` for side-by-side panes
+---
+

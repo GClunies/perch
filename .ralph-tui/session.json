@@ -3,10 +3,10 @@
   "sessionId": "754cca3d-b476-454a-8c3f-349fc72b30a1",
   "status": "running",
   "startedAt": "2026-03-16T10:52:51.540Z",
-  "updatedAt": "2026-03-16T11:16:39.135Z",
-  "currentIteration": 8,
+  "updatedAt": "2026-03-16T11:25:19.337Z",
+  "currentIteration": 9,
   "maxIterations": 10,
-  "tasksCompleted": 8,
+  "tasksCompleted": 9,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -53,8 +53,8 @@
       {
         "id": "perch-14u.7",
         "title": "US-007: Git Status Panel Widget",
-        "status": "open",
-        "completedInSession": false
+        "status": "completed",
+        "completedInSession": true
       },
       {
         "id": "perch-14u.8",
@@ -168,6 +168,16 @@
       "durationMs": 102866,
       "startedAt": "2026-03-16T11:12:20.798Z",
       "endedAt": "2026-03-16T11:14:03.664Z"
+    },
+    {
+      "iteration": 9,
+      "status": "completed",
+      "taskId": "perch-14u.7",
+      "taskTitle": "US-007: Git Status Panel Widget",
+      "taskCompleted": true,
+      "durationMs": 149544,
+      "startedAt": "2026-03-16T11:14:08.311Z",
+      "endedAt": "2026-03-16T11:16:37.855Z"
     }
   ],
   "skippedTaskIds": [],

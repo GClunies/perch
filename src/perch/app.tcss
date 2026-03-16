@@ -1,3 +1,7 @@
+Screen {
+    layout: horizontal;
+}
+
 #left-pane {
     width: 60%;
     height: 100%;
