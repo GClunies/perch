@@ -130,3 +130,13 @@ after each iteration and it's included in prompts for context.
   - Pre-existing flaky test `test_has_tabbed_content` still fails (non-git worktree issue) — unrelated to this change
 ---
 
+## 2026-03-16 - perch-54y.10
+- Added "Toggle Diff View" (`d`) and "Toggle Diff Layout" (`s`) commands to `COMMANDS` list in `commands.py`
+- Added `action_toggle_diff()` and `action_toggle_diff_layout()` app-level actions in `app.py` that delegate to `FileViewer`
+- CSS for `#diff-container`, `#diff-left`, `#diff-right` was already in place from US-004
+- Files changed: `src/perch/commands.py`, `src/perch/app.py`
+- **Learnings:**
+  - Command palette commands run app-level actions, so widget-level actions need thin app-level wrappers that delegate via `query_one(Widget).action_name()`
+  - The `COMMANDS` list format is `(display_name, hotkey_display, action_name)` where `action_name` maps to `action_<name>` on the app
+---
+

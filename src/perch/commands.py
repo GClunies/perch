@@ -17,6 +17,8 @@ COMMANDS: list[tuple[str, str, str]] = [
     ("Open in Editor", "e", "open_editor"),
     ("Shrink Left Pane", "[", "shrink_left_pane"),
     ("Grow Left Pane", "]", "grow_left_pane"),
+    ("Toggle Diff View", "d", "toggle_diff"),
+    ("Toggle Diff Layout", "s", "toggle_diff_layout"),
 ]
 
 

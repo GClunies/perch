@@ -163,6 +163,14 @@ class PerchApp(App):
         if viewer._current_path is not None:
             open_file(self.editor, viewer._current_path, self.worktree_path)
 
+    def action_toggle_diff(self) -> None:
+        """Toggle diff view in the file viewer (command palette entry)."""
+        self.query_one(FileViewer).action_toggle_diff()
+
+    def action_toggle_diff_layout(self) -> None:
+        """Toggle diff layout in the file viewer (command palette entry)."""
+        self.query_one(FileViewer).action_toggle_diff_layout()
+
     def action_shrink_left_pane(self) -> None:
         """Shrink the left pane by 2 columns."""
         self.query_one(DraggableSplitter).resize_left_pane(-2)
