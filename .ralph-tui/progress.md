@@ -63,3 +63,16 @@ after each iteration and it's included in prompts for context.
   - `display = False` / `display = True` is the standard Textual pattern for showing/hiding widgets
 ---
 
+## 2026-03-16 - perch-54y.5
+- Added `_git_status: dict[str, str]` attribute to `WorktreeFileTree` for O(1) status lookup
+- Overrode `render_label()` to append color-coded git status letter (M/A/D/R/C/U/T/?) after file names
+- Colors match `_STATUS_STYLES` in `git_status.py`: modified=yellow, added=green, deleted=red, renamed=cyan, untracked=dim
+- Added `_refresh_file_tree_status()` background worker in `app.py` to populate `_git_status` from `get_status_dict()` on mount
+- Files changed: `src/perch/widgets/file_tree.py`, `src/perch/app.py`
+- **Learnings:**
+  - `DirectoryTree.render_label(node, base_style, style)` returns a `rich.text.Text` — call `super()` first, then `label.append()` to add indicators
+  - `node._allow_expand` distinguishes directories from files; `node.data.path` gives the absolute path
+  - `path.relative_to(self.path)` converts absolute node path to relative for `_git_status` dict lookup
+  - `root.refresh()` triggers re-render of the entire tree after status update
+---
+

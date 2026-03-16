@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from textual import work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Footer, Header, TabbedContent, TabPane
@@ -63,6 +64,7 @@ class PerchApp(App):
         else:
             self.title = "perch"
         self.sub_title = str(self.worktree_path)
+        self._refresh_file_tree_status()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -127,3 +129,19 @@ class PerchApp(App):
     def action_grow_left_pane(self) -> None:
         """Grow the left pane by 2 columns."""
         self.query_one(DraggableSplitter).resize_left_pane(2)
+
+    @work(thread=True)
+    def _refresh_file_tree_status(self) -> None:
+        """Fetch git status dict and update the file tree indicators."""
+        from perch.services.git import get_status_dict
+
+        try:
+            status = get_status_dict(self.worktree_path)
+        except RuntimeError:
+            return
+        self.app.call_from_thread(self._apply_file_tree_status, status)
+
+    def _apply_file_tree_status(self, status: dict[str, str]) -> None:
+        tree = self.query_one(WorktreeFileTree)
+        tree._git_status = status
+        tree.root.refresh()
