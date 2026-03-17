@@ -31,6 +31,7 @@ class PRReview:
     state: str
     body: str
     submitted_at: str
+    url: str = ""
 
 
 @dataclass
@@ -38,6 +39,7 @@ class PRComment:
     author: str
     body: str
     created_at: str
+    url: str = ""
 
 
 @dataclass
@@ -55,6 +57,7 @@ class PRContext:
     number: int
     url: str
     review_decision: str
+    body: str = ""
     reviews: list[PRReview] = field(default_factory=list)
     comments: list[PRComment] = field(default_factory=list)
     checks: list[CICheck] = field(default_factory=list)

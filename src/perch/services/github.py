@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -24,7 +25,7 @@ def get_pr_context(root: Path) -> PRContext | None:
             "pr",
             "view",
             "--json",
-            "title,number,url,reviewDecision,reviews,comments",
+            "title,number,url,body,reviewDecision,reviews,comments",
         ],
         cwd=root,
     )
@@ -40,12 +41,15 @@ def parse_pr_view(raw: str) -> PRContext | None:
     except (json.JSONDecodeError, TypeError):
         return None
 
+    pr_url = data.get("url", "")
+
     reviews = [
         PRReview(
             author=r.get("author", {}).get("login", "unknown"),
             state=r.get("state", ""),
             body=r.get("body", ""),
             submitted_at=r.get("submittedAt", ""),
+            url=r.get("url", "") or pr_url,
         )
         for r in data.get("reviews", [])
     ]
@@ -55,6 +59,7 @@ def parse_pr_view(raw: str) -> PRContext | None:
             author=c.get("author", {}).get("login", "unknown"),
             body=c.get("body", ""),
             created_at=c.get("createdAt", ""),
+            url=c.get("url", "") or pr_url,
         )
         for c in data.get("comments", [])
     ]
@@ -64,6 +69,7 @@ def parse_pr_view(raw: str) -> PRContext | None:
         number=data.get("number", 0),
         url=data.get("url", ""),
         review_decision=data.get("reviewDecision", "") or "",
+        body=data.get("body", ""),
         reviews=reviews,
         comments=comments,
     )
@@ -102,3 +108,32 @@ def parse_checks(raw: str) -> list[CICheck]:
         )
         for c in data
     ]
+
+
+def parse_ci_link(link: str) -> tuple[str, str] | None:
+    """Extract (run_id, job_id) from a GitHub Actions job link."""
+    m = re.search(r"/actions/runs/(\d+)/job/(\d+)", link)
+    if m:
+        return m.group(1), m.group(2)
+    return None
+
+
+def get_job_log(link: str, cwd: Path) -> str:
+    """Fetch CI job logs from GitHub Actions."""
+    ids = parse_ci_link(link)
+    if ids is None:
+        return f"Cannot parse job URL: {link}"
+
+    run_id, job_id = ids
+    result = _run_gh(
+        ["run", "view", run_id, "--log", "-j", job_id],
+        cwd=cwd,
+    )
+    if result.returncode != 0:
+        result = _run_gh(
+            ["run", "view", run_id, "--log-failed", "-j", job_id],
+            cwd=cwd,
+        )
+    if result.returncode != 0:
+        return f"Failed to fetch logs: {result.stderr.strip()}"
+    return result.stdout

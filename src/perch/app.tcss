@@ -47,7 +47,8 @@ GitStatusPanel, PRContextPanel {
 }
 
 GitStatusPanel > ListItem,
-PRContextPanel > ListItem {
+PRContextPanel > ListItem,
+PRContextPanel > ClickableItem {
     height: auto;
     width: auto;
 }

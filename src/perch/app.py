@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
@@ -34,8 +35,8 @@ class PerchApp(App):
         Binding("n", "next_diff_file", "Next File", show=False),
         Binding("p", "prev_diff_file", "Prev File", show=False),
         Binding("e", "open_editor", "Editor", show=False),
-        Binding("[", "shrink_left_pane", "", show=False),
-        Binding("]", "grow_left_pane", "", show=False),
+        Binding("left_square_bracket", "shrink_left_pane", "", show=False),
+        Binding("right_square_bracket", "grow_left_pane", "", show=False),
     ]
 
     def __init__(self, worktree_path: Path, editor: str | None = None) -> None:
@@ -199,6 +200,100 @@ class PerchApp(App):
         viewer.worktree_root = self.worktree_path
         viewer.load_commit_diff(event.commit_hash)
         viewer.focus()
+
+    def on_prcontext_panel_preview_requested(
+        self, event: PRContextPanel.PreviewRequested
+    ) -> None:
+        """Show preview content in the FileViewer when a PR item is highlighted."""
+        viewer = self.query_one(FileViewer)
+        if event.preview_kind == "pr_body":
+            self._show_pr_body(viewer, event.body)
+        elif event.preview_kind == "ci_check":
+            self._show_ci_loading(viewer)
+            self._fetch_ci_log(event.url)
+
+    def _show_pr_body(self, viewer: FileViewer, body: str) -> None:
+        from rich.console import Group
+        from rich.markdown import Markdown
+        from rich.text import Text
+
+        viewer._current_path = None
+        viewer._diff_mode = False
+        viewer._show_content_view()
+
+        if not body.strip():
+            viewer._content.update(Text("No PR description", style="dim italic"))
+            return
+
+        header = Text("PR Description\n", style="bold cyan")
+        viewer._content.update(Group(header, Markdown(body)))
+        viewer.scroll_home(animate=False)
+
+    def _show_ci_loading(self, viewer: FileViewer) -> None:
+        from rich.text import Text
+
+        viewer._current_path = None
+        viewer._diff_mode = False
+        viewer._show_content_view()
+        viewer._content.update(Text("Loading logs...", style="bold yellow"))
+
+    @work(thread=True, exclusive=True, group="ci_log")
+    def _fetch_ci_log(self, url: str) -> None:
+        from perch.services.github import get_job_log
+
+        log_text = get_job_log(url, self.worktree_path)
+        self.call_from_thread(self._show_ci_log, log_text)
+
+    def _show_ci_log(self, log_text: str) -> None:
+        import re
+
+        from rich.text import Text
+
+        viewer = self.query_one(FileViewer)
+        viewer._current_path = None
+        viewer._diff_mode = False
+        viewer._show_content_view()
+
+        if not log_text.strip():
+            viewer._content.update(
+                Text("No log output available", style="dim italic")
+            )
+            return
+
+        result = Text()
+        ansi_re = re.compile(r"\x1b\[[0-9;]*m")
+        current_group: str | None = None
+        for line in log_text.splitlines():
+            # Strip job/step/timestamp prefix: "job\tstep\t{timestamp} msg"
+            parts = line.split("\t", 2)
+            msg = parts[-1] if parts else line
+            # Strip ISO timestamp prefix (e.g. "2026-03-17T01:26:13.1234567Z ")
+            ts_match = re.match(r"\d{4}-\d{2}-\d{2}T[\d:.]+Z\s?", msg)
+            if ts_match:
+                msg = msg[ts_match.end() :]
+            # Strip ANSI escape codes
+            msg = ansi_re.sub("", msg)
+            # Parse GitHub Actions annotations
+            if msg.startswith("##[group]"):
+                current_group = msg[9:]
+                if result.plain:
+                    result.append("\n")
+                result.append(f"  {current_group}\n", style="bold cyan")
+                continue
+            if msg.startswith("##[endgroup]"):
+                current_group = None
+                continue
+            if msg.startswith("##[error]"):
+                result.append(f"  {msg[9:]}\n", style="bold red")
+                continue
+            if msg.startswith("##[warning]"):
+                result.append(f"  {msg[11:]}\n", style="yellow")
+                continue
+            # Regular log line
+            result.append(f"    {msg}\n")
+
+        viewer._content.update(result)
+        viewer.scroll_home(animate=False)
 
     def action_toggle_diff(self) -> None:
         """Toggle diff view in the file viewer (command palette entry)."""

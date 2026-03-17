@@ -8,6 +8,8 @@ from pathlib import Path
 from rich.text import Text
 from textual import work
 from textual.binding import Binding
+from textual.events import Click
+from textual.message import Message
 from textual.widgets import Label, ListItem, ListView
 
 from perch.models import CICheck, PRContext
@@ -29,6 +31,28 @@ _REVIEW_STYLES: dict[str, str] = {
 }
 
 
+class ClickableItem(ListItem):
+    """A ListItem that opens a URL when clicked."""
+
+    DEFAULT_CSS = """
+    ClickableItem {
+        height: auto;
+        width: auto;
+    }
+    """
+
+    def __init__(
+        self, *children, url: str = "", preview_kind: str = "", **kwargs
+    ) -> None:
+        super().__init__(*children, **kwargs)
+        self.url = url
+        self.preview_kind = preview_kind
+
+    def on_click(self, _event: Click) -> None:
+        if self.url:
+            webbrowser.open(self.url)
+
+
 def _make_section_header(title: str) -> ListItem:
     """Create a non-selectable section header."""
     text = Text(f"\n{title}", style="bold")
@@ -40,11 +64,19 @@ def _make_section_header(title: str) -> ListItem:
 class PRContextPanel(ListView):
     """Displays PR context: header, reviews, comments, and CI checks."""
 
+    class PreviewRequested(Message):
+        """Posted when the user highlights an item that has preview content."""
+
+        def __init__(self, preview_kind: str, url: str, body: str = "") -> None:
+            super().__init__()
+            self.preview_kind = preview_kind
+            self.url = url
+            self.body = body
+
     BINDINGS = [
         ("r", "refresh", "Refresh"),
-        ("enter", "open_item", "Open in GitHub"),
-        Binding("pageup", "page_up", "Page Up", show=False),
-        Binding("pagedown", "page_down", "Page Down", show=False),
+        Binding("pageup", "page_up", "", show=False),
+        Binding("pagedown", "page_down", "", show=False),
     ]
 
     def __init__(
@@ -59,7 +91,6 @@ class PRContextPanel(ListView):
         self._worktree_root = worktree_root
         self._pr_context: PRContext | None = None
         self._checks: list[CICheck] = []
-        self._item_urls: dict[int, str] = {}
 
     def on_mount(self) -> None:
         self.append(_make_section_header("Loading PR context..."))
@@ -83,7 +114,6 @@ class PRContextPanel(ListView):
 
     def _show_gh_missing(self) -> None:
         self.clear()
-        self._item_urls = {}
         text = Text(
             "gh CLI not found. Install it from https://cli.github.com/",
             style="bold red",
@@ -93,7 +123,6 @@ class PRContextPanel(ListView):
     def _update_display(self) -> None:
         pr = self._pr_context
         self.clear()
-        self._item_urls = {}
 
         if pr is None:
             text = Text("No PR open for this branch", style="dim italic")
@@ -108,7 +137,7 @@ class PRContextPanel(ListView):
         title_text.append(pr.title, style="bold")
         title_text.append("  ")
         title_text.append(f"[{decision}]", style=f"bold {style}")
-        idx = self._append_item(title_text, url=pr.url)
+        self._append_item(title_text, url=pr.url, preview_kind="pr_body")
 
         # Reviews
         self.append(_make_section_header("Reviews"))
@@ -122,7 +151,7 @@ class PRContextPanel(ListView):
                     text.append(f"  {r.submitted_at}", style="dim")
                 if r.body:
                     text.append(f"\n  {r.body}")
-                self._append_item(text, url=pr.url)
+                self._append_item(text, url=r.url)
         else:
             item = ListItem(Label(Text("  No reviews yet", style="dim")))
             item.disabled = True
@@ -138,38 +167,38 @@ class PRContextPanel(ListView):
                     text.append(f"  {c.created_at}", style="dim")
                 if c.body:
                     text.append(f"\n  {c.body}")
-                self._append_item(text, url=pr.url)
+                self._append_item(text, url=c.url)
         else:
             item = ListItem(Label(Text("  No comments", style="dim")))
             item.disabled = True
             self.append(item)
 
-        # CI Checks
-        self.append(_make_section_header("CI Checks"))
+        # Actions
+        self.append(_make_section_header("Actions"))
         if self._checks:
             for check in self._checks:
                 bucket_style = _BUCKET_STYLES.get(check.bucket, "")
+                status = check.bucket or check.state
                 text = Text()
-                text.append(
-                    f"  {check.bucket or check.state:<10}", style=bucket_style
-                )
-                text.append(f" {check.name}")
-                if check.workflow:
-                    text.append(f"  ({check.workflow})", style="dim")
-                self._append_item(text, url=check.link)
+                text.append(f"  {check.name}  ", style="bold")
+                text.append(status, style=bucket_style)
+                self._append_item(text, url=check.link, preview_kind="ci_check")
         else:
-            item = ListItem(Label(Text("  No checks", style="dim")))
+            item = ListItem(Label(Text("  No actions", style="dim")))
             item.disabled = True
             self.append(item)
 
-    def _append_item(self, text: Text, url: str = "") -> int:
-        """Append a selectable item and record its URL. Returns item index."""
-        item = ListItem(Label(text))
-        self.append(item)
-        idx = len(self) - 1
-        if url:
-            self._item_urls[idx] = url
-        return idx
+        # Select the first enabled item so Enter/click works immediately
+        for i, child in enumerate(self.children):
+            if isinstance(child, ListItem) and not child.disabled:
+                self.index = i
+                break
+
+    def _append_item(
+        self, text: Text, url: str = "", preview_kind: str = ""
+    ) -> None:
+        """Append a clickable item that opens a URL when clicked."""
+        self.append(ClickableItem(Label(text), url=url, preview_kind=preview_kind))
 
     def _page_size(self) -> int:
         return max(1, self.scrollable_content_region.height)
@@ -185,7 +214,27 @@ class PRContextPanel(ListView):
     def action_refresh(self) -> None:
         self._do_refresh()
 
-    def action_open_item(self) -> None:
-        """Open the selected item's URL in the browser."""
-        if self.index is not None and self.index in self._item_urls:
-            webbrowser.open(self._item_urls[self.index])
+    def action_select_cursor(self) -> None:
+        """Handle Enter key: open the URL for the highlighted item."""
+        item = self.highlighted_child
+        if isinstance(item, ClickableItem) and item.url:
+            webbrowser.open(item.url)
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
+        """Post a preview message when the user highlights an item."""
+        if event.item is None or not isinstance(event.item, ClickableItem):
+            return
+        if not event.item.preview_kind:
+            return
+
+        body = ""
+        if event.item.preview_kind == "pr_body" and self._pr_context:
+            body = self._pr_context.body
+
+        self.post_message(
+            self.PreviewRequested(
+                preview_kind=event.item.preview_kind,
+                url=event.item.url,
+                body=body,
+            )
+        )

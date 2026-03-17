@@ -223,19 +223,17 @@ class FileViewer(VerticalScroll):
         except Exception:
             return "monokai"
 
-    def _get_background_color(self) -> str:
+    def _get_background_color(self) -> str | None:
         """Return the Textual theme's surface color for Syntax background.
 
         This ensures the syntax highlighting background matches the app theme
         instead of using the Pygments theme's default background.
+        Returns None when no surface color is set, letting Syntax use its default.
         """
         try:
-            surface = self.app.current_theme.surface
-            if surface:
-                return surface
+            return self.app.current_theme.surface or None
         except Exception:
-            pass
-        return ""
+            return None
 
     def _is_dark_theme(self) -> bool:
         """Return True if the current app theme is dark."""
