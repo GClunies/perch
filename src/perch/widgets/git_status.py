@@ -6,9 +6,9 @@ from pathlib import Path
 
 from rich.text import Text
 from textual import work
-from textual.containers import VerticalScroll
 from textual.message import Message
-from textual.widgets import Collapsible, DataTable, Label, ListItem, ListView, Static
+from textual.binding import Binding
+from textual.widgets import Label, ListItem, ListView
 
 from perch.models import GitFile, GitStatusData
 
@@ -25,28 +25,26 @@ _STATUS_STYLES: dict[str, str] = {
 }
 
 
-def _render_file_list(files: list[GitFile]) -> Text:
-    """Render a list of GitFile entries as styled Rich text."""
-    text = Text()
-    for i, f in enumerate(files):
-        if i > 0:
-            text.append("\n")
-        style = _STATUS_STYLES.get(f.status, "")
-        text.append(f"  {f.status:<12}", style=style)
-        text.append(f" {f.path}")
-    return text
-
-
-def _make_list_item(f: GitFile) -> ListItem:
+def _make_file_item(f: GitFile, staged: bool = False) -> ListItem:
     """Create a ListItem for a GitFile entry with styled status + path."""
     style = _STATUS_STYLES.get(f.status, "")
     text = Text()
     text.append(f"{f.status:<12}", style=style)
     text.append(f" {f.path}")
-    return ListItem(Label(text), name=f.path)
+    item = ListItem(Label(text), name=f.path)
+    item._staged = staged  # type: ignore[attr-defined]
+    return item
 
 
-class GitStatusPanel(VerticalScroll):
+def _make_section_header(title: str) -> ListItem:
+    """Create a non-selectable section header ListItem."""
+    text = Text(f"\n{title}", style="bold")
+    item = ListItem(Label(text), classes="section-header")
+    item.disabled = True
+    return item
+
+
+class GitStatusPanel(ListView):
     """Displays git status: unstaged/staged/untracked files and recent commits."""
 
     class FileSelected(Message):
@@ -57,8 +55,17 @@ class GitStatusPanel(VerticalScroll):
             self.path = path
             self.staged = staged
 
+    class CommitSelected(Message):
+        """Posted when a commit is selected in the git status panel."""
+
+        def __init__(self, commit_hash: str) -> None:
+            super().__init__()
+            self.commit_hash = commit_hash
+
     BINDINGS = [
         ("r", "refresh", "Refresh"),
+        Binding("pageup", "page_up", "Page Up", show=False),
+        Binding("pagedown", "page_down", "Page Down", show=False),
     ]
 
     def __init__(
@@ -71,24 +78,10 @@ class GitStatusPanel(VerticalScroll):
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
         self._worktree_root = worktree_root
-
-    def compose(self):
-        yield Static("Loading git status...", id="git-header")
-        yield Static("Unstaged Changes", classes="section-header")
-        yield ListView(id="git-unstaged")
-        yield Static("Staged Changes", classes="section-header")
-        yield ListView(id="git-staged")
-        yield Static("Untracked Files", classes="section-header")
-        yield ListView(id="git-untracked")
-        yield Collapsible(
-            DataTable(id="commits-table"),
-            title="Recent Commits",
-            id="git-commits",
-        )
+        self._is_git_repo = True
 
     def on_mount(self) -> None:
-        table = self.query_one("#commits-table", DataTable)
-        table.add_columns("Hash", "Message", "Author", "When")
+        self.append(_make_section_header("Loading git status..."))
         self._do_refresh()
         self.set_interval(5, self._do_refresh)
 
@@ -106,101 +99,107 @@ class GitStatusPanel(VerticalScroll):
         self.app.call_from_thread(self._update_display, status, commits)
 
     def _show_not_git_repo(self) -> None:
-        header = self.query_one("#git-header", Static)
-        header.update(
-            Text("Not a git repository", style="bold red")
-        )
-        for cid in ("git-unstaged", "git-staged", "git-untracked"):
-            self.query_one(f"#{cid}", ListView).display = False
-        self.query_one("#git-commits", Collapsible).display = False
-        for sh in self.query(".section-header"):
-            sh.display = False
-
-    def _save_cursor_state(
-        self, lv: ListView
-    ) -> tuple[int, str | None]:
-        """Save the current cursor index and selected file name for a ListView."""
-        index = lv.index or 0
-        selected_name: str | None = None
-        if lv.index is not None and 0 <= lv.index < len(lv):
-            item = lv.children[lv.index]
-            if isinstance(item, ListItem) and item.name is not None:
-                selected_name = item.name
-        return index, selected_name
-
-    def _restore_cursor_state(
-        self, lv: ListView, saved_index: int, saved_name: str | None
-    ) -> None:
-        """Restore cursor position, preferring the previously selected file name."""
-        if len(lv) == 0:
-            return
-        # Try to find the previously selected file by name
-        if saved_name is not None:
-            for i, child in enumerate(lv.children):
-                if isinstance(child, ListItem) and child.name == saved_name:
-                    lv.index = i
-                    return
-        # Fall back to saved index, clamped to valid range
-        lv.index = min(saved_index, len(lv) - 1)
-
-    def _update_list_view(
-        self,
-        lv_id: str,
-        files: list[GitFile],
-        empty_message: str,
-    ) -> None:
-        """Update a ListView, preserving cursor position across refresh."""
-        lv = self.query_one(f"#{lv_id}", ListView)
-        saved_index, saved_name = self._save_cursor_state(lv)
-        lv.clear()
-        if files:
-            for f in files:
-                lv.append(_make_list_item(f))
-        else:
-            lv.append(ListItem(Label(Text(empty_message, style="dim"))))
-        self._restore_cursor_state(lv, saved_index, saved_name)
+        self._is_git_repo = False
+        self.clear()
+        text = Text("Not a git repository", style="bold red")
+        self.append(ListItem(Label(text)))
 
     def _update_display(self, status: GitStatusData, commits: list) -> None:
-        header = self.query_one("#git-header", Static)
-        header.update("")
+        # Save current selection
+        saved_name = self._get_selected_name()
 
-        self._update_list_view(
-            "git-unstaged", status.unstaged, "No unstaged changes"
-        )
-        self._update_list_view(
-            "git-staged", status.staged, "No staged changes"
-        )
-        self._update_list_view(
-            "git-untracked", status.untracked, "No untracked files"
-        )
+        self.clear()
 
-        # Commits
-        commits_section = self.query_one("#git-commits", Collapsible)
-        commits_section.display = True
-        table = self.query_one("#commits-table", DataTable)
-        table.clear()
+        # Unstaged
+        self.append(_make_section_header("Unstaged Changes"))
+        if status.unstaged:
+            for f in status.unstaged:
+                self.append(_make_file_item(f, staged=False))
+        else:
+            item = ListItem(Label(Text("  No unstaged changes", style="dim")))
+            item.disabled = True
+            self.append(item)
+
+        # Staged
+        self.append(_make_section_header("Staged Changes"))
+        if status.staged:
+            for f in status.staged:
+                self.append(_make_file_item(f, staged=True))
+        else:
+            item = ListItem(Label(Text("  No staged changes", style="dim")))
+            item.disabled = True
+            self.append(item)
+
+        # Untracked
+        self.append(_make_section_header("Untracked Files"))
+        if status.untracked:
+            for f in status.untracked:
+                self.append(_make_file_item(f, staged=False))
+        else:
+            item = ListItem(Label(Text("  No untracked files", style="dim")))
+            item.disabled = True
+            self.append(item)
+
+        # Recent commits
+        self.append(_make_section_header("Recent Commits"))
         for c in commits:
-            table.add_row(
-                Text(c.hash, style="cyan"),
-                c.message,
-                c.author,
-                Text(c.relative_time, style="dim"),
-            )
+            text = Text()
+            text.append(c.hash, style="cyan")
+            text.append(f" {c.message}  ")
+            text.append(c.author, style="dim")
+            text.append(f"  {c.relative_time}", style="dim")
+            item = ListItem(Label(text), name=f"commit:{c.hash}")
+            self.append(item)
+
+        # Restore selection
+        self._restore_selection(saved_name)
+
+    def _get_selected_name(self) -> str | None:
+        """Get the file name of the currently selected item."""
+        if self.index is not None and 0 <= self.index < len(self):
+            item = self.children[self.index]
+            if isinstance(item, ListItem) and item.name is not None:
+                return item.name
+        return None
+
+    def _restore_selection(self, saved_name: str | None) -> None:
+        """Restore selection by file name, or select the first enabled item."""
+        if saved_name is not None:
+            for i, child in enumerate(self.children):
+                if isinstance(child, ListItem) and child.name == saved_name:
+                    self.index = i
+                    return
+        # Select first enabled item
+        for i, child in enumerate(self.children):
+            if isinstance(child, ListItem) and not child.disabled:
+                self.index = i
+                return
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        """Handle file selection in any of the ListViews."""
+        """Handle file or commit selection."""
         item = event.item
         if item.name is None:
             return
-        # Determine if selected from the staged list
-        staged = False
-        try:
-            parent_lv = item.parent
-            if parent_lv is not None and parent_lv.id == "git-staged":
-                staged = True
-        except Exception:
-            pass
-        self.post_message(self.FileSelected(path=item.name, staged=staged))
+        if item.name.startswith("commit:"):
+            commit_hash = item.name.removeprefix("commit:")
+            self.post_message(self.CommitSelected(commit_hash=commit_hash))
+        else:
+            staged = getattr(item, "_staged", False)
+            self.post_message(self.FileSelected(path=item.name, staged=staged))
+
+    def _page_size(self) -> int:
+        """Return the number of items visible in the viewport."""
+        return max(1, self.scrollable_content_region.height)
+
+    def action_page_up(self) -> None:
+        """Move selection up by a page."""
+        if self.index is not None:
+            self.index = max(0, self.index - self._page_size())
+
+    def action_page_down(self) -> None:
+        """Move selection down by a page."""
+        if self.index is not None:
+            self.index = min(len(self) - 1, self.index + self._page_size())
 
     def action_refresh(self) -> None:
         self._do_refresh()
