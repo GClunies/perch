@@ -6,9 +6,9 @@ import webbrowser
 from pathlib import Path
 
 from rich.text import Text
-from textual.containers import VerticalScroll
-from textual.widgets import Collapsible, DataTable, Label, Static
 from textual import work
+from textual.binding import Binding
+from textual.widgets import Label, ListItem, ListView
 
 from perch.models import CICheck, PRContext
 
@@ -29,12 +29,22 @@ _REVIEW_STYLES: dict[str, str] = {
 }
 
 
-class PRContextPanel(VerticalScroll):
+def _make_section_header(title: str) -> ListItem:
+    """Create a non-selectable section header."""
+    text = Text(f"\n{title}", style="bold")
+    item = ListItem(Label(text), classes="section-header")
+    item.disabled = True
+    return item
+
+
+class PRContextPanel(ListView):
     """Displays PR context: header, reviews, comments, and CI checks."""
 
     BINDINGS = [
         ("r", "refresh", "Refresh"),
-        ("enter", "open_check", "Open Check"),
+        ("enter", "open_item", "Open in GitHub"),
+        Binding("pageup", "page_up", "Page Up", show=False),
+        Binding("pagedown", "page_down", "Page Down", show=False),
     ]
 
     def __init__(
@@ -49,21 +59,10 @@ class PRContextPanel(VerticalScroll):
         self._worktree_root = worktree_root
         self._pr_context: PRContext | None = None
         self._checks: list[CICheck] = []
-
-    def compose(self):
-        yield Static("Loading PR context...", id="pr-header")
-        yield Collapsible(Label(""), title="Reviews", id="pr-reviews")
-        yield Collapsible(Label(""), title="Comments", id="pr-comments")
-        yield Collapsible(
-            DataTable(id="checks-table"),
-            title="CI Checks",
-            id="pr-checks",
-        )
+        self._item_urls: dict[int, str] = {}
 
     def on_mount(self) -> None:
-        table = self.query_one("#checks-table", DataTable)
-        table.add_columns("Status", "Name", "Workflow")
-        table.cursor_type = "row"
+        self.append(_make_section_header("Loading PR context..."))
         self._do_refresh()
         self.set_interval(30, self._do_refresh)
 
@@ -83,24 +82,22 @@ class PRContextPanel(VerticalScroll):
         self.app.call_from_thread(self._update_display)
 
     def _show_gh_missing(self) -> None:
-        header = self.query_one("#pr-header", Static)
-        header.update(
-            Text(
-                "gh CLI not found. Install it from https://cli.github.com/",
-                style="bold red",
-            )
+        self.clear()
+        self._item_urls = {}
+        text = Text(
+            "gh CLI not found. Install it from https://cli.github.com/",
+            style="bold red",
         )
-        for cid in ("pr-reviews", "pr-comments", "pr-checks"):
-            self.query_one(f"#{cid}", Collapsible).display = False
+        self.append(ListItem(Label(text)))
 
     def _update_display(self) -> None:
-        header = self.query_one("#pr-header", Static)
         pr = self._pr_context
+        self.clear()
+        self._item_urls = {}
 
         if pr is None:
-            header.update(Text("No PR open for this branch", style="dim italic"))
-            for cid in ("pr-reviews", "pr-comments", "pr-checks"):
-                self.query_one(f"#{cid}", Collapsible).display = False
+            text = Text("No PR open for this branch", style="dim italic")
+            self.append(ListItem(Label(text)))
             return
 
         # PR header
@@ -111,64 +108,84 @@ class PRContextPanel(VerticalScroll):
         title_text.append(pr.title, style="bold")
         title_text.append("  ")
         title_text.append(f"[{decision}]", style=f"bold {style}")
-
-        header.update(title_text)
+        idx = self._append_item(title_text, url=pr.url)
 
         # Reviews
-        reviews_section = self.query_one("#pr-reviews", Collapsible)
-        reviews_section.display = True
+        self.append(_make_section_header("Reviews"))
         if pr.reviews:
-            lines = Text()
-            for i, r in enumerate(pr.reviews):
-                if i > 0:
-                    lines.append("\n\n")
+            for r in pr.reviews:
+                text = Text()
                 r_style = _REVIEW_STYLES.get(r.state, "")
-                lines.append(f"{r.author}", style="bold")
-                lines.append(f" [{r.state}]", style=r_style)
+                text.append(f"{r.author}", style="bold")
+                text.append(f" [{r.state}]", style=r_style)
                 if r.submitted_at:
-                    lines.append(f"  {r.submitted_at}", style="dim")
+                    text.append(f"  {r.submitted_at}", style="dim")
                 if r.body:
-                    lines.append(f"\n{r.body}")
-            reviews_section.query_one(Label).update(lines)
+                    text.append(f"\n  {r.body}")
+                self._append_item(text, url=pr.url)
         else:
-            reviews_section.query_one(Label).update(Text("No reviews yet", style="dim"))
+            item = ListItem(Label(Text("  No reviews yet", style="dim")))
+            item.disabled = True
+            self.append(item)
 
         # Comments
-        comments_section = self.query_one("#pr-comments", Collapsible)
-        comments_section.display = True
+        self.append(_make_section_header("Comments"))
         if pr.comments:
-            lines = Text()
-            for i, c in enumerate(pr.comments):
-                if i > 0:
-                    lines.append("\n\n")
-                lines.append(f"{c.author}", style="bold")
+            for c in pr.comments:
+                text = Text()
+                text.append(f"{c.author}", style="bold")
                 if c.created_at:
-                    lines.append(f"  {c.created_at}", style="dim")
+                    text.append(f"  {c.created_at}", style="dim")
                 if c.body:
-                    lines.append(f"\n{c.body}")
-            comments_section.query_one(Label).update(lines)
+                    text.append(f"\n  {c.body}")
+                self._append_item(text, url=pr.url)
         else:
-            comments_section.query_one(Label).update(Text("No comments", style="dim"))
+            item = ListItem(Label(Text("  No comments", style="dim")))
+            item.disabled = True
+            self.append(item)
 
         # CI Checks
-        checks_section = self.query_one("#pr-checks", Collapsible)
-        checks_section.display = True
-        table = self.query_one("#checks-table", DataTable)
-        table.clear()
-        for check in self._checks:
-            style = _BUCKET_STYLES.get(check.bucket, "")
-            status = Text(check.bucket or check.state, style=style)
-            table.add_row(status, check.name, check.workflow)
+        self.append(_make_section_header("CI Checks"))
+        if self._checks:
+            for check in self._checks:
+                bucket_style = _BUCKET_STYLES.get(check.bucket, "")
+                text = Text()
+                text.append(
+                    f"  {check.bucket or check.state:<10}", style=bucket_style
+                )
+                text.append(f" {check.name}")
+                if check.workflow:
+                    text.append(f"  ({check.workflow})", style="dim")
+                self._append_item(text, url=check.link)
+        else:
+            item = ListItem(Label(Text("  No checks", style="dim")))
+            item.disabled = True
+            self.append(item)
+
+    def _append_item(self, text: Text, url: str = "") -> int:
+        """Append a selectable item and record its URL. Returns item index."""
+        item = ListItem(Label(text))
+        self.append(item)
+        idx = len(self) - 1
+        if url:
+            self._item_urls[idx] = url
+        return idx
+
+    def _page_size(self) -> int:
+        return max(1, self.scrollable_content_region.height)
+
+    def action_page_up(self) -> None:
+        if self.index is not None:
+            self.index = max(0, self.index - self._page_size())
+
+    def action_page_down(self) -> None:
+        if self.index is not None:
+            self.index = min(len(self) - 1, self.index + self._page_size())
 
     def action_refresh(self) -> None:
         self._do_refresh()
 
-    def action_open_check(self) -> None:
-        table = self.query_one("#checks-table", DataTable)
-        if not table.has_focus or table.row_count == 0:
-            return
-        row_idx = table.cursor_row
-        if 0 <= row_idx < len(self._checks):
-            link = self._checks[row_idx].link
-            if link:
-                webbrowser.open(link)
+    def action_open_item(self) -> None:
+        """Open the selected item's URL in the browser."""
+        if self.index is not None and self.index in self._item_urls:
+            webbrowser.open(self._item_urls[self.index])

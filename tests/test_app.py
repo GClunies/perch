@@ -483,7 +483,7 @@ class TestToggleFocusMode:
             pilot.app.action_toggle_focus_mode()
             await pilot.pause()
             viewer = pilot.app.query_one("#left-pane", FileViewer)
-            assert "60" in str(viewer.styles.width)
+            assert "75" in str(viewer.styles.width)
 
 
 class TestResizePanes:

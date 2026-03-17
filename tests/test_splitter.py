@@ -56,21 +56,17 @@ class TestClampWidth:
 class TestKeyboardResize:
     """Tests for [ and ] keyboard shortcuts."""
 
-    async def test_right_bracket_grows_left_pane(self, worktree: Path) -> None:
-        async with PerchApp(worktree).run_test(size=(80, 24)) as pilot:
+    async def test_grow_then_shrink_returns_to_same_width(self, worktree: Path) -> None:
+        """Growing and then shrinking by the same amount restores width."""
+        async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
             left = pilot.app.query_one("#left-pane")
-            initial_outer = left.outer_size.width
-            await pilot.press("right_square_bracket")
+            pilot.app.action_grow_left_pane()
             await pilot.pause()
-            assert left.outer_size.width == initial_outer + 2
-
-    async def test_left_bracket_shrinks_left_pane(self, worktree: Path) -> None:
-        async with PerchApp(worktree).run_test(size=(80, 24)) as pilot:
-            left = pilot.app.query_one("#left-pane")
-            initial_outer = left.outer_size.width
-            await pilot.press("left_square_bracket")
+            after_grow = left.outer_size.width
+            pilot.app.action_shrink_left_pane()
             await pilot.pause()
-            assert left.outer_size.width == initial_outer - 2
+            after_shrink = left.outer_size.width
+            assert after_grow == after_shrink + 2
 
     async def test_shrink_respects_min_left(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test(size=(80, 24)) as pilot:

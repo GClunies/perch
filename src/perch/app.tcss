@@ -41,17 +41,19 @@ FileViewer {
     overflow-y: auto;
 }
 
-GitStatusPanel {
+GitStatusPanel, PRContextPanel {
     height: 1fr;
     overflow-x: auto;
 }
 
-GitStatusPanel > ListItem {
+GitStatusPanel > ListItem,
+PRContextPanel > ListItem {
     height: auto;
     width: auto;
 }
 
-GitStatusPanel > .section-header {
+GitStatusPanel > .section-header,
+PRContextPanel > .section-header {
     height: auto;
 }
 
