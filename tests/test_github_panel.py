@@ -1,4 +1,4 @@
-"""Tests for PRContextPanel widget."""
+"""Tests for GitHubPanel widget."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from textual.widgets import ListItem
 
 from perch.app import PerchApp
 from perch.models import CICheck, PRComment, PRContext, PRReview
-from perch.widgets.pr_context import PRContextPanel
+from perch.widgets.github_panel import GitHubPanel
 
 
 @pytest.fixture
@@ -69,7 +69,7 @@ def _patches(pr=None, checks=None):
     )
 
 
-def _get_all_text(panel: PRContextPanel) -> str:
+def _get_all_text(panel: GitHubPanel) -> str:
     """Get all visible text from the panel's list items."""
     from textual.widgets import Label
 
@@ -95,7 +95,7 @@ class TestShowGhMissing:
             async with PerchApp(worktree).run_test() as pilot:
                 await pilot.pause()
                 await pilot.pause()
-                panel = pilot.app.query_one(PRContextPanel)
+                panel = pilot.app.query_one(GitHubPanel)
                 text = _get_all_text(panel)
                 assert "gh CLI not found" in text
 
@@ -107,7 +107,7 @@ class TestNoPR:
             async with PerchApp(worktree).run_test() as pilot:
                 await pilot.pause()
                 await pilot.pause()
-                panel = pilot.app.query_one(PRContextPanel)
+                panel = pilot.app.query_one(GitHubPanel)
                 text = _get_all_text(panel)
                 assert "No PR open" in text
 
@@ -120,11 +120,11 @@ class TestUpdateDisplayWithPR:
             async with PerchApp(worktree).run_test() as pilot:
                 await pilot.pause()
                 await pilot.pause()
-                panel = pilot.app.query_one(PRContextPanel)
+                panel = pilot.app.query_one(GitHubPanel)
                 text = _get_all_text(panel)
                 assert "#99" in text
                 assert "Fix the thing" in text
-                assert "APPROVED" in text
+                assert "\uf00c" in text  # nf-fa-check icon for APPROVED
 
     async def test_reviews_shown(self, worktree: Path) -> None:
         pr = _make_pr_context(
@@ -142,10 +142,10 @@ class TestUpdateDisplayWithPR:
             async with PerchApp(worktree).run_test() as pilot:
                 await pilot.pause()
                 await pilot.pause()
-                panel = pilot.app.query_one(PRContextPanel)
+                panel = pilot.app.query_one(GitHubPanel)
                 text = _get_all_text(panel)
                 assert "alice" in text
-                assert "APPROVED" in text
+                assert "\uf00c" in text  # nf-fa-check icon for APPROVED
 
     async def test_no_reviews_placeholder(self, worktree: Path) -> None:
         pr = _make_pr_context(reviews=[])
@@ -154,7 +154,7 @@ class TestUpdateDisplayWithPR:
             async with PerchApp(worktree).run_test() as pilot:
                 await pilot.pause()
                 await pilot.pause()
-                panel = pilot.app.query_one(PRContextPanel)
+                panel = pilot.app.query_one(GitHubPanel)
                 text = _get_all_text(panel)
                 assert "No reviews yet" in text
 
@@ -169,7 +169,7 @@ class TestUpdateDisplayWithPR:
             async with PerchApp(worktree).run_test() as pilot:
                 await pilot.pause()
                 await pilot.pause()
-                panel = pilot.app.query_one(PRContextPanel)
+                panel = pilot.app.query_one(GitHubPanel)
                 text = _get_all_text(panel)
                 assert "carol" in text
                 assert "Nice!" in text
@@ -181,7 +181,7 @@ class TestUpdateDisplayWithPR:
             async with PerchApp(worktree).run_test() as pilot:
                 await pilot.pause()
                 await pilot.pause()
-                panel = pilot.app.query_one(PRContextPanel)
+                panel = pilot.app.query_one(GitHubPanel)
                 text = _get_all_text(panel)
                 assert "No comments" in text
 
@@ -193,7 +193,7 @@ class TestUpdateDisplayWithPR:
             async with PerchApp(worktree).run_test() as pilot:
                 await pilot.pause()
                 await pilot.pause()
-                panel = pilot.app.query_one(PRContextPanel)
+                panel = pilot.app.query_one(GitHubPanel)
                 text = _get_all_text(panel)
                 assert "build" in text
                 assert "lint" in text
@@ -205,71 +205,69 @@ class TestUpdateDisplayWithPR:
             async with PerchApp(worktree).run_test() as pilot:
                 await pilot.pause()
                 await pilot.pause()
-                panel = pilot.app.query_one(PRContextPanel)
+                panel = pilot.app.query_one(GitHubPanel)
                 text = _get_all_text(panel)
                 assert "No actions" in text
 
 
-class TestArrowAndEnter:
-    """Arrow keys navigate between items; Enter opens the highlighted URL."""
+class TestOpenInBrowser:
+    """Pressing 'o' on a highlighted item opens its URL in the browser."""
 
     @staticmethod
-    async def _activate_pr_tab(pilot) -> PRContextPanel:
+    async def _activate_github_tab(pilot) -> GitHubPanel:
         from textual.widgets import TabbedContent
 
         await pilot.pause()
         await pilot.pause()
-        pilot.app.query_one(TabbedContent).active = "tab-pr"
+        pilot.app.query_one(TabbedContent).active = "tab-github"
         await pilot.pause()
-        panel = pilot.app.query_one(PRContextPanel)
+        panel = pilot.app.query_one(GitHubPanel)
         panel.focus()
         await pilot.pause()
         return panel
 
     @staticmethod
-    def _navigate_to(panel: PRContextPanel, text_match: str) -> None:
+    def _navigate_to(panel: GitHubPanel, text_match: str) -> None:
         """Set the highlight to the item matching the given text."""
         item = _find_item_with_text(panel, text_match)
         assert item is not None, f"Item with {text_match!r} not found"
         panel.index = list(panel.children).index(item)
 
-    async def test_enter_on_pr_header(self, worktree: Path) -> None:
+    async def test_o_opens_pr_header(self, worktree: Path) -> None:
         pr = _make_pr_context()
         p1, p2 = _patches(pr=pr)
-        with p1, p2, patch("perch.widgets.pr_context.webbrowser.open") as mock_open:
+        with p1, p2, patch("perch.widgets.github_panel.webbrowser.open") as mock_open:
             async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_pr_tab(pilot)
+                panel = await self._activate_github_tab(pilot)
                 self._navigate_to(panel, "#42")
-                await pilot.press("enter")
+                await pilot.press("o")
                 await pilot.pause()
                 mock_open.assert_called_once_with("https://github.com/org/repo/pull/42")
 
-    async def test_enter_on_ci_check(self, worktree: Path) -> None:
+    async def test_o_opens_ci_check(self, worktree: Path) -> None:
         pr = _make_pr_context()
         checks = _make_checks()
         p1, p2 = _patches(pr=pr, checks=checks)
-        with p1, p2, patch("perch.widgets.pr_context.webbrowser.open") as mock_open:
+        with p1, p2, patch("perch.widgets.github_panel.webbrowser.open") as mock_open:
             async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_pr_tab(pilot)
+                panel = await self._activate_github_tab(pilot)
                 self._navigate_to(panel, "build")
-                await pilot.press("enter")
+                await pilot.press("o")
                 await pilot.pause()
                 mock_open.assert_called_once_with(
                     "https://github.com/org/repo/actions/runs/123"
                 )
 
-    async def test_arrow_down_then_enter(self, worktree: Path) -> None:
-        """Navigate with real arrow keys, then press Enter to open."""
+    async def test_arrow_down_then_o(self, worktree: Path) -> None:
+        """Navigate with arrow keys, then press 'o' to open."""
         pr = _make_pr_context()
         checks = _make_checks()
         p1, p2 = _patches(pr=pr, checks=checks)
-        with p1, p2, patch("perch.widgets.pr_context.webbrowser.open") as mock_open:
+        with p1, p2, patch("perch.widgets.github_panel.webbrowser.open") as mock_open:
             async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_pr_tab(pilot)
-                # Start at the PR title
+                panel = await self._activate_github_tab(pilot)
                 self._navigate_to(panel, "#42")
-                # Arrow down until we reach a CI check
-                from perch.widgets.pr_context import ClickableItem
+                from perch.widgets.github_panel import ClickableItem
 
                 for _ in range(20):
                     await pilot.press("down")
@@ -277,33 +275,31 @@ class TestArrowAndEnter:
                     hc = panel.highlighted_child
                     if isinstance(hc, ClickableItem) and "actions" in hc.url:
                         break
-                await pilot.press("enter")
+                await pilot.press("o")
                 await pilot.pause()
                 mock_open.assert_called_once()
-                # Should be one of the check URLs
                 url = mock_open.call_args[0][0]
                 assert "actions/runs" in url
 
-    async def test_enter_on_header_does_nothing(self, worktree: Path) -> None:
+    async def test_o_on_header_does_nothing(self, worktree: Path) -> None:
         pr = _make_pr_context()
         p1, p2 = _patches(pr=pr)
-        with p1, p2, patch("perch.widgets.pr_context.webbrowser.open") as mock_open:
+        with p1, p2, patch("perch.widgets.github_panel.webbrowser.open") as mock_open:
             async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
                 await pilot.pause()
                 await pilot.pause()
-                panel = pilot.app.query_one(PRContextPanel)
-                # Set index to a disabled header
+                panel = pilot.app.query_one(GitHubPanel)
                 for i, child in enumerate(panel.children):
                     if isinstance(child, ListItem) and child.disabled:
                         panel.index = i
                         break
                 panel.focus()
-                await pilot.press("enter")
+                await pilot.press("o")
                 await pilot.pause()
                 mock_open.assert_not_called()
 
 
-def _find_item_with_text(panel: PRContextPanel, text_match: str) -> ListItem | None:
+def _find_item_with_text(panel: GitHubPanel, text_match: str) -> ListItem | None:
     """Find a non-disabled ListItem containing the given text."""
     from textual.widgets import Label as _Label
 
@@ -315,158 +311,18 @@ def _find_item_with_text(panel: PRContextPanel, text_match: str) -> ListItem | N
     return None
 
 
-class TestMouseClick:
-    """Mouse-clicking any item with a URL should open that URL in the browser."""
-
-    @staticmethod
-    async def _activate_pr_tab(pilot) -> PRContextPanel:
-        """Switch to the PR tab and return the panel (items need layout to be clickable)."""
-        from textual.widgets import TabbedContent
-
-        await pilot.pause()
-        await pilot.pause()
-        pilot.app.query_one(TabbedContent).active = "tab-pr"
-        await pilot.pause()
-        return pilot.app.query_one(PRContextPanel)
-
-    async def test_click_pr_title(self, worktree: Path) -> None:
-        pr = _make_pr_context()
-        p1, p2 = _patches(pr=pr, checks=[])
-        with p1, p2, patch("perch.widgets.pr_context.webbrowser.open") as mock_open:
-            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_pr_tab(pilot)
-                item = _find_item_with_text(panel, "#42")
-                assert item is not None, "PR title item not found"
-                await pilot.click(item)
-                await pilot.pause()
-                mock_open.assert_called_once_with("https://github.com/org/repo/pull/42")
-
-    async def test_click_ci_check(self, worktree: Path) -> None:
-        pr = _make_pr_context()
-        checks = _make_checks()
-        p1, p2 = _patches(pr=pr, checks=checks)
-        with p1, p2, patch("perch.widgets.pr_context.webbrowser.open") as mock_open:
-            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_pr_tab(pilot)
-                item = _find_item_with_text(panel, "build")
-                assert item is not None, "CI check item not found"
-                await pilot.click(item)
-                await pilot.pause()
-                mock_open.assert_called_once_with(
-                    "https://github.com/org/repo/actions/runs/123"
-                )
-
-    async def test_click_second_ci_check(self, worktree: Path) -> None:
-        """Each CI check opens its own URL, not the first one's."""
-        pr = _make_pr_context()
-        checks = _make_checks()
-        p1, p2 = _patches(pr=pr, checks=checks)
-        with p1, p2, patch("perch.widgets.pr_context.webbrowser.open") as mock_open:
-            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_pr_tab(pilot)
-                item = _find_item_with_text(panel, "lint")
-                assert item is not None, "lint check item not found"
-                await pilot.click(item)
-                await pilot.pause()
-                mock_open.assert_called_once_with(
-                    "https://github.com/org/repo/actions/runs/456"
-                )
-
-    async def test_click_review(self, worktree: Path) -> None:
-        pr = _make_pr_context(
-            reviews=[
-                PRReview(
-                    author="alice",
-                    state="APPROVED",
-                    body="LGTM",
-                    submitted_at="2025-01-15",
-                    url="https://github.com/org/repo/pull/42#review-1",
-                ),
-            ]
-        )
-        p1, p2 = _patches(pr=pr)
-        with p1, p2, patch("perch.widgets.pr_context.webbrowser.open") as mock_open:
-            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_pr_tab(pilot)
-                item = _find_item_with_text(panel, "alice")
-                assert item is not None, "review item not found"
-                await pilot.click(item)
-                await pilot.pause()
-                mock_open.assert_called_once_with(
-                    "https://github.com/org/repo/pull/42#review-1"
-                )
-
-    async def test_click_comment(self, worktree: Path) -> None:
-        pr = _make_pr_context(
-            comments=[
-                PRComment(
-                    author="bob",
-                    body="Needs more tests",
-                    created_at="2025-01-15",
-                    url="https://github.com/org/repo/pull/42#comment-1",
-                ),
-            ]
-        )
-        p1, p2 = _patches(pr=pr)
-        with p1, p2, patch("perch.widgets.pr_context.webbrowser.open") as mock_open:
-            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_pr_tab(pilot)
-                item = _find_item_with_text(panel, "bob")
-                assert item is not None, "comment item not found"
-                await pilot.click(item)
-                await pilot.pause()
-                mock_open.assert_called_once_with(
-                    "https://github.com/org/repo/pull/42#comment-1"
-                )
-
-    async def test_items_clickable_after_refresh(self, worktree: Path) -> None:
-        """Items remain clickable after the panel refreshes its data."""
-        pr = _make_pr_context()
-        checks = _make_checks()
-        p1, p2 = _patches(pr=pr, checks=checks)
-        with p1, p2, patch("perch.widgets.pr_context.webbrowser.open") as mock_open:
-            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_pr_tab(pilot)
-                # Simulate the 30s refresh timer firing
-                panel._update_display()
-                await pilot.pause()
-                item = _find_item_with_text(panel, "build")
-                assert item is not None, "CI check not found after refresh"
-                await pilot.click(item)
-                await pilot.pause()
-                mock_open.assert_called_once_with(
-                    "https://github.com/org/repo/actions/runs/123"
-                )
-
-    async def test_section_header_click_does_not_open(self, worktree: Path) -> None:
-        pr = _make_pr_context()
-        p1, p2 = _patches(pr=pr)
-        with p1, p2, patch("perch.widgets.pr_context.webbrowser.open") as mock_open:
-            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_pr_tab(pilot)
-                header = None
-                for child in panel.children:
-                    if isinstance(child, ListItem) and child.disabled:
-                        header = child
-                        break
-                if header is not None:
-                    await pilot.click(header)
-                    await pilot.pause()
-                mock_open.assert_not_called()
-
-
 class TestHighlightPreview:
     """Navigating to an item in the PR tab should preview its content in the FileViewer."""
 
     @staticmethod
-    async def _activate_pr_tab(pilot) -> PRContextPanel:
+    async def _activate_pr_tab(pilot) -> GitHubPanel:
         from textual.widgets import TabbedContent
 
         await pilot.pause()
         await pilot.pause()
-        pilot.app.query_one(TabbedContent).active = "tab-pr"
+        pilot.app.query_one(TabbedContent).active = "tab-github"
         await pilot.pause()
-        panel = pilot.app.query_one(PRContextPanel)
+        panel = pilot.app.query_one(GitHubPanel)
         panel.focus()
         await pilot.pause()
         return panel
@@ -562,7 +418,7 @@ class TestHighlightPreview:
                 initial = content
                 # The section header should not update the viewer
                 # (it has no preview_kind)
-                panel = pilot.app.query_one(PRContextPanel)
+                panel = pilot.app.query_one(GitHubPanel)
                 for i, child in enumerate(panel.children):
                     if isinstance(child, ListItem) and child.disabled:
                         panel.index = i
@@ -581,7 +437,7 @@ class TestActionRefresh:
                 await pilot.pause()
                 await pilot.pause()
                 initial = mock_pr.call_count
-                panel = pilot.app.query_one(PRContextPanel)
+                panel = pilot.app.query_one(GitHubPanel)
                 panel.action_refresh()
                 await pilot.pause()
                 await pilot.pause()

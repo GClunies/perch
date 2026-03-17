@@ -24,6 +24,11 @@ FileViewer {
     height: 100%;
 }
 
+#right-pane Tab {
+    width: 1fr;
+    text-align: center;
+}
+
 #diff-container {
     display: none;
     height: 1fr;
@@ -41,20 +46,20 @@ FileViewer {
     overflow-y: auto;
 }
 
-GitStatusPanel, PRContextPanel {
+GitStatusPanel, GitHubPanel {
     height: 1fr;
     overflow-x: auto;
 }
 
 GitStatusPanel > ListItem,
-PRContextPanel > ListItem,
-PRContextPanel > ClickableItem {
+GitHubPanel > ListItem,
+GitHubPanel > ClickableItem {
     height: auto;
     width: auto;
 }
 
 GitStatusPanel > .section-header,
-PRContextPanel > .section-header {
+GitHubPanel > .section-header {
     height: auto;
 }
 

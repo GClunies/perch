@@ -12,7 +12,7 @@ from perch.commands import DiscoveryCommandProvider
 from perch.widgets.file_tree import WorktreeFileTree
 from perch.widgets.file_viewer import FileViewer
 from perch.widgets.git_status import GitStatusPanel
-from perch.widgets.pr_context import PRContextPanel
+from perch.widgets.github_panel import GitHubPanel
 from perch.widgets.splitter import DraggableSplitter
 
 
@@ -108,9 +108,9 @@ class TestPerchAppCompose:
             assert panel is not None
 
     async def test_pr_tab_has_context_panel(self, worktree: Path) -> None:
-        """PR tab should contain a PRContextPanel widget."""
+        """PR tab should contain a GitHubPanel widget."""
         async with PerchApp(worktree).run_test() as pilot:
-            panel = pilot.app.query_one(PRContextPanel)
+            panel = pilot.app.query_one(GitHubPanel)
             assert panel is not None
 
 
@@ -136,7 +136,7 @@ class TestTabSwitching:
         async with PerchApp(worktree).run_test() as pilot:
             await pilot.press("3")
             await pilot.pause()
-            assert pilot.app.query_one(TabbedContent).active == "tab-pr"
+            assert pilot.app.query_one(TabbedContent).active == "tab-github"
 
 
 class TestCommandPalette:
@@ -185,12 +185,12 @@ class TestActionShowTab:
             assert pilot.app.query_one(TabbedContent).active == "tab-git"
 
     async def test_show_tab_switches_to_pr(self, worktree: Path) -> None:
-        """action_show_tab('tab-pr') should activate the pr tab."""
+        """action_show_tab('tab-github') should activate the pr tab."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            pilot.app.action_show_tab("tab-pr")
+            pilot.app.action_show_tab("tab-github")
             await pilot.pause()
-            assert pilot.app.query_one(TabbedContent).active == "tab-pr"
+            assert pilot.app.query_one(TabbedContent).active == "tab-github"
 
     async def test_show_tab_switches_to_files(self, worktree: Path) -> None:
         """action_show_tab('tab-files') should activate the files tab."""
@@ -212,12 +212,12 @@ class TestActionShowTab:
             assert panel.has_focus
 
     async def test_show_tab_focuses_pr_panel(self, worktree: Path) -> None:
-        """Switching to PR tab should focus the PRContextPanel."""
+        """Switching to PR tab should focus the GitHubPanel."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            pilot.app.action_show_tab("tab-pr")
+            pilot.app.action_show_tab("tab-github")
             await pilot.pause()
-            panel = pilot.app.query_one(PRContextPanel)
+            panel = pilot.app.query_one(GitHubPanel)
             assert panel.has_focus
 
     async def test_show_tab_focuses_file_tree(self, worktree: Path) -> None:
@@ -290,13 +290,13 @@ class TestFocusActiveTab:
             assert pilot.app.query_one(GitStatusPanel).has_focus
 
     async def test_focus_active_tab_pr(self, worktree: Path) -> None:
-        """_focus_active_tab on pr tab should focus the PRContextPanel."""
+        """_focus_active_tab on pr tab should focus the GitHubPanel."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            pilot.app.action_show_tab("tab-pr")
+            pilot.app.action_show_tab("tab-github")
             await pilot.pause()
             await pilot.pause()
-            assert pilot.app.query_one(PRContextPanel).has_focus
+            assert pilot.app.query_one(GitHubPanel).has_focus
 
 
 class TestGitStatusPanelFileSelected:

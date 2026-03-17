@@ -12,7 +12,7 @@ from perch.widgets.file_search import FileSearchScreen
 from perch.widgets.file_tree import WorktreeFileTree
 from perch.widgets.file_viewer import FileViewer
 from perch.widgets.git_status import GitStatusPanel
-from perch.widgets.pr_context import PRContextPanel
+from perch.widgets.github_panel import GitHubPanel
 from perch.widgets.splitter import DraggableSplitter
 
 
@@ -29,14 +29,14 @@ class PerchApp(App):
         Binding("tab", "focus_next_pane", "Switch Pane", priority=True),
         ("1", "show_tab('tab-files')", "Files"),
         ("2", "show_tab('tab-git')", "Git"),
-        ("3", "show_tab('tab-pr')", "PR"),
+        ("3", "show_tab('tab-github')", "GitHub"),
         ("f", "toggle_focus_mode", "Focus Mode"),
         ("ctrl+p", "file_search", "File Search"),
         Binding("d", "toggle_diff", "Toggle Diff", show=False),
         Binding("s", "toggle_diff_layout", "Diff Layout", show=False),
         Binding("n", "next_diff_file", "Next File", show=False),
         Binding("p", "prev_diff_file", "Prev File", show=False),
-        Binding("e", "open_editor", "Editor", show=False),
+        Binding("o", "open_editor", "Open", show=False),
         Binding("left_square_bracket", "shrink_left_pane", "", show=False),
         Binding("right_square_bracket", "grow_left_pane", "", show=False),
     ]
@@ -81,12 +81,12 @@ class PerchApp(App):
             yield FileViewer(worktree_root=self.worktree_path, id="left-pane")
             yield DraggableSplitter()
             with TabbedContent(id="right-pane"):
-                with TabPane("Files", id="tab-files"):
+                with TabPane("\uf0c5", id="tab-files"):
                     yield WorktreeFileTree(self.worktree_path)
-                with TabPane("Git", id="tab-git"):
+                with TabPane("\ue725", id="tab-git"):
                     yield GitStatusPanel(self.worktree_path)
-                with TabPane("PR", id="tab-pr"):
-                    yield PRContextPanel(self.worktree_path)
+                with TabPane("\uf09b", id="tab-github"):
+                    yield GitHubPanel(self.worktree_path)
         yield Footer()
 
     def on_git_status_panel_file_selected(
@@ -171,8 +171,8 @@ class PerchApp(App):
             panel.focus()
             if panel.index is None:
                 panel._restore_selection(None)
-        elif active == "tab-pr":
-            self.query_one(PRContextPanel).focus()
+        elif active == "tab-github":
+            self.query_one(GitHubPanel).focus()
         else:
             self.query_one(WorktreeFileTree).focus()
 
@@ -202,8 +202,8 @@ class PerchApp(App):
         viewer.load_commit_diff(event.commit_hash)
         viewer.focus()
 
-    def on_prcontext_panel_preview_requested(
-        self, event: PRContextPanel.PreviewRequested
+    def on_git_hub_panel_preview_requested(
+        self, event: GitHubPanel.PreviewRequested
     ) -> None:
         """Show preview content in the FileViewer when a PR item is highlighted."""
         viewer = self.query_one(FileViewer)

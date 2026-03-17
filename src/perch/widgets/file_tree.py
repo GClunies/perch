@@ -32,6 +32,10 @@ _GIT_INDICATORS: dict[str, tuple[str, str]] = {
 class WorktreeFileTree(DirectoryTree):
     """A directory tree that filters out noise directories."""
 
+    ICON_FILE = "󰈙 "
+    ICON_NODE = "󰉋 "
+    ICON_NODE_EXPANDED = "\U000f0770 "
+
     BINDINGS = [
         Binding("right", "expand_node", "Expand", show=False),
         Binding("left", "collapse_node", "Collapse", show=False),

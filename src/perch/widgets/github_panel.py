@@ -1,4 +1,4 @@
-"""PR context panel showing reviews, comments, and CI checks."""
+"""GitHub panel showing PR details, reviews, comments, and Actions."""
 
 from __future__ import annotations
 
@@ -8,31 +8,30 @@ from pathlib import Path
 from rich.text import Text
 from textual import work
 from textual.binding import Binding
-from textual.events import Click
 from textual.message import Message
 from textual.widgets import Label, ListItem, ListView
 
 from perch.models import CICheck, PRContext
 
 
-_BUCKET_STYLES: dict[str, str] = {
-    "pass": "green",
-    "fail": "red",
-    "pending": "yellow",
-    "skipping": "dim",
+_BUCKET_ICONS: dict[str, tuple[str, str]] = {
+    "pass": ("\uf00c", "green"),  # nf-fa-check
+    "fail": ("\uf00d", "red"),  # nf-fa-close
+    "pending": ("\uf017", "yellow"),  # nf-fa-clock_o
+    "skipping": ("\uf068", "dim"),  # nf-fa-minus
 }
 
-_REVIEW_STYLES: dict[str, str] = {
-    "APPROVED": "green",
-    "CHANGES_REQUESTED": "red",
-    "COMMENTED": "yellow",
-    "DISMISSED": "dim",
-    "PENDING": "yellow",
+_REVIEW_ICONS: dict[str, tuple[str, str]] = {
+    "APPROVED": ("\uf00c", "green"),
+    "CHANGES_REQUESTED": ("\uf00d", "red"),
+    "COMMENTED": ("\uf075", "yellow"),  # nf-fa-comment
+    "DISMISSED": ("\uf068", "dim"),
+    "PENDING": ("\uf017", "yellow"),
 }
 
 
 class ClickableItem(ListItem):
-    """A ListItem that opens a URL when clicked."""
+    """A ListItem that can open a URL in the browser."""
 
     DEFAULT_CSS = """
     ClickableItem {
@@ -48,10 +47,6 @@ class ClickableItem(ListItem):
         self.url = url
         self.preview_kind = preview_kind
 
-    def on_click(self, _event: Click) -> None:
-        if self.url:
-            webbrowser.open(self.url)
-
 
 def _make_section_header(title: str) -> ListItem:
     """Create a non-selectable section header."""
@@ -61,7 +56,7 @@ def _make_section_header(title: str) -> ListItem:
     return item
 
 
-class PRContextPanel(ListView):
+class GitHubPanel(ListView):
     """Displays PR context: header, reviews, comments, and CI checks."""
 
     class PreviewRequested(Message):
@@ -74,6 +69,7 @@ class PRContextPanel(ListView):
             self.body = body
 
     BINDINGS = [
+        ("o", "open_in_browser", "Open"),
         ("r", "refresh", "Refresh"),
         Binding("pageup", "page_up", "", show=False),
         Binding("pagedown", "page_down", "", show=False),
@@ -131,12 +127,12 @@ class PRContextPanel(ListView):
 
         # PR header
         decision = pr.review_decision or "NONE"
-        style = _REVIEW_STYLES.get(decision, "")
+        icon, color = _REVIEW_ICONS.get(decision, ("", ""))
         title_text = Text()
         title_text.append(f"#{pr.number} ", style="bold cyan")
         title_text.append(pr.title, style="bold")
-        title_text.append("  ")
-        title_text.append(f"[{decision}]", style=f"bold {style}")
+        if icon:
+            title_text.append(f"  {icon}", style=color)
         self._append_item(title_text, url=pr.url, preview_kind="pr_body")
 
         # Reviews
@@ -144,13 +140,14 @@ class PRContextPanel(ListView):
         if pr.reviews:
             for r in pr.reviews:
                 text = Text()
-                r_style = _REVIEW_STYLES.get(r.state, "")
+                r_icon, r_color = _REVIEW_ICONS.get(r.state, ("", ""))
+                if r_icon:
+                    text.append(f"  {r_icon} ", style=r_color)
                 text.append(f"{r.author}", style="bold")
-                text.append(f" [{r.state}]", style=r_style)
                 if r.submitted_at:
                     text.append(f"  {r.submitted_at}", style="dim")
                 if r.body:
-                    text.append(f"\n  {r.body}")
+                    text.append(f"\n    {r.body}")
                 self._append_item(text, url=r.url)
         else:
             item = ListItem(Label(Text("  No reviews yet", style="dim")))
@@ -177,11 +174,13 @@ class PRContextPanel(ListView):
         self.append(_make_section_header("Actions"))
         if self._checks:
             for check in self._checks:
-                bucket_style = _BUCKET_STYLES.get(check.bucket, "")
-                status = check.bucket or check.state
+                icon, color = _BUCKET_ICONS.get(
+                    check.bucket,
+                    ("\uf128", "dim"),  # nf-fa-question
+                )
                 text = Text()
-                text.append(f"  {check.name}  ", style="bold")
-                text.append(status, style=bucket_style)
+                text.append(f"  {icon} ", style=color)
+                text.append(check.name)
                 self._append_item(text, url=check.link, preview_kind="ci_check")
         else:
             item = ListItem(Label(Text("  No actions", style="dim")))
@@ -212,8 +211,8 @@ class PRContextPanel(ListView):
     def action_refresh(self) -> None:
         self._do_refresh()
 
-    def action_select_cursor(self) -> None:
-        """Handle Enter key: open the URL for the highlighted item."""
+    def action_open_in_browser(self) -> None:
+        """Open the highlighted item's URL in the browser."""
         item = self.highlighted_child
         if isinstance(item, ClickableItem) and item.url:
             webbrowser.open(item.url)
