@@ -96,7 +96,9 @@ def parse_checks(raw: str) -> list[CICheck]:
             state=c.get("state", ""),
             bucket=c.get("bucket", ""),
             link=c.get("link", ""),
-            workflow=c.get("workflow", {}).get("name", "") if isinstance(c.get("workflow"), dict) else str(c.get("workflow", "")),
+            workflow=c.get("workflow", {}).get("name", "")
+            if isinstance(c.get("workflow"), dict)
+            else str(c.get("workflow", "")),
         )
         for c in data
     ]

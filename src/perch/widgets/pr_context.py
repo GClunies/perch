@@ -98,9 +98,7 @@ class PRContextPanel(VerticalScroll):
         pr = self._pr_context
 
         if pr is None:
-            header.update(
-                Text("No PR open for this branch", style="dim italic")
-            )
+            header.update(Text("No PR open for this branch", style="dim italic"))
             for cid in ("pr-reviews", "pr-comments", "pr-checks"):
                 self.query_one(f"#{cid}", Collapsible).display = False
             return
@@ -133,9 +131,7 @@ class PRContextPanel(VerticalScroll):
                     lines.append(f"\n{r.body}")
             reviews_section.query_one(Label).update(lines)
         else:
-            reviews_section.query_one(Label).update(
-                Text("No reviews yet", style="dim")
-            )
+            reviews_section.query_one(Label).update(Text("No reviews yet", style="dim"))
 
         # Comments
         comments_section = self.query_one("#pr-comments", Collapsible)
@@ -152,9 +148,7 @@ class PRContextPanel(VerticalScroll):
                     lines.append(f"\n{c.body}")
             comments_section.query_one(Label).update(lines)
         else:
-            comments_section.query_one(Label).update(
-                Text("No comments", style="dim")
-            )
+            comments_section.query_one(Label).update(Text("No comments", style="dim"))
 
         # CI Checks
         checks_section = self.query_one("#pr-checks", Collapsible)

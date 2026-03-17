@@ -4,9 +4,19 @@
 }
 
 #left-pane {
-    width: 60%;
+    width: 75%;
     height: 100%;
     border: solid green;
+}
+
+FileViewer {
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+#file-content {
+    min-width: 100%;
+    width: auto;
 }
 
 #right-pane {
@@ -16,6 +26,10 @@
 
 #diff-container {
     display: none;
+    height: 1fr;
+}
+
+#diff-panels {
     layout: horizontal;
     height: 1fr;
 }
@@ -23,20 +37,22 @@
 #diff-left, #diff-right {
     width: 1fr;
     height: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
 }
 
-GitStatusPanel ListView {
+GitStatusPanel {
+    height: 1fr;
+    overflow-x: auto;
+}
+
+GitStatusPanel > ListItem {
     height: auto;
-    max-height: 15;
+    width: auto;
 }
 
-GitStatusPanel ListItem {
-    height: 1;
-}
-
-GitStatusPanel .section-header {
-    text-style: bold;
-    padding: 1 0 0 1;
+GitStatusPanel > .section-header {
+    height: auto;
 }
 
 .placeholder {
