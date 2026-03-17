@@ -242,9 +242,7 @@ class TestArrowAndEnter:
                 self._navigate_to(panel, "#42")
                 await pilot.press("enter")
                 await pilot.pause()
-                mock_open.assert_called_once_with(
-                    "https://github.com/org/repo/pull/42"
-                )
+                mock_open.assert_called_once_with("https://github.com/org/repo/pull/42")
 
     async def test_enter_on_ci_check(self, worktree: Path) -> None:
         pr = _make_pr_context()
@@ -341,9 +339,7 @@ class TestMouseClick:
                 assert item is not None, "PR title item not found"
                 await pilot.click(item)
                 await pilot.pause()
-                mock_open.assert_called_once_with(
-                    "https://github.com/org/repo/pull/42"
-                )
+                mock_open.assert_called_once_with("https://github.com/org/repo/pull/42")
 
     async def test_click_ci_check(self, worktree: Path) -> None:
         pr = _make_pr_context()
@@ -513,7 +509,11 @@ class TestHighlightPreview:
         pr = _make_pr_context()
         checks = _make_checks()
         p1, p2 = _patches(pr=pr, checks=checks)
-        with p1, p2, patch("perch.services.github.get_job_log", return_value="log output"):
+        with (
+            p1,
+            p2,
+            patch("perch.services.github.get_job_log", return_value="log output"),
+        ):
             async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
                 panel = await self._activate_pr_tab(pilot)
                 check_item = _find_item_with_text(panel, "build")
@@ -523,15 +523,21 @@ class TestHighlightPreview:
                 await pilot.pause()
                 content = self._viewer_text(pilot)
                 # Should show loading or the actual log (depending on timing)
-                assert "Loading" in content or "log output" in content or "CI" in content
+                assert (
+                    "Loading" in content or "log output" in content or "CI" in content
+                )
 
     async def test_highlight_ci_check_shows_log(self, worktree: Path) -> None:
         """After fetching, the CI check log is displayed in the viewer."""
         pr = _make_pr_context()
         checks = _make_checks()
         p1, p2 = _patches(pr=pr, checks=checks)
-        with p1, p2, patch(
-            "perch.services.github.get_job_log", return_value="step 1\nstep 2\nDone"
+        with (
+            p1,
+            p2,
+            patch(
+                "perch.services.github.get_job_log", return_value="step 1\nstep 2\nDone"
+            ),
         ):
             async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
                 panel = await self._activate_pr_tab(pilot)
@@ -567,9 +573,10 @@ class TestHighlightPreview:
 
 class TestActionRefresh:
     async def test_refresh_calls_github(self, worktree: Path) -> None:
-        with patch(
-            "perch.services.github.get_pr_context", return_value=None
-        ) as mock_pr, patch("perch.services.github.get_checks", return_value=[]):
+        with (
+            patch("perch.services.github.get_pr_context", return_value=None) as mock_pr,
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
             async with PerchApp(worktree).run_test() as pilot:
                 await pilot.pause()
                 await pilot.pause()

@@ -6,7 +6,11 @@ from unittest.mock import patch
 from textual.widgets import Label, ListItem
 
 from perch.models import Commit, GitFile, GitStatusData
-from perch.widgets.git_status import GitStatusPanel, _make_file_item, _make_section_header
+from perch.widgets.git_status import (
+    GitStatusPanel,
+    _make_file_item,
+    _make_section_header,
+)
 
 
 class TestMakeFileItem:
@@ -90,8 +94,15 @@ _SAMPLE_STATUS = GitStatusData(
     untracked=[GitFile(path="new.txt", status="untracked", staged=False)],
 )
 _SAMPLE_COMMITS = [
-    Commit(hash="aaa111", message="first commit", author="Alice", relative_time="2 hours ago"),
-    Commit(hash="bbb222", message="second commit", author="Bob", relative_time="1 day ago"),
+    Commit(
+        hash="aaa111",
+        message="first commit",
+        author="Alice",
+        relative_time="2 hours ago",
+    ),
+    Commit(
+        hash="bbb222", message="second commit", author="Bob", relative_time="1 day ago"
+    ),
 ]
 
 
@@ -157,7 +168,9 @@ class TestUpdateDisplay:
 
                 children = list(panel.children)
                 # Should have 4 section headers + 3 placeholder items = 7
-                disabled_items = [c for c in children if isinstance(c, ListItem) and c.disabled]
+                disabled_items = [
+                    c for c in children if isinstance(c, ListItem) and c.disabled
+                ]
                 assert len(disabled_items) >= 7
 
     async def test_status_with_files_and_commits(self, tmp_path: Path) -> None:
@@ -176,7 +189,9 @@ class TestUpdateDisplay:
                 await pilot.pause()
 
                 # Check file items exist by name
-                names = [c.name for c in panel.children if isinstance(c, ListItem) and c.name]
+                names = [
+                    c.name for c in panel.children if isinstance(c, ListItem) and c.name
+                ]
                 assert "file_a.py" in names
                 assert "file_b.py" in names
                 assert "new.txt" in names
@@ -314,7 +329,8 @@ class TestOnListViewSelected:
                 mock_post = MagicMock()
 
                 file_item = _make_file_item(
-                    GitFile(path="file_a.py", status="modified", staged=False), staged=False
+                    GitFile(path="file_a.py", status="modified", staged=False),
+                    staged=False,
                 )
                 from textual.widgets import ListView
 

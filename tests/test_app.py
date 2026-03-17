@@ -266,7 +266,6 @@ class TestFocusPaneToggle:
             assert tree.has_focus
 
 
-
 class TestFocusActiveTab:
     """Tests for _focus_active_tab() targeting each tab."""
 
@@ -303,9 +302,7 @@ class TestFocusActiveTab:
 class TestGitStatusPanelFileSelected:
     """Tests for on_git_status_panel_file_selected() handler."""
 
-    async def test_file_selected_loads_existing_file(
-        self, git_worktree: Path
-    ) -> None:
+    async def test_file_selected_loads_existing_file(self, git_worktree: Path) -> None:
         """Selecting an existing file should load it in the viewer."""
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
@@ -330,9 +327,7 @@ class TestGitStatusPanelFileSelected:
             assert viewer._diff_mode is True
             assert viewer._current_path == git_worktree / "hello.py"
 
-    async def test_file_selected_deleted_file_no_diff(
-        self, worktree: Path
-    ) -> None:
+    async def test_file_selected_deleted_file_no_diff(self, worktree: Path) -> None:
         """Selecting a deleted file with no git diff available should show fallback."""
         # No git repo, so get_diff will raise RuntimeError
         # Remove file so it is not found
@@ -350,9 +345,7 @@ class TestGitStatusPanelFileSelected:
 class TestGitStatusPanelCommitSelected:
     """Tests for on_git_status_panel_commit_selected() handler."""
 
-    async def test_commit_selected_loads_commit_diff(
-        self, git_worktree: Path
-    ) -> None:
+    async def test_commit_selected_loads_commit_diff(self, git_worktree: Path) -> None:
         """Selecting a commit should load its diff in the viewer."""
         # Get the commit hash
         result = subprocess.run(
@@ -386,9 +379,7 @@ class TestToggleDiff:
                 pilot.app.action_toggle_diff()
                 mock.assert_called_once()
 
-    async def test_toggle_diff_layout_delegates_to_viewer(
-        self, worktree: Path
-    ) -> None:
+    async def test_toggle_diff_layout_delegates_to_viewer(self, worktree: Path) -> None:
         """action_toggle_diff_layout should call the viewer's method."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
@@ -401,9 +392,7 @@ class TestToggleDiff:
 class TestDiffFileNavigation:
     """Tests for action_next_diff_file() and action_prev_diff_file()."""
 
-    async def test_next_diff_file_delegates_to_viewer(
-        self, worktree: Path
-    ) -> None:
+    async def test_next_diff_file_delegates_to_viewer(self, worktree: Path) -> None:
         """action_next_diff_file should call the viewer's action."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
@@ -412,9 +401,7 @@ class TestDiffFileNavigation:
                 pilot.app.action_next_diff_file()
                 mock.assert_called_once()
 
-    async def test_prev_diff_file_delegates_to_viewer(
-        self, worktree: Path
-    ) -> None:
+    async def test_prev_diff_file_delegates_to_viewer(self, worktree: Path) -> None:
         """action_prev_diff_file should call the viewer's action."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:

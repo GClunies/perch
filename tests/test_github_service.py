@@ -59,6 +59,7 @@ class TestParsePrView:
             state="APPROVED",
             body="LGTM",
             submitted_at="2025-01-15T10:00:00Z",
+            url="https://github.com/org/repo/pull/10",
         )
         assert result.reviews[1].author == "bob"
         assert result.reviews[1].state == "CHANGES_REQUESTED"
@@ -85,6 +86,7 @@ class TestParsePrView:
             author="carol",
             body="Nice work!",
             created_at="2025-01-15T12:00:00Z",
+            url="https://github.com/org/repo/pull/5",
         )
 
     def test_null_review_decision(self) -> None:

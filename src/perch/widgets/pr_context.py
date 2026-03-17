@@ -194,9 +194,7 @@ class PRContextPanel(ListView):
                 self.index = i
                 break
 
-    def _append_item(
-        self, text: Text, url: str = "", preview_kind: str = ""
-    ) -> None:
+    def _append_item(self, text: Text, url: str = "", preview_kind: str = "") -> None:
         """Append a clickable item that opens a URL when clicked."""
         self.append(ClickableItem(Label(text), url=url, preview_kind=preview_kind))
 

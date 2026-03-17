@@ -23,7 +23,9 @@ class PerchApp(App):
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        Binding("question_mark", "command_palette", "Help", key_display="?", priority=True),
+        Binding(
+            "question_mark", "command_palette", "Help", key_display="?", priority=True
+        ),
         Binding("tab", "focus_next_pane", "Switch Pane", priority=True),
         ("1", "show_tab('tab-files')", "Files"),
         ("2", "show_tab('tab-git')", "Git"),
@@ -174,7 +176,6 @@ class PerchApp(App):
         else:
             self.query_one(WorktreeFileTree).focus()
 
-
     def action_file_search(self) -> None:
         """Open the fuzzy file search modal."""
         self.push_screen(FileSearchScreen(self.worktree_path), self._on_file_selected)
@@ -255,9 +256,7 @@ class PerchApp(App):
         viewer._show_content_view()
 
         if not log_text.strip():
-            viewer._content.update(
-                Text("No log output available", style="dim italic")
-            )
+            viewer._content.update(Text("No log output available", style="dim italic"))
             return
 
         result = Text()

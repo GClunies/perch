@@ -11,8 +11,7 @@ class TestCLIEntryPoint:
 
     def test_default_path_is_current_dir(self) -> None:
         """With no arguments, path should default to '.' resolved."""
-        with patch("sys.argv", ["perch"]), \
-             patch("perch.app.PerchApp") as MockApp:
+        with patch("sys.argv", ["perch"]), patch("perch.app.PerchApp") as MockApp:
             mock_instance = MagicMock()
             MockApp.return_value = mock_instance
 
@@ -27,8 +26,10 @@ class TestCLIEntryPoint:
 
     def test_explicit_path(self, tmp_path: Path) -> None:
         """An explicit path argument should be resolved and passed to PerchApp."""
-        with patch("sys.argv", ["perch", str(tmp_path)]), \
-             patch("perch.app.PerchApp") as MockApp:
+        with (
+            patch("sys.argv", ["perch", str(tmp_path)]),
+            patch("perch.app.PerchApp") as MockApp,
+        ):
             mock_instance = MagicMock()
             MockApp.return_value = mock_instance
 
@@ -43,8 +44,10 @@ class TestCLIEntryPoint:
 
     def test_editor_option(self, tmp_path: Path) -> None:
         """--editor should be passed to PerchApp."""
-        with patch("sys.argv", ["perch", str(tmp_path), "--editor", "vim"]), \
-             patch("perch.app.PerchApp") as MockApp:
+        with (
+            patch("sys.argv", ["perch", str(tmp_path), "--editor", "vim"]),
+            patch("perch.app.PerchApp") as MockApp,
+        ):
             mock_instance = MagicMock()
             MockApp.return_value = mock_instance
 
@@ -59,8 +62,7 @@ class TestCLIEntryPoint:
 
     def test_editor_defaults_to_none(self) -> None:
         """Without --editor, editor should be None."""
-        with patch("sys.argv", ["perch"]), \
-             patch("perch.app.PerchApp") as MockApp:
+        with patch("sys.argv", ["perch"]), patch("perch.app.PerchApp") as MockApp:
             mock_instance = MagicMock()
             MockApp.return_value = mock_instance
 

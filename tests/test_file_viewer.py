@@ -192,12 +192,7 @@ class TestRenderDiff:
     """Covers render_diff() for both dark and light themes."""
 
     SAMPLE_DIFF = (
-        "--- a/foo.py\n"
-        "+++ b/foo.py\n"
-        "@@ -1,3 +1,3 @@\n"
-        " context\n"
-        "-old line\n"
-        "+new line"
+        "--- a/foo.py\n+++ b/foo.py\n@@ -1,3 +1,3 @@\n context\n-old line\n+new line"
     )
 
     def test_dark_mode_styles(self) -> None:
@@ -416,10 +411,7 @@ class TestFileViewerLoadDiff:
 
     async def test_load_diff_unified(self, worktree: Path) -> None:
         """When get_diff returns text and layout is unified, render_diff is used."""
-        diff_text = (
-            "--- a/hello.py\n+++ b/hello.py\n"
-            "@@ -1 +1 @@\n-old\n+new"
-        )
+        diff_text = "--- a/hello.py\n+++ b/hello.py\n@@ -1 +1 @@\n-old\n+new"
         app = PerchApp(worktree)
         async with app.run_test():
             viewer = app.query_one(FileViewer)
@@ -431,10 +423,7 @@ class TestFileViewerLoadDiff:
 
     async def test_load_diff_side_by_side(self, worktree: Path) -> None:
         """Side-by-side layout uses _show_side_by_side_view."""
-        diff_text = (
-            "--- a/hello.py\n+++ b/hello.py\n"
-            "@@ -1 +1 @@\n-old\n+new"
-        )
+        diff_text = "--- a/hello.py\n+++ b/hello.py\n@@ -1 +1 @@\n-old\n+new"
         app = PerchApp(worktree)
         async with app.run_test():
             viewer = app.query_one(FileViewer)
@@ -545,9 +534,7 @@ class TestFileViewerLoadCommitDiff:
         async with app.run_test():
             viewer = app.query_one(FileViewer)
             viewer.worktree_root = worktree
-            with patch(
-                "perch.services.git.get_commit_diff", return_value=""
-            ):
+            with patch("perch.services.git.get_commit_diff", return_value=""):
                 viewer.load_commit_diff("abc123")
                 assert viewer._diff_file_offsets == []
                 assert viewer._diff_file_index == 0
@@ -706,35 +693,39 @@ class TestFileViewerExceptionFallbacks:
         async with app.run_test():
             viewer = app.query_one(FileViewer)
             with patch.object(
-                type(app), "current_theme", new_callable=lambda: property(
+                type(app),
+                "current_theme",
+                new_callable=lambda: property(
                     lambda self: (_ for _ in ()).throw(AttributeError("no theme"))
                 ),
             ):
                 assert viewer._get_syntax_theme() == "monokai"
 
-    async def test_get_background_color_exception_returns_empty(
+    async def test_get_background_color_exception_returns_none(
         self, worktree: Path
     ) -> None:
-        """If app.current_theme raises, fall back to empty string."""
+        """If app.current_theme raises, fall back to None."""
         app = PerchApp(worktree)
         async with app.run_test():
             viewer = app.query_one(FileViewer)
             with patch.object(
-                type(app), "current_theme", new_callable=lambda: property(
+                type(app),
+                "current_theme",
+                new_callable=lambda: property(
                     lambda self: (_ for _ in ()).throw(AttributeError("no theme"))
                 ),
             ):
-                assert viewer._get_background_color() == ""
+                assert viewer._get_background_color() is None
 
-    async def test_is_dark_theme_exception_returns_true(
-        self, worktree: Path
-    ) -> None:
+    async def test_is_dark_theme_exception_returns_true(self, worktree: Path) -> None:
         """If app.current_theme raises, fall back to True (dark)."""
         app = PerchApp(worktree)
         async with app.run_test():
             viewer = app.query_one(FileViewer)
             with patch.object(
-                type(app), "current_theme", new_callable=lambda: property(
+                type(app),
+                "current_theme",
+                new_callable=lambda: property(
                     lambda self: (_ for _ in ()).throw(AttributeError("no theme"))
                 ),
             ):
