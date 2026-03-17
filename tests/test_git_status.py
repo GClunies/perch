@@ -1,51 +1,550 @@
 """Tests for GitStatusPanel widget and helpers."""
 
-from perch.models import GitFile
-from perch.widgets.git_status import _render_file_list
+from pathlib import Path
+from unittest.mock import patch
+
+from textual.widgets import Label, ListItem
+
+from perch.models import Commit, GitFile, GitStatusData
+from perch.widgets.git_status import GitStatusPanel, _make_file_item, _make_section_header
 
 
-class TestRenderFileList:
-    """Tests for _render_file_list helper."""
-
-    def test_empty_list(self) -> None:
-        result = _render_file_list([])
-        assert result.plain == ""
+class TestMakeFileItem:
+    """Tests for _make_file_item helper."""
 
     def test_single_modified_file(self) -> None:
-        files = [GitFile(path="src/app.py", status="modified", staged=False)]
-        result = _render_file_list(files)
-        assert "modified" in result.plain
-        assert "src/app.py" in result.plain
+        f = GitFile(path="src/app.py", status="modified", staged=False)
+        item = _make_file_item(f)
+        assert item.name == "src/app.py"
 
-    def test_multiple_files(self) -> None:
-        files = [
-            GitFile(path="a.py", status="modified", staged=False),
-            GitFile(path="b.py", status="deleted", staged=False),
-        ]
-        result = _render_file_list(files)
-        assert "a.py" in result.plain
-        assert "b.py" in result.plain
-        assert "modified" in result.plain
-        assert "deleted" in result.plain
+    def test_staged_flag(self) -> None:
+        f = GitFile(path="a.py", status="added", staged=True)
+        item = _make_file_item(f, staged=True)
+        assert getattr(item, "_staged", False) is True
 
-    def test_untracked_file(self) -> None:
-        files = [GitFile(path="new.txt", status="untracked", staged=False)]
-        result = _render_file_list(files)
-        assert "untracked" in result.plain
-        assert "new.txt" in result.plain
-
-    def test_files_separated_by_newlines(self) -> None:
-        files = [
-            GitFile(path="a.py", status="added", staged=True),
-            GitFile(path="b.py", status="added", staged=True),
-        ]
-        result = _render_file_list(files)
-        lines = result.plain.strip().split("\n")
-        assert len(lines) == 2
+    def test_unstaged_flag(self) -> None:
+        f = GitFile(path="a.py", status="modified", staged=False)
+        item = _make_file_item(f, staged=False)
+        assert getattr(item, "_staged", True) is False
 
     def test_all_status_types_render(self) -> None:
-        statuses = ["modified", "added", "deleted", "renamed", "copied", "unmerged", "type-changed", "untracked"]
-        files = [GitFile(path=f"{s}.py", status=s, staged=False) for s in statuses]
-        result = _render_file_list(files)
+        statuses = [
+            "modified",
+            "added",
+            "deleted",
+            "renamed",
+            "copied",
+            "unmerged",
+            "type-changed",
+            "untracked",
+        ]
         for s in statuses:
-            assert s in result.plain
+            f = GitFile(path=f"{s}.py", status=s, staged=False)
+            item = _make_file_item(f)
+            assert item.name == f"{s}.py"
+
+
+class TestMakeSectionHeader:
+    """Tests for _make_section_header helper."""
+
+    def test_returns_disabled_list_item(self) -> None:
+        item = _make_section_header("Unstaged Changes")
+        assert isinstance(item, ListItem)
+        assert item.disabled is True
+
+    def test_has_section_header_class(self) -> None:
+        item = _make_section_header("Staged Changes")
+        assert "section-header" in item.classes
+
+
+class TestFileSelectedMessage:
+    """Tests for GitStatusPanel.FileSelected message."""
+
+    def test_attributes(self) -> None:
+        msg = GitStatusPanel.FileSelected(path="src/app.py", staged=True)
+        assert msg.path == "src/app.py"
+        assert msg.staged is True
+
+    def test_unstaged(self) -> None:
+        msg = GitStatusPanel.FileSelected(path="README.md", staged=False)
+        assert msg.path == "README.md"
+        assert msg.staged is False
+
+
+class TestCommitSelectedMessage:
+    """Tests for GitStatusPanel.CommitSelected message."""
+
+    def test_attributes(self) -> None:
+        msg = GitStatusPanel.CommitSelected(commit_hash="abc123")
+        assert msg.commit_hash == "abc123"
+
+
+# ---------------------------------------------------------------------------
+# Helpers for async widget tests
+# ---------------------------------------------------------------------------
+
+_EMPTY_STATUS = GitStatusData()
+_SAMPLE_STATUS = GitStatusData(
+    unstaged=[GitFile(path="file_a.py", status="modified", staged=False)],
+    staged=[GitFile(path="file_b.py", status="added", staged=True)],
+    untracked=[GitFile(path="new.txt", status="untracked", staged=False)],
+)
+_SAMPLE_COMMITS = [
+    Commit(hash="aaa111", message="first commit", author="Alice", relative_time="2 hours ago"),
+    Commit(hash="bbb222", message="second commit", author="Bob", relative_time="1 day ago"),
+]
+
+
+def _patch_git_services(status=_EMPTY_STATUS, commits=None):
+    """Return a tuple of patches for get_status, get_log, and github services."""
+    if commits is None:
+        commits = []
+    return (
+        patch("perch.services.git.get_status", return_value=status),
+        patch("perch.services.git.get_log", return_value=commits),
+        patch("perch.services.github.get_pr_context", return_value=None),
+        patch("perch.services.github.get_checks", return_value=[]),
+    )
+
+
+def _init_git_repo(path: Path) -> None:
+    """Initialise a tiny git repo so PerchApp can resolve a branch."""
+    import subprocess
+
+    subprocess.run(["git", "init", str(path)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(path), "commit", "--allow-empty", "-m", "init"],
+        check=True,
+        capture_output=True,
+        env={
+            "GIT_AUTHOR_NAME": "test",
+            "GIT_AUTHOR_EMAIL": "test@test.com",
+            "GIT_COMMITTER_NAME": "test",
+            "GIT_COMMITTER_EMAIL": "test@test.com",
+            "PATH": "/usr/bin:/bin:/usr/local/bin",
+            "HOME": str(path),
+        },
+    )
+
+
+class TestGitStatusPanelIsListView:
+    """GitStatusPanel should be a ListView subclass."""
+
+    def test_inherits_list_view(self) -> None:
+        from textual.widgets import ListView
+
+        assert issubclass(GitStatusPanel, ListView)
+
+
+class TestUpdateDisplay:
+    """Tests for GitStatusPanel._update_display()."""
+
+    async def test_empty_status_shows_placeholders(self, tmp_path: Path) -> None:
+        """With no files and no commits, all sections show 'No ...' placeholders."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_EMPTY_STATUS, [])
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+                # Force an update so we don't rely on the threaded worker
+                panel._update_display(_EMPTY_STATUS, [])
+                await pilot.pause()
+
+                children = list(panel.children)
+                # Should have 4 section headers + 3 placeholder items = 7
+                disabled_items = [c for c in children if isinstance(c, ListItem) and c.disabled]
+                assert len(disabled_items) >= 7
+
+    async def test_status_with_files_and_commits(self, tmp_path: Path) -> None:
+        """Files and commits are rendered as selectable ListItems."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Check file items exist by name
+                names = [c.name for c in panel.children if isinstance(c, ListItem) and c.name]
+                assert "file_a.py" in names
+                assert "file_b.py" in names
+                assert "new.txt" in names
+                assert "commit:aaa111" in names
+                assert "commit:bbb222" in names
+
+    async def test_update_display_restores_selection(self, tmp_path: Path) -> None:
+        """_update_display should restore the previously-selected item."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Find index of file_b.py and select it
+                for i, child in enumerate(panel.children):
+                    if isinstance(child, ListItem) and child.name == "file_b.py":
+                        panel.index = i
+                        break
+
+                # Update again — selection should be restored to file_b.py
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                selected_name = panel._get_selected_name()
+                assert selected_name == "file_b.py"
+
+
+class TestGetSelectedName:
+    """Tests for _get_selected_name."""
+
+    async def test_returns_none_when_no_selection(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                panel.clear()
+                panel.index = None
+                assert panel._get_selected_name() is None
+
+    async def test_returns_name_of_selected_item(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Select file_a.py
+                for i, child in enumerate(panel.children):
+                    if isinstance(child, ListItem) and child.name == "file_a.py":
+                        panel.index = i
+                        break
+                assert panel._get_selected_name() == "file_a.py"
+
+
+class TestRestoreSelection:
+    """Tests for _restore_selection."""
+
+    async def test_restores_by_name(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._restore_selection("file_b.py")
+                assert panel._get_selected_name() == "file_b.py"
+
+    async def test_falls_back_to_first_enabled(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Passing None should select the first enabled item
+                panel._restore_selection(None)
+                selected = panel._get_selected_name()
+                # First enabled item should be file_a.py (first non-header)
+                assert selected == "file_a.py"
+
+
+class TestOnListViewSelected:
+    """Tests for on_list_view_selected dispatching FileSelected / CommitSelected."""
+
+    async def test_file_selected_message(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                mock_post = MagicMock()
+
+                file_item = _make_file_item(
+                    GitFile(path="file_a.py", status="modified", staged=False), staged=False
+                )
+                from textual.widgets import ListView
+
+                event = ListView.Selected(panel, file_item, index=0)
+                with patch.object(panel, "post_message", mock_post):
+                    panel.on_list_view_selected(event)
+                assert mock_post.call_count == 1
+                msg = mock_post.call_args[0][0]
+                assert isinstance(msg, GitStatusPanel.FileSelected)
+                assert msg.path == "file_a.py"
+                assert msg.staged is False
+
+    async def test_commit_selected_message(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+
+                mock_post = MagicMock()
+                commit_item = ListItem(Label("commit"), name="commit:abc123")
+                from textual.widgets import ListView
+
+                event = ListView.Selected(panel, commit_item, index=0)
+                with patch.object(panel, "post_message", mock_post):
+                    panel.on_list_view_selected(event)
+                assert mock_post.call_count == 1
+                msg = mock_post.call_args[0][0]
+                assert isinstance(msg, GitStatusPanel.CommitSelected)
+                assert msg.commit_hash == "abc123"
+
+    async def test_none_name_is_ignored(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+
+                mock_post = MagicMock()
+                item = ListItem(Label("header"))
+                from textual.widgets import ListView
+
+                event = ListView.Selected(panel, item, index=0)
+                with patch.object(panel, "post_message", mock_post):
+                    panel.on_list_view_selected(event)
+                mock_post.assert_not_called()
+
+    async def test_staged_file_selected_message(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+
+                mock_post = MagicMock()
+                file_item = _make_file_item(
+                    GitFile(path="staged.py", status="added", staged=True), staged=True
+                )
+                from textual.widgets import ListView
+
+                event = ListView.Selected(panel, file_item, index=0)
+                with patch.object(panel, "post_message", mock_post):
+                    panel.on_list_view_selected(event)
+                assert mock_post.call_count == 1
+                msg = mock_post.call_args[0][0]
+                assert isinstance(msg, GitStatusPanel.FileSelected)
+                assert msg.staged is True
+
+
+class TestPageUpDown:
+    """Tests for action_page_up and action_page_down."""
+
+    async def test_page_down_moves_index_forward(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Set index to first enabled item
+                panel._restore_selection(None)
+                old_index = panel.index
+                assert old_index is not None
+
+                panel.action_page_down()
+                assert panel.index is not None
+                assert panel.index >= old_index
+
+    async def test_page_up_moves_index_backward(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Select the last commit item
+                last_idx = len(panel.children) - 1
+                panel.index = last_idx
+
+                panel.action_page_up()
+                assert panel.index is not None
+                assert panel.index <= last_idx
+
+    async def test_page_up_with_none_index(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                panel.clear()
+                panel.index = None
+                # Should not raise
+                panel.action_page_up()
+                assert panel.index is None
+
+    async def test_page_down_with_none_index(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+                panel.clear()
+                panel.index = None
+                panel.action_page_down()
+                assert panel.index is None
+
+
+class TestShowNotGitRepo:
+    """Tests for _show_not_git_repo."""
+
+    async def test_displays_not_git_repo_message(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+
+                panel._show_not_git_repo()
+                await pilot.pause()
+
+                assert panel._is_git_repo is False
+                assert len(panel.children) == 1
+
+
+class TestDoRefreshRuntimeError:
+    """Tests for _do_refresh RuntimeError handling."""
+
+    async def test_runtime_error_shows_not_git_repo(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        # Make get_status raise RuntimeError on the FIRST call so the
+        # on_mount refresh triggers _show_not_git_repo.
+        with patch(
+            "perch.services.git.get_status", side_effect=RuntimeError("not a git repo")
+        ):
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                # Give the threaded worker time to complete and call back
+                for _ in range(20):
+                    await pilot.pause()
+                assert panel._is_git_repo is False
+
+
+class TestActionRefresh:
+    """Tests for action_refresh."""
+
+    async def test_action_refresh_calls_do_refresh(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                await pilot.pause()
+
+                # Patch _do_refresh to track calls
+                called = []
+                original = panel._do_refresh
+                panel._do_refresh = lambda: called.append(True) or original()  # type: ignore[assignment]
+
+                panel.action_refresh()
+                assert len(called) == 1

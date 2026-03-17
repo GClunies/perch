@@ -1,48 +1,84 @@
+import subprocess
 from pathlib import Path
 
-from perch.widgets.file_tree import EXCLUDED_NAMES, WorktreeFileTree
+from perch.widgets.file_tree import ALWAYS_EXCLUDED, WorktreeFileTree
+
+
+def _init_git_repo(path: Path, gitignore: str = "") -> None:
+    """Create a git repo with an optional .gitignore."""
+    subprocess.run(["git", "init", str(path)], check=True, capture_output=True)
+    if gitignore:
+        (path / ".gitignore").write_text(gitignore)
 
 
 class TestFilterPaths:
     """Tests for WorktreeFileTree.filter_paths()."""
 
-    def _filter(self, names: list[str]) -> list[str]:
-        tree = WorktreeFileTree("/tmp")
-        paths = [Path(name) for name in names]
-        return [p.name for p in tree.filter_paths(paths)]
-
-    def test_excludes_git_directory(self) -> None:
-        assert ".git" not in self._filter([".git", "src"])
-
-    def test_excludes_pycache(self) -> None:
-        assert "__pycache__" not in self._filter(["__pycache__", "main.py"])
-
-    def test_excludes_ds_store(self) -> None:
-        assert ".DS_Store" not in self._filter([".DS_Store", "readme.md"])
-
-    def test_excludes_node_modules(self) -> None:
-        assert "node_modules" not in self._filter(["node_modules", "src"])
-
-    def test_excludes_ruff_cache(self) -> None:
-        assert ".ruff_cache" not in self._filter([".ruff_cache", "src"])
-
-    def test_excludes_egg_info(self) -> None:
-        result = self._filter(["perch.egg-info", "src"])
-        assert "perch.egg-info" not in result
+    def test_always_excludes_git_directory(self, tmp_path: Path) -> None:
+        tree = WorktreeFileTree(str(tmp_path))
+        paths = [tmp_path / ".git", tmp_path / "src"]
+        result = [p.name for p in tree.filter_paths(paths)]
+        assert ".git" in ALWAYS_EXCLUDED
+        assert ".git" not in result
         assert "src" in result
 
-    def test_keeps_normal_files(self) -> None:
-        result = self._filter(["src", "tests", "pyproject.toml", "README.md"])
-        assert result == ["src", "tests", "pyproject.toml", "README.md"]
+    def test_shows_gitignored_files(self, tmp_path: Path) -> None:
+        """Gitignored files should appear but be tracked as ignored."""
+        _init_git_repo(tmp_path, gitignore="__pycache__/\n.venv/\n")
+        tree = WorktreeFileTree(str(tmp_path))
+        paths = [tmp_path / "__pycache__", tmp_path / ".venv", tmp_path / "src"]
+        result = [p.name for p in tree.filter_paths(paths)]
+        # All shown — nothing filtered out (except .git)
+        assert "__pycache__" in result
+        assert ".venv" in result
+        assert "src" in result
+        # But ignored paths are tracked
+        assert tmp_path / "__pycache__" in tree._ignored_paths
+        assert tmp_path / ".venv" in tree._ignored_paths
+        assert tmp_path / "src" not in tree._ignored_paths
 
-    def test_empty_input(self) -> None:
-        assert self._filter([]) == []
+    def test_keeps_normal_files(self, tmp_path: Path) -> None:
+        _init_git_repo(tmp_path)
+        tree = WorktreeFileTree(str(tmp_path))
+        paths = [tmp_path / "src", tmp_path / "tests", tmp_path / "pyproject.toml"]
+        result = [p.name for p in tree.filter_paths(paths)]
+        assert result == ["src", "tests", "pyproject.toml"]
 
-    def test_all_excluded(self) -> None:
-        result = self._filter(list(EXCLUDED_NAMES))
-        assert result == []
+    def test_empty_input(self, tmp_path: Path) -> None:
+        tree = WorktreeFileTree(str(tmp_path))
+        assert list(tree.filter_paths([])) == []
 
-    def test_mixed_input(self) -> None:
-        names = [".git", "src", "__pycache__", "main.py", "node_modules", ".DS_Store"]
-        result = self._filter(names)
-        assert result == ["src", "main.py"]
+    def test_graceful_without_git_repo(self, tmp_path: Path) -> None:
+        """Without a git repo, all files except .git are shown."""
+        tree = WorktreeFileTree(str(tmp_path))
+        paths = [tmp_path / ".git", tmp_path / "src", tmp_path / "__pycache__"]
+        result = [p.name for p in tree.filter_paths(paths)]
+        assert ".git" not in result
+        assert "src" in result
+        assert "__pycache__" in result
+
+
+class TestIsDimmed:
+    """Tests for _is_dimmed() — dotfiles and gitignored paths."""
+
+    def test_dotfile_is_dimmed(self, tmp_path: Path) -> None:
+        tree = WorktreeFileTree(str(tmp_path))
+        assert tree._is_dimmed(tmp_path / ".env") is True
+
+    def test_dotdir_is_dimmed(self, tmp_path: Path) -> None:
+        tree = WorktreeFileTree(str(tmp_path))
+        assert tree._is_dimmed(tmp_path / ".venv") is True
+
+    def test_normal_file_not_dimmed(self, tmp_path: Path) -> None:
+        tree = WorktreeFileTree(str(tmp_path))
+        assert tree._is_dimmed(tmp_path / "main.py") is False
+
+    def test_ignored_path_is_dimmed(self, tmp_path: Path) -> None:
+        tree = WorktreeFileTree(str(tmp_path))
+        tree._ignored_paths.add(tmp_path / "node_modules")
+        assert tree._is_dimmed(tmp_path / "node_modules") is True
+
+    def test_non_ignored_path_not_dimmed(self, tmp_path: Path) -> None:
+        tree = WorktreeFileTree(str(tmp_path))
+        tree._ignored_paths.add(tmp_path / "dist")
+        assert tree._is_dimmed(tmp_path / "src") is False
