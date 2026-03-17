@@ -27,6 +27,38 @@ def _run_git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
+def get_ignored_paths(root: Path, paths: list[Path]) -> set[Path]:
+    """Return the subset of *paths* that are ignored by git."""
+    if not paths:
+        return set()
+    # Send each path twice — once plain, once with trailing / — so git
+    # matches both file and directory ignore patterns.
+    path_map: dict[str, Path] = {}
+    for p in paths:
+        try:
+            rel = str(p.relative_to(root))
+        except ValueError:
+            rel = str(p)
+        path_map[rel] = p
+        path_map[rel.rstrip("/") + "/"] = p
+
+    input_text = "\n".join(path_map.keys())
+    result = subprocess.run(
+        ["git", "check-ignore", "--stdin"],
+        cwd=root,
+        input=input_text,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    ignored = set()
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if line and line in path_map:
+            ignored.add(path_map[line])
+    return ignored
+
+
 def get_worktree_root(path: Path) -> Path:
     """Return the git worktree root for *path*, or raise if not in a repo."""
     result = _run_git(["rev-parse", "--show-toplevel"], cwd=path)
@@ -96,6 +128,20 @@ def get_diff(root: Path, path: str, staged: bool = False) -> str:
     result = _run_git(args, cwd=root)
     if result.returncode != 0:
         raise RuntimeError(f"git diff failed: {result.stderr.strip()}")
+    return result.stdout
+
+
+def get_commit_diff(root: Path, commit_hash: str) -> str:
+    """Return the full diff for a commit (all files).
+
+    Uses ``git show`` with unified diff format.
+    """
+    result = _run_git(
+        ["show", "--no-color", "--format=", commit_hash],
+        cwd=root,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"git show failed: {result.stderr.strip()}")
     return result.stdout
 
 

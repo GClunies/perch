@@ -7,21 +7,12 @@ from typing import Iterable
 from rich.style import Style
 from rich.text import Text
 from textual import work
+from textual.binding import Binding
 from textual.widgets import DirectoryTree
 from textual.widgets._tree import TreeNode
 
-EXCLUDED_NAMES: set[str] = {
+ALWAYS_EXCLUDED: set[str] = {
     ".git",
-    "__pycache__",
-    ".DS_Store",
-    "node_modules",
-    ".ruff_cache",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".venv",
-    ".tox",
-    ".eggs",
-    ".beads",
 }
 
 # Maps git status labels to (short code, color) for tree indicators.
@@ -41,9 +32,45 @@ _GIT_INDICATORS: dict[str, tuple[str, str]] = {
 class WorktreeFileTree(DirectoryTree):
     """A directory tree that filters out noise directories."""
 
+    BINDINGS = [
+        Binding("right", "expand_node", "Expand", show=False),
+        Binding("left", "collapse_node", "Collapse", show=False),
+        Binding("pageup", "page_up", "Page Up", show=False),
+        Binding("pagedown", "page_down", "Page Down", show=False),
+    ]
+
+    def action_expand_node(self) -> None:
+        """Expand the currently highlighted folder node."""
+        node = self.cursor_node
+        if node is not None and node._allow_expand and not node.is_expanded:
+            node.expand()
+
+    def action_collapse_node(self) -> None:
+        """Collapse the currently highlighted folder node."""
+        node = self.cursor_node
+        if node is not None and node._allow_expand and node.is_expanded:
+            node.collapse()
+        elif node is not None and node.parent is not None:
+            # On a file or already-collapsed folder, jump to parent
+            self.select_node(node.parent)
+            node.parent.collapse()
+
+    def _page_size(self) -> int:
+        """Return the number of visible lines in the tree viewport."""
+        return max(1, self.scrollable_content_region.height)
+
+    def action_page_up(self) -> None:
+        """Move cursor up by a page."""
+        self.cursor_line = max(0, self.cursor_line - self._page_size())
+
+    def action_page_down(self) -> None:
+        """Move cursor down by a page."""
+        self.cursor_line = min(self.last_line, self.cursor_line + self._page_size())
+
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._git_status: dict[str, str] = {}
+        self._ignored_paths: set[Path] = set()
         self._stop_watching = threading.Event()
 
     def on_mount(self) -> None:
@@ -81,28 +108,42 @@ class WorktreeFileTree(DirectoryTree):
             pass
 
     def _apply_git_status(self, status: dict[str, str]) -> None:
-        """Apply fetched git status and re-render the tree."""
+        """Apply fetched git status and reload the tree structure."""
         self._git_status = status
-        self.root.refresh()
+        self.reload()
 
     def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
-        return [
-            path
-            for path in paths
-            if path.name not in EXCLUDED_NAMES
-            and not path.name.endswith(".egg-info")
-        ]
+        path_list = [p for p in paths if p.name not in ALWAYS_EXCLUDED]
+        if not path_list:
+            return path_list
+        try:
+            from perch.services.git import get_ignored_paths
 
-    def render_label(
-        self, node: TreeNode, base_style: Style, style: Style
-    ) -> Text:
+            self._ignored_paths |= get_ignored_paths(Path(self.path), path_list)
+        except Exception:
+            pass
+        return path_list
+
+    def _is_dimmed(self, path: Path) -> bool:
+        """Return True if the path is gitignored or a dotfile/dotdir."""
+        if path.name.startswith("."):
+            return True
+        return path in self._ignored_paths
+
+    def render_label(self, node: TreeNode, base_style: Style, style: Style) -> Text:
         label = super().render_label(node, base_style, style)
 
-        if node._allow_expand or node.data is None:
+        path = node.data.path if hasattr(node.data, "path") else node.data
+        if node.data is None or not isinstance(path, Path):
             return label
 
-        path = node.data.path if hasattr(node.data, "path") else node.data
-        if not isinstance(path, Path):
+        # Dim gitignored and hidden entries
+        if self._is_dimmed(path):
+            label.stylize("dim")
+            return label
+
+        # Git status indicators (files only)
+        if node._allow_expand:
             return label
 
         try:
