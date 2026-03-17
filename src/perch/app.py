@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from rich.syntax import Syntax
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.widgets import Footer, Header, TabbedContent, TabPane
 
@@ -18,25 +18,31 @@ from perch.widgets.splitter import DraggableSplitter
 class PerchApp(App):
     CSS_PATH = "app.tcss"
     COMMANDS = App.COMMANDS | {DiscoveryCommandProvider}
+    COMMAND_PALETTE_BINDING = "question_mark"
 
     BINDINGS = [
         ("q", "quit", "Quit"),
+        Binding("question_mark", "command_palette", "Help", key_display="?", priority=True),
+        Binding("tab", "focus_next_pane", "Switch Pane", priority=True),
         ("1", "show_tab('tab-files')", "Files"),
         ("2", "show_tab('tab-git')", "Git"),
         ("3", "show_tab('tab-pr')", "PR"),
-        ("tab", "focus_next_pane", "Next Pane"),
-        ("shift+tab", "focus_prev_pane", "Prev Pane"),
-        ("ctrl+p", "file_search", "Search Files"),
-        ("ctrl+shift+p", "command_palette", "Command Palette"),
-        ("e", "open_editor", "Open in Editor"),
-        ("left_square_bracket", "shrink_left_pane", "Shrink Left"),
-        ("right_square_bracket", "grow_left_pane", "Grow Left"),
+        ("f", "toggle_focus_mode", "Focus Mode"),
+        ("ctrl+p", "file_search", "File Search"),
+        Binding("d", "toggle_diff", "Toggle Diff", show=False),
+        Binding("s", "toggle_diff_layout", "Diff Layout", show=False),
+        Binding("n", "next_diff_file", "Next File", show=False),
+        Binding("p", "prev_diff_file", "Prev File", show=False),
+        Binding("e", "open_editor", "Editor", show=False),
+        Binding("[", "shrink_left_pane", "", show=False),
+        Binding("]", "grow_left_pane", "", show=False),
     ]
 
     def __init__(self, worktree_path: Path, editor: str | None = None) -> None:
         super().__init__()
         self.worktree_path = worktree_path
         self.editor = editor
+        self._focus_mode = False
         self._branch: str | None = None
         try:
             from perch.services.git import get_current_branch, get_worktree_root
@@ -64,6 +70,7 @@ class PerchApp(App):
         else:
             self.title = "perch"
         self.sub_title = str(self.worktree_path)
+        self._focus_active_tab()
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -87,6 +94,7 @@ class PerchApp(App):
         viewer = self.query_one(FileViewer)
         if file_path.is_file():
             viewer.load_file(file_path)
+            viewer.focus()
         else:
             # File was deleted — show message and offer diff view
             viewer._current_path = file_path
@@ -98,28 +106,23 @@ class PerchApp(App):
 
             rel_path = event.path
             try:
-                diff_text = get_diff(
-                    self.worktree_path, rel_path, staged=event.staged
-                )
+                diff_text = get_diff(self.worktree_path, rel_path, staged=event.staged)
             except RuntimeError:
                 diff_text = ""
             from rich.console import Group
             from rich.text import Text
 
+            from perch.widgets.file_viewer import render_diff
+
             if diff_text:
-                syntax = Syntax(
-                    diff_text,
-                    "diff",
-                    line_numbers=True,
-                    word_wrap=False,
-                    theme=viewer._get_syntax_theme(),
-                )
+                styled = render_diff(diff_text, dark=viewer._is_dark_theme())
                 header = Text("File deleted — showing diff\n", style="bold red")
-                viewer._content.update(Group(header, syntax))
+                viewer._content.update(Group(header, styled))
             else:
                 viewer._content.update(
                     Text("File deleted — no diff available", style="bold red")
                 )
+            viewer.focus()
 
     def on_tree_node_highlighted(self, event) -> None:
         """Update the file viewer when a tree node is highlighted (cursor moves)."""
@@ -130,21 +133,46 @@ class PerchApp(App):
         if isinstance(path, Path) and path.is_file():
             self.query_one(FileViewer).load_file(path)
 
+    def on_directory_tree_file_selected(self, event) -> None:
+        """Focus the file viewer when a file is selected with enter."""
+        viewer = self.query_one(FileViewer)
+        viewer.load_file(event.path)
+        viewer.focus()
+
     def action_show_tab(self, tab: str) -> None:
-        """Switch to the specified tab."""
+        """Switch to the specified tab and focus its content."""
         self.query_one(TabbedContent).active = tab
+        self._focus_active_tab()
 
     def action_focus_next_pane(self) -> None:
         """Move focus to the other pane."""
         viewer = self.query_one("#left-pane", FileViewer)
         if viewer.has_focus:
-            self.query_one(WorktreeFileTree).focus()
+            self._focus_active_tab()
         else:
             viewer.focus()
 
-    def action_focus_prev_pane(self) -> None:
-        """Move focus to the other pane (reverse direction)."""
-        self.action_focus_next_pane()
+    def _focus_active_tab(self) -> None:
+        """Focus the first navigable widget inside the active right-pane tab."""
+        tabbed = self.query_one(TabbedContent)
+        active = tabbed.active
+
+        if active == "tab-files":
+            tree = self.query_one(WorktreeFileTree)
+            tree.focus()
+            # Ensure the cursor is on the root so arrow keys work immediately
+            if tree.cursor_line == -1:
+                tree.cursor_line = 0
+        elif active == "tab-git":
+            panel = self.query_one(GitStatusPanel)
+            panel.focus()
+            if panel.index is None:
+                panel._restore_selection(None)
+        elif active == "tab-pr":
+            self.query_one(PRContextPanel).focus()
+        else:
+            self.query_one(WorktreeFileTree).focus()
+
 
     def action_file_search(self) -> None:
         """Open the fuzzy file search modal."""
@@ -163,6 +191,15 @@ class PerchApp(App):
         if viewer._current_path is not None:
             open_file(self.editor, viewer._current_path, self.worktree_path)
 
+    def on_git_status_panel_commit_selected(
+        self, event: GitStatusPanel.CommitSelected
+    ) -> None:
+        """Handle commit selection in the git tab — show full commit diff."""
+        viewer = self.query_one(FileViewer)
+        viewer.worktree_root = self.worktree_path
+        viewer.load_commit_diff(event.commit_hash)
+        viewer.focus()
+
     def action_toggle_diff(self) -> None:
         """Toggle diff view in the file viewer (command palette entry)."""
         self.query_one(FileViewer).action_toggle_diff()
@@ -171,6 +208,32 @@ class PerchApp(App):
         """Toggle diff layout in the file viewer (command palette entry)."""
         self.query_one(FileViewer).action_toggle_diff_layout()
 
+    def action_next_diff_file(self) -> None:
+        """Jump to the next file in a multi-file diff."""
+        self.query_one(FileViewer).action_next_diff_file()
+
+    def action_prev_diff_file(self) -> None:
+        """Jump to the previous file in a multi-file diff."""
+        self.query_one(FileViewer).action_prev_diff_file()
+
+    def action_toggle_focus_mode(self) -> None:
+        """Toggle the right pane and splitter to give the left pane full width."""
+        self._focus_mode = not self._focus_mode
+        right_pane = self.query_one("#right-pane", TabbedContent)
+        splitter = self.query_one(DraggableSplitter)
+        viewer = self.query_one("#left-pane", FileViewer)
+
+        if self._focus_mode:
+            right_pane.display = False
+            splitter.display = False
+            viewer.styles.width = "100%"
+            viewer.focus()
+        else:
+            right_pane.display = True
+            splitter.display = True
+            viewer.styles.width = "75%"
+            self._focus_active_tab()
+
     def action_shrink_left_pane(self) -> None:
         """Shrink the left pane by 2 columns."""
         self.query_one(DraggableSplitter).resize_left_pane(-2)
@@ -178,4 +241,3 @@ class PerchApp(App):
     def action_grow_left_pane(self) -> None:
         """Grow the left pane by 2 columns."""
         self.query_one(DraggableSplitter).resize_left_pane(2)
-
