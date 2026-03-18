@@ -9,7 +9,7 @@ from rich.text import Text
 from textual import work
 from textual.binding import Binding
 from textual.widgets import DirectoryTree
-from textual.widgets._tree import TreeNode
+from textual.widgets._tree import Tree, TreeNode
 
 ALWAYS_EXCLUDED: set[str] = {
     ".git",
@@ -53,11 +53,20 @@ class WorktreeFileTree(DirectoryTree):
         """Collapse the currently highlighted folder node."""
         node = self.cursor_node
         if node is not None and node._allow_expand and node.is_expanded:
+            if node is self.root:
+                return  # Root is the worktree anchor — never collapse it
             node.collapse()
         elif node is not None and node.parent is not None:
-            # On a file or already-collapsed folder, jump to parent
-            self.select_node(node.parent)
-            node.parent.collapse()
+            parent = node.parent
+            if parent is self.root:
+                return  # Don't collapse the root by navigating up
+            self.select_node(parent)
+            parent.collapse()
+
+    def on_tree_node_collapsed(self, event: Tree.NodeCollapsed) -> None:
+        """Re-expand the root immediately if it is ever collapsed (e.g. via click)."""
+        if event.node is self.root:
+            self.root.expand()
 
     def _page_size(self) -> int:
         """Return the number of visible lines in the tree viewport."""

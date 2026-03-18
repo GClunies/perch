@@ -10,7 +10,7 @@ from textual.widgets import Footer, Header, TabbedContent, TabPane
 from perch.app import PerchApp
 from perch.commands import DiscoveryCommandProvider
 from perch.widgets.file_tree import WorktreeFileTree
-from perch.widgets.file_viewer import FileViewer
+from perch.widgets.viewer import Viewer
 from perch.widgets.git_status import GitStatusPanel
 from perch.widgets.github_panel import GitHubPanel
 from perch.widgets.splitter import DraggableSplitter
@@ -78,9 +78,9 @@ class TestPerchAppCompose:
             assert pilot.app.sub_title == str(worktree)
 
     async def test_has_file_viewer(self, worktree: Path) -> None:
-        """App should have a FileViewer as the left pane."""
+        """App should have a Viewer as the left pane."""
         async with PerchApp(worktree).run_test() as pilot:
-            viewer = pilot.app.query_one("#left-pane", FileViewer)
+            viewer = pilot.app.query_one("#left-pane", Viewer)
             assert viewer is not None
 
     async def test_has_tabbed_content(self, worktree: Path) -> None:
@@ -247,14 +247,14 @@ class TestFocusPaneToggle:
             # Press tab to toggle to left pane
             pilot.app.action_focus_next_pane()
             await pilot.pause()
-            viewer = pilot.app.query_one("#left-pane", FileViewer)
+            viewer = pilot.app.query_one("#left-pane", Viewer)
             assert viewer.has_focus
 
     async def test_focus_next_pane_from_left_to_right(self, worktree: Path) -> None:
         """Tab from left pane should move focus back to the active tab."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one("#left-pane", FileViewer)
+            viewer = pilot.app.query_one("#left-pane", Viewer)
             viewer.focus()
             await pilot.pause()
             assert viewer.has_focus
@@ -306,7 +306,7 @@ class TestGitStatusPanelFileSelected:
         """Selecting an existing file should load it in the viewer."""
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             event = GitStatusPanel.FileSelected(path="hello.py", staged=False)
             pilot.app.on_git_status_panel_file_selected(event)
             await pilot.pause()
@@ -320,7 +320,7 @@ class TestGitStatusPanelFileSelected:
         (git_worktree / "hello.py").unlink()
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             event = GitStatusPanel.FileSelected(path="hello.py", staged=False)
             pilot.app.on_git_status_panel_file_selected(event)
             await pilot.pause()
@@ -334,7 +334,7 @@ class TestGitStatusPanelFileSelected:
         deleted_name = "gone.py"
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             event = GitStatusPanel.FileSelected(path=deleted_name, staged=False)
             pilot.app.on_git_status_panel_file_selected(event)
             await pilot.pause()
@@ -359,7 +359,7 @@ class TestGitStatusPanelCommitSelected:
 
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             event = GitStatusPanel.CommitSelected(commit_hash=commit_hash)
             pilot.app.on_git_status_panel_commit_selected(event)
             await pilot.pause()
@@ -374,7 +374,7 @@ class TestToggleDiff:
         """action_toggle_diff should call the viewer's action_toggle_diff."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             with patch.object(viewer, "action_toggle_diff") as mock:
                 pilot.app.action_toggle_diff()
                 mock.assert_called_once()
@@ -383,7 +383,7 @@ class TestToggleDiff:
         """action_toggle_diff_layout should call the viewer's method."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             with patch.object(viewer, "action_toggle_diff_layout") as mock:
                 pilot.app.action_toggle_diff_layout()
                 mock.assert_called_once()
@@ -396,7 +396,7 @@ class TestDiffFileNavigation:
         """action_next_diff_file should call the viewer's action."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             with patch.object(viewer, "action_next_diff_file") as mock:
                 pilot.app.action_next_diff_file()
                 mock.assert_called_once()
@@ -405,7 +405,7 @@ class TestDiffFileNavigation:
         """action_prev_diff_file should call the viewer's action."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             with patch.object(viewer, "action_prev_diff_file") as mock:
                 pilot.app.action_prev_diff_file()
                 mock.assert_called_once()
@@ -432,7 +432,7 @@ class TestToggleFocusMode:
         async with app.run_test() as pilot:
             pilot.app.action_toggle_focus_mode()
             await pilot.pause()
-            viewer = pilot.app.query_one("#left-pane", FileViewer)
+            viewer = pilot.app.query_one("#left-pane", Viewer)
             assert viewer.styles.width is not None
             assert "100" in str(viewer.styles.width)
 
@@ -442,7 +442,7 @@ class TestToggleFocusMode:
         async with app.run_test() as pilot:
             pilot.app.action_toggle_focus_mode()
             await pilot.pause()
-            viewer = pilot.app.query_one("#left-pane", FileViewer)
+            viewer = pilot.app.query_one("#left-pane", Viewer)
             assert viewer.has_focus
 
     async def test_exit_focus_mode_restores_layout(self, worktree: Path) -> None:
@@ -469,7 +469,7 @@ class TestToggleFocusMode:
             await pilot.pause()
             pilot.app.action_toggle_focus_mode()
             await pilot.pause()
-            viewer = pilot.app.query_one("#left-pane", FileViewer)
+            viewer = pilot.app.query_one("#left-pane", Viewer)
             assert "75" in str(viewer.styles.width)
 
 
@@ -518,7 +518,7 @@ class TestOpenEditor:
         """action_open_editor should call open_file when a file is loaded."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             with patch("perch.app.open_file") as mock:
                 pilot.app.action_open_editor()
@@ -532,7 +532,7 @@ class TestOpenEditor:
         """action_open_editor should do nothing when no file is loaded."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             viewer._current_path = None
             with patch("perch.app.open_file") as mock:
                 pilot.app.action_open_editor()
@@ -554,7 +554,7 @@ class TestWatchTheme:
         """watch_theme should re-render when a file is loaded."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             viewer.load_file(worktree / "hello.py")
             await pilot.pause()
             # Should not raise
@@ -564,7 +564,7 @@ class TestWatchTheme:
         """watch_theme in diff mode should call _load_diff."""
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             viewer._current_path = git_worktree / "hello.py"
             viewer._diff_mode = True
             with patch.object(viewer, "_load_diff") as mock:
@@ -579,7 +579,7 @@ class TestFileSearch:
         """_on_file_selected(None) should not load any file."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             viewer._current_path = None
             pilot.app._on_file_selected(None)
             await pilot.pause()
@@ -589,7 +589,7 @@ class TestFileSearch:
         """_on_file_selected with a valid relative path should load the file."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             pilot.app._on_file_selected("hello.py")
             await pilot.pause()
             assert viewer._current_path == worktree / "hello.py"
@@ -600,7 +600,7 @@ class TestFileSearch:
         """_on_file_selected with a non-existent file should not load it."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(FileViewer)
+            viewer = pilot.app.query_one(Viewer)
             viewer._current_path = None
             pilot.app._on_file_selected("nonexistent.py")
             await pilot.pause()
@@ -613,3 +613,75 @@ class TestFileSearch:
             with patch.object(pilot.app, "push_screen") as mock:
                 pilot.app.action_file_search()
                 mock.assert_called_once()
+
+    async def test_on_file_selected_updates_files_tab_cache(
+        self, worktree: Path
+    ) -> None:
+        """_on_file_selected should cache the path under _files_tab_last_path."""
+        app = PerchApp(worktree)
+        async with app.run_test() as pilot:
+            pilot.app._on_file_selected("hello.py")
+            await pilot.pause()
+            assert pilot.app._files_tab_last_path == worktree / "hello.py"
+
+
+class TestSelectionRestored:
+    """Tests for on_git_status_panel_selection_restored."""
+
+    async def test_ignored_when_git_tab_not_active(self, worktree: Path) -> None:
+        """SelectionRestored is a no-op when the Git tab is not active."""
+        with (
+            patch("perch.services.git.get_status", return_value=__import__("perch.models", fromlist=["GitStatusData"]).GitStatusData()),
+            patch("perch.services.git.get_log", return_value=[]),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                # Files tab is active by default; load a file so the viewer has content
+                viewer = pilot.app.query_one(Viewer)
+                viewer.load_file(worktree / "hello.py")
+                await pilot.pause()
+                assert viewer._current_path == worktree / "hello.py"
+
+                # Fire SelectionRestored while on Files tab — viewer must not change
+                from perch.widgets.git_status import GitStatusPanel
+                panel = pilot.app.query_one(GitStatusPanel)
+                pilot.app.on_git_status_panel_selection_restored(
+                    GitStatusPanel.SelectionRestored()
+                )
+                await pilot.pause()
+                # Viewer content unchanged
+                assert viewer._current_path == worktree / "hello.py"
+
+    async def test_syncs_viewer_when_git_tab_active(self, worktree: Path) -> None:
+        """SelectionRestored updates the viewer when the Git tab is active."""
+        from perch.models import Commit, GitFile, GitStatusData
+        from perch.widgets.git_status import GitStatusPanel
+
+        status = GitStatusData(
+            unstaged=[GitFile(path="hello.py", status="modified", staged=False)]
+        )
+        commits = [Commit(hash="abc", message="m", author="a", relative_time="now")]
+        with (
+            patch("perch.services.git.get_status", return_value=status),
+            patch("perch.services.git.get_log", return_value=commits),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                from textual.widgets import TabbedContent
+
+                pilot.app.query_one(TabbedContent).active = "tab-git"
+                panel = pilot.app.query_one(GitStatusPanel)
+                panel._update_display(status, commits)
+                await pilot.pause()
+
+                # SelectionRestored while Git tab is active — viewer should load file
+                pilot.app.on_git_status_panel_selection_restored(
+                    GitStatusPanel.SelectionRestored()
+                )
+                await pilot.pause()
+                viewer = pilot.app.query_one(Viewer)
+                assert viewer._current_path == worktree / "hello.py"

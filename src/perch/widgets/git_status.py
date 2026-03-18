@@ -62,6 +62,13 @@ class GitStatusPanel(ListView):
             super().__init__()
             self.commit_hash = commit_hash
 
+    class SelectionRestored(Message):
+        """Posted after each data refresh once the selection has been set.
+
+        The app uses this to sync the viewer when the Git tab is active and the
+        initial async load completes after the user switched to the tab.
+        """
+
     BINDINGS = [
         ("r", "refresh", "Refresh"),
         Binding("pageup", "page_up", "Page Up", show=False),
@@ -79,6 +86,13 @@ class GitStatusPanel(ListView):
         super().__init__(name=name, id=id, classes=classes)
         self._worktree_root = worktree_root
         self._is_git_repo = True
+
+    def _on_list_item__child_clicked(self, event: ListItem._ChildClicked) -> None:
+        """Guard against stale item references after an auto-refresh."""
+        try:
+            super()._on_list_item__child_clicked(event)
+        except ValueError:
+            pass  # Item was replaced by a concurrent refresh
 
     def on_mount(self) -> None:
         self.append(_make_section_header("Loading git status..."))
@@ -151,29 +165,45 @@ class GitStatusPanel(ListView):
             item = ListItem(Label(text), name=f"commit:{c.hash}")
             self.append(item)
 
-        # Restore selection
+        # Restore selection and notify the app so it can sync the viewer
         self._restore_selection(saved_name)
+        self.post_message(self.SelectionRestored())
 
     def _get_selected_name(self) -> str | None:
         """Get the file name of the currently selected item."""
-        if self.index is not None and 0 <= self.index < len(self):
-            item = self.children[self.index]
-            if isinstance(item, ListItem) and item.name is not None:
-                return item.name
+        item = self.highlighted_child
+        if isinstance(item, ListItem) and item.name is not None:
+            return item.name
         return None
 
     def _restore_selection(self, saved_name: str | None) -> None:
         """Restore selection by file name, or select the first enabled item."""
         if saved_name is not None:
-            for i, child in enumerate(self.children):
-                if isinstance(child, ListItem) and child.name == saved_name:
+            for i, node in enumerate(self._nodes):
+                if isinstance(node, ListItem) and node.name == saved_name:
                     self.index = i
                     return
         # Select first enabled item
-        for i, child in enumerate(self.children):
-            if isinstance(child, ListItem) and not child.disabled:
+        for i, node in enumerate(self._nodes):
+            if isinstance(node, ListItem) and not node.disabled:
                 self.index = i
                 return
+
+    def activate_current_selection(self) -> bool:
+        """Post the appropriate message for the currently selected item.
+
+        Returns True if an item was activated, False if nothing is selected.
+        """
+        item = self.highlighted_child
+        if not isinstance(item, ListItem) or item.name is None:
+            return False
+        if item.name.startswith("commit:"):
+            commit_hash = item.name.removeprefix("commit:")
+            self.post_message(self.CommitSelected(commit_hash=commit_hash))
+        else:
+            staged = getattr(item, "_staged", False)
+            self.post_message(self.FileSelected(path=item.name, staged=staged))
+        return True
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Handle file or commit selection."""

@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
@@ -10,10 +9,10 @@ from perch.commands import DiscoveryCommandProvider
 from perch.services.editor import open_file
 from perch.widgets.file_search import FileSearchScreen
 from perch.widgets.file_tree import WorktreeFileTree
-from perch.widgets.file_viewer import FileViewer
 from perch.widgets.git_status import GitStatusPanel
 from perch.widgets.github_panel import GitHubPanel
 from perch.widgets.splitter import DraggableSplitter
+from perch.widgets.viewer import Viewer
 
 
 class PerchApp(App):
@@ -47,6 +46,8 @@ class PerchApp(App):
         self.editor = editor
         self._focus_mode = False
         self._branch: str | None = None
+        self._files_tab_last_path: Path | None = None
+        self._git_tab_first_visit = True
         try:
             from perch.services.git import get_current_branch, get_worktree_root
 
@@ -56,16 +57,12 @@ class PerchApp(App):
             pass
 
     def watch_theme(self, _value: str | None = None) -> None:
-        """Re-render the file viewer when the app theme changes."""
+        """Re-render the viewer when the app theme changes."""
         try:
-            viewer = self.query_one(FileViewer)
+            viewer = self.query_one(Viewer)
         except Exception:
             return
-        if viewer._current_path is not None:
-            if viewer._diff_mode:
-                viewer._load_diff()
-            else:
-                viewer.load_file(viewer._current_path)
+        viewer.refresh_content()
 
     def on_mount(self) -> None:
         if self._branch:
@@ -73,12 +70,13 @@ class PerchApp(App):
         else:
             self.title = "perch"
         self.sub_title = str(self.worktree_path)
+        self.query_one(TabbedContent).active = "tab-files"
         self._focus_active_tab()
 
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="main-content"):
-            yield FileViewer(worktree_root=self.worktree_path, id="left-pane")
+            yield Viewer(worktree_root=self.worktree_path, id="left-pane")
             yield DraggableSplitter()
             with TabbedContent(id="right-pane"):
                 with TabPane("\uf0c5", id="tab-files"):
@@ -89,58 +87,75 @@ class PerchApp(App):
                     yield GitHubPanel(self.worktree_path)
         yield Footer()
 
+    # ------------------------------------------------------------------
+    # Event handlers — right-pane selections → viewer
+    # ------------------------------------------------------------------
+
     def on_git_status_panel_file_selected(
         self, event: GitStatusPanel.FileSelected
     ) -> None:
-        """Handle file selection in the git tab — open in file viewer."""
+        """Handle file selection in the git tab — open in viewer."""
         file_path = self.worktree_path / event.path
-        viewer = self.query_one(FileViewer)
+        viewer = self.query_one(Viewer)
         if file_path.is_file():
             viewer.load_file(file_path)
-            viewer.focus()
         else:
-            # File was deleted — show message and offer diff view
-            viewer._current_path = file_path
-            viewer.worktree_root = self.worktree_path
-            viewer._diff_mode = True
-            viewer._diff_layout = "unified"
-            viewer._show_content_view()
-            from perch.services.git import get_diff
-
-            rel_path = event.path
-            try:
-                diff_text = get_diff(self.worktree_path, rel_path, staged=event.staged)
-            except RuntimeError:
-                diff_text = ""
-            from rich.console import Group
-            from rich.text import Text
-
-            from perch.widgets.file_viewer import render_diff
-
-            if diff_text:
-                styled = render_diff(diff_text, dark=viewer._is_dark_theme())
-                header = Text("File deleted — showing diff\n", style="bold red")
-                viewer._content.update(Group(header, styled))
-            else:
-                viewer._content.update(
-                    Text("File deleted — no diff available", style="bold red")
-                )
-            viewer.focus()
+            viewer.show_deleted_file_diff(file_path, event.path, staged=event.staged)
+        viewer.focus()
 
     def on_tree_node_highlighted(self, event) -> None:
-        """Update the file viewer when a tree node is highlighted (cursor moves)."""
+        """Update the viewer when a tree node is highlighted (cursor moves)."""
         node = event.node
         if node.data is None:
             return
         path = node.data.path if hasattr(node.data, "path") else node.data
         if isinstance(path, Path) and path.is_file():
-            self.query_one(FileViewer).load_file(path)
+            self.query_one(Viewer).load_file(path)
+            self._files_tab_last_path = path
 
     def on_directory_tree_file_selected(self, event) -> None:
-        """Focus the file viewer when a file is selected with enter."""
-        viewer = self.query_one(FileViewer)
+        """Focus the viewer when a file is selected with enter."""
+        viewer = self.query_one(Viewer)
         viewer.load_file(event.path)
         viewer.focus()
+
+    def on_git_status_panel_commit_selected(
+        self, event: GitStatusPanel.CommitSelected
+    ) -> None:
+        """Handle commit selection in the git tab — show full commit diff."""
+        viewer = self.query_one(Viewer)
+        viewer.worktree_root = self.worktree_path
+        viewer.load_commit_diff(event.commit_hash)
+        viewer.focus()
+
+    def on_git_hub_panel_preview_requested(
+        self, event: GitHubPanel.PreviewRequested
+    ) -> None:
+        """Show preview content in the viewer when a PR item is highlighted."""
+        if self.query_one(TabbedContent).active != "tab-github":
+            return
+        viewer = self.query_one(Viewer)
+        if event.preview_kind == "pr_body":
+            viewer.show_pr_body(event.body, title=event.title)
+        elif event.preview_kind == "review":
+            viewer.show_review(event.body, title=event.title)
+        elif event.preview_kind == "ci_check":
+            viewer.show_ci_loading(title=event.title)
+            viewer.fetch_ci_log(event.url)
+
+    def on_git_status_panel_selection_restored(
+        self, event: GitStatusPanel.SelectionRestored
+    ) -> None:
+        """Sync the viewer after an async git refresh, but only when Git tab is active."""
+        if self.query_one(TabbedContent).active != "tab-git":
+            return
+        panel = self.query_one(GitStatusPanel)
+        if not panel.activate_current_selection():
+            self.query_one(Viewer).show_clean_tree()
+
+    # ------------------------------------------------------------------
+    # Tab navigation
+    # ------------------------------------------------------------------
 
     def action_show_tab(self, tab: str) -> None:
         """Switch to the specified tab and focus its content."""
@@ -149,7 +164,7 @@ class PerchApp(App):
 
     def action_focus_next_pane(self) -> None:
         """Move focus to the other pane."""
-        viewer = self.query_one("#left-pane", FileViewer)
+        viewer = self.query_one("#left-pane", Viewer)
         if viewer.has_focus:
             self._focus_active_tab()
         else:
@@ -163,18 +178,34 @@ class PerchApp(App):
         if active == "tab-files":
             tree = self.query_one(WorktreeFileTree)
             tree.focus()
-            # Ensure the cursor is on the root so arrow keys work immediately
             if tree.cursor_line == -1:
                 tree.cursor_line = 0
+            # Restore the last file viewed in the Files context
+            viewer = self.query_one(Viewer)
+            if self._files_tab_last_path and self._files_tab_last_path.is_file():
+                viewer.load_file(self._files_tab_last_path)
+            else:
+                viewer.show_placeholder()
         elif active == "tab-git":
             panel = self.query_one(GitStatusPanel)
             panel.focus()
-            if panel.index is None:
+            if self._git_tab_first_visit or panel.index is None:
                 panel._restore_selection(None)
+                self._git_tab_first_visit = False
+            # Data may still be loading; SelectionRestored will sync the viewer
+            # once the async refresh completes. Handle the already-loaded case now.
+            if not panel.activate_current_selection():
+                self.query_one(Viewer).show_clean_tree()
         elif active == "tab-github":
-            self.query_one(GitHubPanel).focus()
+            github = self.query_one(GitHubPanel)
+            github.focus()
+            github.activate_current_preview()
         else:
             self.query_one(WorktreeFileTree).focus()
+
+    # ------------------------------------------------------------------
+    # File search
+    # ------------------------------------------------------------------
 
     def action_file_search(self) -> None:
         """Open the fuzzy file search modal."""
@@ -185,137 +216,45 @@ class PerchApp(App):
         if result is not None:
             path = self.worktree_path / result
             if path.is_file():
-                self.query_one(FileViewer).load_file(path)
+                self.query_one(Viewer).load_file(path)
+                self._files_tab_last_path = path
 
     def action_open_editor(self) -> None:
         """Open the currently highlighted file in the external editor."""
-        viewer = self.query_one(FileViewer)
+        viewer = self.query_one(Viewer)
         if viewer._current_path is not None:
             open_file(self.editor, viewer._current_path, self.worktree_path)
 
-    def on_git_status_panel_commit_selected(
-        self, event: GitStatusPanel.CommitSelected
-    ) -> None:
-        """Handle commit selection in the git tab — show full commit diff."""
-        viewer = self.query_one(FileViewer)
-        viewer.worktree_root = self.worktree_path
-        viewer.load_commit_diff(event.commit_hash)
-        viewer.focus()
-
-    def on_git_hub_panel_preview_requested(
-        self, event: GitHubPanel.PreviewRequested
-    ) -> None:
-        """Show preview content in the FileViewer when a PR item is highlighted."""
-        viewer = self.query_one(FileViewer)
-        if event.preview_kind == "pr_body":
-            self._show_pr_body(viewer, event.body)
-        elif event.preview_kind == "ci_check":
-            self._show_ci_loading(viewer)
-            self._fetch_ci_log(event.url)
-
-    def _show_pr_body(self, viewer: FileViewer, body: str) -> None:
-        from rich.console import Group
-        from rich.markdown import Markdown
-        from rich.text import Text
-
-        viewer._current_path = None
-        viewer._diff_mode = False
-        viewer._show_content_view()
-
-        if not body.strip():
-            viewer._content.update(Text("No PR description", style="dim italic"))
-            return
-
-        header = Text("PR Description\n", style="bold cyan")
-        viewer._content.update(Group(header, Markdown(body)))
-        viewer.scroll_home(animate=False)
-
-    def _show_ci_loading(self, viewer: FileViewer) -> None:
-        from rich.text import Text
-
-        viewer._current_path = None
-        viewer._diff_mode = False
-        viewer._show_content_view()
-        viewer._content.update(Text("Loading logs...", style="bold yellow"))
-
-    @work(thread=True, exclusive=True, group="ci_log")
-    def _fetch_ci_log(self, url: str) -> None:
-        from perch.services.github import get_job_log
-
-        log_text = get_job_log(url, self.worktree_path)
-        self.call_from_thread(self._show_ci_log, log_text)
-
-    def _show_ci_log(self, log_text: str) -> None:
-        import re
-
-        from rich.text import Text
-
-        viewer = self.query_one(FileViewer)
-        viewer._current_path = None
-        viewer._diff_mode = False
-        viewer._show_content_view()
-
-        if not log_text.strip():
-            viewer._content.update(Text("No log output available", style="dim italic"))
-            return
-
-        result = Text()
-        ansi_re = re.compile(r"\x1b\[[0-9;]*m")
-        current_group: str | None = None
-        for line in log_text.splitlines():
-            # Strip job/step/timestamp prefix: "job\tstep\t{timestamp} msg"
-            parts = line.split("\t", 2)
-            msg = parts[-1] if parts else line
-            # Strip ISO timestamp prefix (e.g. "2026-03-17T01:26:13.1234567Z ")
-            ts_match = re.match(r"\d{4}-\d{2}-\d{2}T[\d:.]+Z\s?", msg)
-            if ts_match:
-                msg = msg[ts_match.end() :]
-            # Strip ANSI escape codes
-            msg = ansi_re.sub("", msg)
-            # Parse GitHub Actions annotations
-            if msg.startswith("##[group]"):
-                current_group = msg[9:]
-                if result.plain:
-                    result.append("\n")
-                result.append(f"  {current_group}\n", style="bold cyan")
-                continue
-            if msg.startswith("##[endgroup]"):
-                current_group = None
-                continue
-            if msg.startswith("##[error]"):
-                result.append(f"  {msg[9:]}\n", style="bold red")
-                continue
-            if msg.startswith("##[warning]"):
-                result.append(f"  {msg[11:]}\n", style="yellow")
-                continue
-            # Regular log line
-            result.append(f"    {msg}\n")
-
-        viewer._content.update(result)
-        viewer.scroll_home(animate=False)
+    # ------------------------------------------------------------------
+    # Viewer action delegates
+    # ------------------------------------------------------------------
 
     def action_toggle_diff(self) -> None:
-        """Toggle diff view in the file viewer (command palette entry)."""
-        self.query_one(FileViewer).action_toggle_diff()
+        """Toggle diff view in the viewer (command palette entry)."""
+        self.query_one(Viewer).action_toggle_diff()
 
     def action_toggle_diff_layout(self) -> None:
-        """Toggle diff layout in the file viewer (command palette entry)."""
-        self.query_one(FileViewer).action_toggle_diff_layout()
+        """Toggle diff layout in the viewer (command palette entry)."""
+        self.query_one(Viewer).action_toggle_diff_layout()
 
     def action_next_diff_file(self) -> None:
         """Jump to the next file in a multi-file diff."""
-        self.query_one(FileViewer).action_next_diff_file()
+        self.query_one(Viewer).action_next_diff_file()
 
     def action_prev_diff_file(self) -> None:
         """Jump to the previous file in a multi-file diff."""
-        self.query_one(FileViewer).action_prev_diff_file()
+        self.query_one(Viewer).action_prev_diff_file()
+
+    # ------------------------------------------------------------------
+    # Focus mode & pane resizing
+    # ------------------------------------------------------------------
 
     def action_toggle_focus_mode(self) -> None:
         """Toggle the right pane and splitter to give the left pane full width."""
         self._focus_mode = not self._focus_mode
         right_pane = self.query_one("#right-pane", TabbedContent)
         splitter = self.query_one(DraggableSplitter)
-        viewer = self.query_one("#left-pane", FileViewer)
+        viewer = self.query_one("#left-pane", Viewer)
 
         if self._focus_mode:
             right_pane.display = False

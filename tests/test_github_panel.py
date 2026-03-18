@@ -312,7 +312,7 @@ def _find_item_with_text(panel: GitHubPanel, text_match: str) -> ListItem | None
 
 
 class TestHighlightPreview:
-    """Navigating to an item in the PR tab should preview its content in the FileViewer."""
+    """Navigating to an item in the PR tab should preview its content in the Viewer."""
 
     @staticmethod
     async def _activate_pr_tab(pilot) -> GitHubPanel:
@@ -329,14 +329,14 @@ class TestHighlightPreview:
 
     @staticmethod
     def _viewer_text(pilot) -> str:
-        """Render the FileViewer content to plain text."""
+        """Render the Viewer content to plain text."""
         from io import StringIO
 
         from rich.console import Console
 
-        from perch.widgets.file_viewer import FileViewer
+        from perch.widgets.viewer import Viewer
 
-        viewer = pilot.app.query_one(FileViewer)
+        viewer = pilot.app.query_one(Viewer)
         # Static stores its renderable in name-mangled _Static__content
         renderable = viewer._content._Static__content
         if renderable is None:
@@ -427,6 +427,146 @@ class TestHighlightPreview:
                 assert self._viewer_text(pilot) == initial
 
 
+class TestHighlightReview:
+    """Navigating to a review should show its body in the viewer."""
+
+    @staticmethod
+    async def _activate_pr_tab(pilot) -> GitHubPanel:
+        from textual.widgets import TabbedContent
+
+        await pilot.pause()
+        await pilot.pause()
+        pilot.app.query_one(TabbedContent).active = "tab-github"
+        await pilot.pause()
+        panel = pilot.app.query_one(GitHubPanel)
+        panel.focus()
+        await pilot.pause()
+        return panel
+
+    async def test_highlight_review_shows_body(self, worktree: Path) -> None:
+        pr = _make_pr_context(
+            reviews=[
+                PRReview(
+                    author="alice",
+                    state="APPROVED",
+                    body="Looks great!",
+                    submitted_at="2h ago",
+                    url="https://github.com/org/repo/pull/42#pullrequestreview-1",
+                ),
+            ],
+        )
+        p1, p2 = _patches(pr=pr, checks=[])
+        with p1, p2:
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                panel = await self._activate_pr_tab(pilot)
+                review_item = _find_item_with_text(panel, "alice")
+                assert review_item is not None
+                panel.index = list(panel.children).index(review_item)
+                await pilot.pause()
+                await pilot.pause()
+                from perch.widgets.viewer import Viewer
+
+                viewer = pilot.app.query_one(Viewer)
+                content = viewer._content._Static__content
+                assert content is not None
+                from io import StringIO
+
+                from rich.console import Console
+
+                console = Console(file=StringIO(), width=120)
+                console.print(content)
+                text = console.file.getvalue()
+                assert "Looks great" in text
+
+    async def test_highlight_review_no_body(self, worktree: Path) -> None:
+        pr = _make_pr_context(
+            reviews=[
+                PRReview(
+                    author="bob",
+                    state="COMMENTED",
+                    body="",
+                    submitted_at="1d ago",
+                    url="https://github.com/org/repo/pull/42#pullrequestreview-2",
+                ),
+            ],
+        )
+        p1, p2 = _patches(pr=pr, checks=[])
+        with p1, p2:
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                panel = await self._activate_pr_tab(pilot)
+                review_item = _find_item_with_text(panel, "bob")
+                assert review_item is not None
+                panel.index = list(panel.children).index(review_item)
+                await pilot.pause()
+                await pilot.pause()
+                from perch.widgets.viewer import Viewer
+
+                viewer = pilot.app.query_one(Viewer)
+                content = viewer._content._Static__content
+                assert content is not None
+                from io import StringIO
+
+                from rich.console import Console
+
+                console = Console(file=StringIO(), width=120)
+                console.print(content)
+                text = console.file.getvalue()
+                assert "No review body" in text
+
+
+class TestActivateCurrentPreview:
+    """Tests for GitHubPanel.activate_current_preview()."""
+
+    async def test_no_op_when_no_preview_item_highlighted(
+        self, worktree: Path
+    ) -> None:
+        """activate_current_preview does nothing when no previewable item is active."""
+        from unittest.mock import MagicMock
+
+        p1, p2 = _patches(pr=None, checks=[])
+        with p1, p2:
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitHubPanel)
+                await pilot.pause()
+                await pilot.pause()
+                mock_post = MagicMock()
+                with patch.object(panel, "post_message", mock_post):
+                    panel.activate_current_preview()
+                mock_post.assert_not_called()
+
+    async def test_posts_preview_for_pr_body(self, worktree: Path) -> None:
+        """activate_current_preview posts PreviewRequested for the PR title item."""
+        from unittest.mock import MagicMock
+
+        pr = _make_pr_context(body="## My PR")
+        p1, p2 = _patches(pr=pr, checks=[])
+        with p1, p2:
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                from textual.widgets import TabbedContent
+
+                pilot.app.query_one(TabbedContent).active = "tab-github"
+                await pilot.pause()
+                await pilot.pause()
+                panel = pilot.app.query_one(GitHubPanel)
+                # Point the index at the PR title item (first enabled item)
+                from perch.widgets.github_panel import ClickableItem
+
+                for i, child in enumerate(panel.children):
+                    if isinstance(child, ClickableItem) and child.preview_kind == "pr_body":
+                        panel.index = i
+                        break
+                await pilot.pause()
+
+                mock_post = MagicMock()
+                with patch.object(panel, "post_message", mock_post):
+                    panel.activate_current_preview()
+                assert mock_post.call_count == 1
+                msg = mock_post.call_args[0][0]
+                assert isinstance(msg, GitHubPanel.PreviewRequested)
+                assert msg.preview_kind == "pr_body"
+                assert "My PR" in msg.body
+
+
 class TestActionRefresh:
     async def test_refresh_calls_github(self, worktree: Path) -> None:
         with (
@@ -442,3 +582,41 @@ class TestActionRefresh:
                 await pilot.pause()
                 await pilot.pause()
                 assert mock_pr.call_count > initial
+
+
+class TestTwoPhaseLoading:
+    """PR context should render before actions finish loading."""
+
+    async def test_actions_show_loading_then_resolve(self, worktree: Path) -> None:
+        pr = _make_pr_context()
+        checks = _make_checks()
+        with (
+            patch("perch.services.github.get_pr_context", return_value=pr),
+            patch("perch.services.github.get_checks", return_value=checks),
+        ):
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                for _ in range(20):
+                    await pilot.pause()
+                panel = pilot.app.query_one(GitHubPanel)
+                text = _get_all_text(panel)
+                # After full load, actions should be resolved (not "Loading")
+                assert "Loading actions" not in text
+                assert "build" in text or "lint" in text
+
+    async def test_gh_missing_for_checks_still_shows_pr(self, worktree: Path) -> None:
+        """If get_checks raises FileNotFoundError, PR data should still display."""
+        pr = _make_pr_context()
+        with (
+            patch("perch.services.github.get_pr_context", return_value=pr),
+            patch(
+                "perch.services.github.get_checks",
+                side_effect=FileNotFoundError("no gh"),
+            ),
+        ):
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                for _ in range(20):
+                    await pilot.pause()
+                panel = pilot.app.query_one(GitHubPanel)
+                text = _get_all_text(panel)
+                assert "#42" in text
+                assert "Fix bug" in text

@@ -543,6 +543,77 @@ class TestDoRefreshRuntimeError:
                 assert panel._is_git_repo is False
 
 
+class TestActivateCurrentSelection:
+    """Tests for GitStatusPanel.activate_current_selection()."""
+
+    async def test_returns_false_when_no_selection(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                panel.index = None
+                mock_post = MagicMock()
+                with patch.object(panel, "post_message", mock_post):
+                    result = panel.activate_current_selection()
+                assert result is False
+                mock_post.assert_not_called()
+
+    async def test_posts_file_selected_for_file_item(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                # _update_display calls _restore_selection which selects the first
+                # enabled item (file_a.py — first unstaged file)
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+                assert panel.index is not None
+
+                mock_post = MagicMock()
+                with patch.object(panel, "post_message", mock_post):
+                    result = panel.activate_current_selection()
+                assert result is True
+                msg = mock_post.call_args[0][0]
+                assert isinstance(msg, GitStatusPanel.FileSelected)
+                assert msg.path == "file_a.py"
+
+    async def test_posts_commit_selected_for_commit_item(self, tmp_path: Path) -> None:
+        from unittest.mock import MagicMock
+
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_EMPTY_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                # With empty status + commits, first enabled item is the first commit
+                panel._update_display(_EMPTY_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+                assert panel.index is not None
+
+                mock_post = MagicMock()
+                with patch.object(panel, "post_message", mock_post):
+                    result = panel.activate_current_selection()
+                assert result is True
+                msg = mock_post.call_args[0][0]
+                assert isinstance(msg, GitStatusPanel.CommitSelected)
+                assert msg.commit_hash in {"aaa111", "bbb222"}
+
+
 class TestActionRefresh:
     """Tests for action_refresh."""
 
@@ -564,3 +635,29 @@ class TestActionRefresh:
 
                 panel.action_refresh()
                 assert len(called) == 1
+
+
+class TestStaleClickGuard:
+    """The click guard should swallow ValueError from stale item references."""
+
+    async def test_stale_click_does_not_raise(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitStatusPanel)
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Grab a reference to an item, then replace the list contents
+                old_item = panel.children[1]
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Simulate a click on the now-stale old_item
+                event = ListItem._ChildClicked(old_item)
+                # Should not raise ValueError
+                panel._on_list_item__child_clicked(event)

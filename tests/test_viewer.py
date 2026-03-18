@@ -1,4 +1,4 @@
-"""Tests for the FileViewer widget's helper functions."""
+"""Tests for the Viewer widget's helper functions."""
 
 from pathlib import Path
 from unittest.mock import patch
@@ -7,10 +7,10 @@ import pytest
 from rich.text import Text
 
 from perch.app import PerchApp
-from perch.widgets.file_viewer import (
+from perch.widgets.viewer import (
     BINARY_CHECK_SIZE,
     MAX_LINES,
-    FileViewer,
+    Viewer,
     SyncedDiffView,
     is_binary,
     parse_diff_sides,
@@ -157,14 +157,14 @@ def worktree(tmp_path: Path) -> Path:
     return tmp_path
 
 
-class TestFileViewerTheme:
+class TestViewerTheme:
     """Verify the file viewer background matches the active Textual theme."""
 
     async def test_background_color_matches_theme_surface(self, worktree: Path) -> None:
         """_get_background_color should return the current theme's surface color."""
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             surface = app.current_theme.surface
             assert viewer._get_background_color() == surface
 
@@ -174,7 +174,7 @@ class TestFileViewerTheme:
         """Switching themes should change the background color returned."""
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
 
             app.theme = "textual-dark"
             bg_dark = viewer._get_background_color()
@@ -254,7 +254,7 @@ class TestSyncedDiffView:
     async def test_compose_creates_panels(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             sdv = viewer.query_one(SyncedDiffView)
             # The two panels and their content statics exist
             assert sdv.query_one("#diff-left-content")
@@ -264,7 +264,7 @@ class TestSyncedDiffView:
         """All 8 scroll actions should execute without error."""
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             sdv = viewer.query_one(SyncedDiffView)
             # Make the diff container visible so scrolls have a target
             sdv.display = True
@@ -279,46 +279,46 @@ class TestSyncedDiffView:
 
 
 # ---------------------------------------------------------------------------
-# FileViewer._get_syntax_theme / _is_dark_theme (lines 211-237)
+# Viewer._get_syntax_theme / _is_dark_theme (lines 211-237)
 # ---------------------------------------------------------------------------
-class TestFileViewerHelpers:
+class TestViewerHelpers:
     async def test_get_syntax_theme_dark(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
             app.theme = "textual-dark"
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             assert viewer._get_syntax_theme() == "monokai"
 
     async def test_get_syntax_theme_light(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
             app.theme = "textual-light"
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             assert viewer._get_syntax_theme() == "default"
 
     async def test_is_dark_theme_dark(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
             app.theme = "textual-dark"
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             assert viewer._is_dark_theme() is True
 
     async def test_is_dark_theme_light(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
             app.theme = "textual-light"
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             assert viewer._is_dark_theme() is False
 
 
 # ---------------------------------------------------------------------------
-# FileViewer.load_file — lines 273-313
+# Viewer.load_file — lines 273-313
 # ---------------------------------------------------------------------------
-class TestFileViewerLoadFile:
+class TestViewerLoadFile:
     async def test_load_normal_file(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             hello = worktree / "hello.py"
             viewer.load_file(hello)
             assert viewer._current_path == hello
@@ -327,7 +327,7 @@ class TestFileViewerLoadFile:
     async def test_load_nonexistent_path(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer.load_file(worktree / "nope.py")
             # _content should say "Not a file"
             assert viewer._current_path == worktree / "nope.py"
@@ -337,7 +337,7 @@ class TestFileViewerLoadFile:
         binary.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00")
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer.load_file(binary)
             assert viewer._current_path == binary
 
@@ -346,7 +346,7 @@ class TestFileViewerLoadFile:
         subdir.mkdir()
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer.load_file(subdir)
             assert viewer._current_path == subdir
 
@@ -355,14 +355,14 @@ class TestFileViewerLoadFile:
         big.write_text("line\n" * (MAX_LINES + 100))
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer.load_file(big)
             assert viewer._current_path == big
 
     async def test_load_file_resets_diff_mode(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._diff_mode = True
             viewer._diff_layout = "side-by-side"
             viewer.load_file(worktree / "hello.py")
@@ -371,13 +371,13 @@ class TestFileViewerLoadFile:
 
 
 # ---------------------------------------------------------------------------
-# FileViewer._load_diff — lines 317-347
+# Viewer._load_diff — lines 317-347
 # ---------------------------------------------------------------------------
-class TestFileViewerLoadDiff:
+class TestViewerLoadDiff:
     async def test_load_diff_no_file_selected(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._current_path = None
             viewer.worktree_root = worktree
             viewer._load_diff()
@@ -386,7 +386,7 @@ class TestFileViewerLoadDiff:
     async def test_load_diff_no_worktree_root(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = None
             viewer._load_diff()
@@ -394,7 +394,7 @@ class TestFileViewerLoadDiff:
     async def test_load_diff_file_not_in_worktree(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._current_path = Path("/some/other/place.py")
             viewer.worktree_root = worktree
             viewer._load_diff()
@@ -403,7 +403,7 @@ class TestFileViewerLoadDiff:
         """When get_diff returns empty, show 'No changes'."""
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
             with patch("perch.services.git.get_diff", return_value=""):
@@ -414,7 +414,7 @@ class TestFileViewerLoadDiff:
         diff_text = "--- a/hello.py\n+++ b/hello.py\n@@ -1 +1 @@\n-old\n+new"
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
             viewer._diff_layout = "unified"
@@ -426,7 +426,7 @@ class TestFileViewerLoadDiff:
         diff_text = "--- a/hello.py\n+++ b/hello.py\n@@ -1 +1 @@\n-old\n+new"
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
             viewer._diff_layout = "side-by-side"
@@ -437,7 +437,7 @@ class TestFileViewerLoadDiff:
         """RuntimeError from get_diff is caught and displayed."""
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
             with patch(
@@ -448,14 +448,14 @@ class TestFileViewerLoadDiff:
 
 
 # ---------------------------------------------------------------------------
-# FileViewer.action_toggle_diff / action_toggle_diff_layout — lines 351-366
+# Viewer.action_toggle_diff / action_toggle_diff_layout — lines 351-366
 # ---------------------------------------------------------------------------
-class TestFileViewerToggleDiff:
+class TestViewerToggleDiff:
     async def test_toggle_diff_no_file(self, worktree: Path) -> None:
         """Toggle diff with no file should be a no-op."""
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._current_path = None
             viewer.action_toggle_diff()
             assert viewer._diff_mode is False
@@ -463,7 +463,7 @@ class TestFileViewerToggleDiff:
     async def test_toggle_diff_on_and_off(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
             with patch("perch.services.git.get_diff", return_value=""):
@@ -476,7 +476,7 @@ class TestFileViewerToggleDiff:
         """Toggle layout when not in diff mode is a no-op."""
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._diff_mode = False
             viewer.action_toggle_diff_layout()
             assert viewer._diff_layout == "unified"
@@ -484,7 +484,7 @@ class TestFileViewerToggleDiff:
     async def test_toggle_diff_layout_unified_to_side(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
             viewer._diff_mode = True
@@ -496,7 +496,7 @@ class TestFileViewerToggleDiff:
     async def test_toggle_diff_layout_side_to_unified(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
             viewer._diff_mode = True
@@ -507,13 +507,13 @@ class TestFileViewerToggleDiff:
 
 
 # ---------------------------------------------------------------------------
-# FileViewer.load_commit_diff — lines 370-408
+# Viewer.load_commit_diff — lines 370-408
 # ---------------------------------------------------------------------------
-class TestFileViewerLoadCommitDiff:
+class TestViewerLoadCommitDiff:
     async def test_load_commit_diff_no_worktree(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer.worktree_root = None
             viewer.load_commit_diff("abc123")
             # Should be a no-op (early return)
@@ -521,7 +521,7 @@ class TestFileViewerLoadCommitDiff:
     async def test_load_commit_diff_runtime_error(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             with patch(
                 "perch.services.git.get_commit_diff",
@@ -532,7 +532,7 @@ class TestFileViewerLoadCommitDiff:
     async def test_load_commit_diff_empty(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             with patch("perch.services.git.get_commit_diff", return_value=""):
                 viewer.load_commit_diff("abc123")
@@ -556,7 +556,7 @@ class TestFileViewerLoadCommitDiff:
         )
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             with patch(
                 "perch.services.git.get_commit_diff",
@@ -578,7 +578,7 @@ class TestFileViewerLoadCommitDiff:
         )
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             with patch(
                 "perch.services.git.get_commit_diff",
@@ -589,13 +589,13 @@ class TestFileViewerLoadCommitDiff:
 
 
 # ---------------------------------------------------------------------------
-# FileViewer.action_next_diff_file / action_prev_diff_file — lines 412-432
+# Viewer.action_next_diff_file / action_prev_diff_file — lines 412-432
 # ---------------------------------------------------------------------------
-class TestFileViewerDiffFileNavigation:
+class TestViewerDiffFileNavigation:
     async def test_next_no_offsets(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._diff_file_offsets = []
             viewer.action_next_diff_file()
             assert viewer._diff_file_index == 0
@@ -603,7 +603,7 @@ class TestFileViewerDiffFileNavigation:
     async def test_prev_no_offsets(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._diff_file_offsets = []
             viewer.action_prev_diff_file()
             assert viewer._diff_file_index == 0
@@ -611,7 +611,7 @@ class TestFileViewerDiffFileNavigation:
     async def test_next_advances_index(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._diff_file_offsets = [0, 10, 20]
             viewer._diff_file_index = 0
             viewer.action_next_diff_file()
@@ -622,7 +622,7 @@ class TestFileViewerDiffFileNavigation:
     async def test_next_clamps_at_end(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._diff_file_offsets = [0, 10]
             viewer._diff_file_index = 1
             viewer.action_next_diff_file()
@@ -631,7 +631,7 @@ class TestFileViewerDiffFileNavigation:
     async def test_prev_decrements_index(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._diff_file_offsets = [0, 10, 20]
             viewer._diff_file_index = 2
             viewer.action_prev_diff_file()
@@ -642,7 +642,7 @@ class TestFileViewerDiffFileNavigation:
     async def test_prev_clamps_at_start(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._diff_file_offsets = [0, 10]
             viewer._diff_file_index = 0
             viewer.action_prev_diff_file()
@@ -651,19 +651,19 @@ class TestFileViewerDiffFileNavigation:
     async def test_scroll_to_diff_file_no_offsets(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._diff_file_offsets = []
             viewer._scroll_to_diff_file()  # should be no-op
 
 
 # ---------------------------------------------------------------------------
-# FileViewer._show_content_view / _show_side_by_side_view — lines 244-269
+# Viewer._show_content_view / _show_side_by_side_view — lines 244-269
 # ---------------------------------------------------------------------------
-class TestFileViewerViewSwitching:
+class TestViewerViewSwitching:
     async def test_show_content_view(self, worktree: Path) -> None:
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._show_content_view()
             assert viewer._content.display is True
 
@@ -671,7 +671,7 @@ class TestFileViewerViewSwitching:
         diff_text = "--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-old\n+new"
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             viewer._show_side_by_side_view(diff_text)
             assert viewer._content.display is False
             sdv = viewer.query_one("#diff-container", SyncedDiffView)
@@ -681,7 +681,7 @@ class TestFileViewerViewSwitching:
 # ---------------------------------------------------------------------------
 # Edge cases for exception fallbacks and OSError — remaining uncovered lines
 # ---------------------------------------------------------------------------
-class TestFileViewerExceptionFallbacks:
+class TestViewerExceptionFallbacks:
     """Cover the except branches in _get_syntax_theme, _get_background_color,
     _is_dark_theme, and the OSError branch in load_file."""
 
@@ -691,7 +691,7 @@ class TestFileViewerExceptionFallbacks:
         """If app.current_theme raises, fall back to 'monokai'."""
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             with patch.object(
                 type(app),
                 "current_theme",
@@ -707,7 +707,7 @@ class TestFileViewerExceptionFallbacks:
         """If app.current_theme raises, fall back to None."""
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             with patch.object(
                 type(app),
                 "current_theme",
@@ -721,7 +721,7 @@ class TestFileViewerExceptionFallbacks:
         """If app.current_theme raises, fall back to True (dark)."""
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             with patch.object(
                 type(app),
                 "current_theme",
@@ -735,10 +735,10 @@ class TestFileViewerExceptionFallbacks:
         """OSError during read_file_content is caught and displayed."""
         app = PerchApp(worktree)
         async with app.run_test():
-            viewer = app.query_one(FileViewer)
+            viewer = app.query_one(Viewer)
             target = worktree / "hello.py"
             with patch(
-                "perch.widgets.file_viewer.read_file_content",
+                "perch.widgets.viewer.read_file_content",
                 side_effect=OSError("permission denied"),
             ):
                 viewer.load_file(target)

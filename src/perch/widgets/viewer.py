@@ -1,13 +1,15 @@
-"""File viewer widget with syntax highlighting and line numbers."""
+"""Viewer widget — renders files, diffs, markdown, logs, and status messages."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from rich.console import Group
 from rich.syntax import Syntax
 from rich.text import Text
 
+from textual import work
 from textual.binding import Binding
 from textual.containers import Horizontal, ScrollableContainer, VerticalScroll
 from textual.widgets import Static
@@ -186,8 +188,8 @@ class SyncedDiffView(ScrollableContainer):
         left.scroll_page_down(animate=False)
 
 
-class FileViewer(VerticalScroll):
-    """Displays file content with syntax highlighting and line numbers."""
+class Viewer(VerticalScroll):
+    """Renders files, diffs, markdown, logs, and status messages."""
 
     BINDINGS = [
         ("d", "toggle_diff", "Toggle Diff"),
@@ -206,13 +208,20 @@ class FileViewer(VerticalScroll):
         classes: str | None = None,
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
-        self._content = Static("No file selected", id="file-content")
+        self._content = Static(
+            Text("Select a file in the right pane to view it here", style="dim italic"),
+            id="file-content",
+        )
         self._current_path: Path | None = None
         self.worktree_root: Path | None = worktree_root
         self._diff_mode: bool = False
         self._diff_layout: str = "unified"
         self._diff_file_offsets: list[int] = []
         self._diff_file_index: int = 0
+
+    # ------------------------------------------------------------------
+    # Theme helpers
+    # ------------------------------------------------------------------
 
     def _get_syntax_theme(self) -> str:
         """Return a Pygments theme appropriate for the current app theme."""
@@ -241,6 +250,10 @@ class FileViewer(VerticalScroll):
             return self.app.current_theme.dark
         except Exception:
             return True
+
+    # ------------------------------------------------------------------
+    # Layout helpers
+    # ------------------------------------------------------------------
 
     def compose(self):
         yield self._content
@@ -274,12 +287,30 @@ class FileViewer(VerticalScroll):
 
         diff_view.focus()
 
+    # ------------------------------------------------------------------
+    # Public API — content types
+    # ------------------------------------------------------------------
+
+    def _update_border_title(self, title: str = "") -> None:
+        """Set the border title shown in the viewer's top border."""
+        self.border_title = title
+
+    def _path_label(self, path: Path) -> str:
+        """Return a relative path string for display, or the full path as fallback."""
+        if self.worktree_root:
+            try:
+                return str(path.relative_to(self.worktree_root))
+            except ValueError:
+                pass
+        return str(path)
+
     def load_file(self, path: Path) -> None:
         """Load and display a file with syntax highlighting."""
         self._current_path = path
         self._diff_mode = False
         self._diff_layout = "unified"
         self._show_content_view()
+        self._update_border_title(self._path_label(path))
 
         if not path.is_file():
             self._content.update("Not a file")
@@ -317,6 +348,196 @@ class FileViewer(VerticalScroll):
             self._content.update(syntax)
 
         self.scroll_home(animate=False)
+
+    def load_commit_diff(self, commit_hash: str) -> None:
+        """Load and display the full diff for a commit with file jump support."""
+        from perch.services.git import get_commit_diff
+
+        if self.worktree_root is None:
+            return
+
+        self._current_path = None
+        self._diff_mode = True
+        self._show_content_view()
+        self._update_border_title(f"commit {commit_hash[:8]}")
+
+        try:
+            diff_text = get_commit_diff(self.worktree_root, commit_hash)
+        except RuntimeError as e:
+            self._content.update(f"Error getting commit diff: {e}")
+            return
+
+        if not diff_text:
+            self._content.update(Text("Empty commit", style="dim italic"))
+            self._diff_file_offsets = []
+            self._diff_file_index = 0
+            return
+
+        # Build file boundary offsets (line numbers where "diff --git" appears)
+        self._diff_file_offsets = []
+        for i, line in enumerate(diff_text.splitlines()):
+            if line.startswith("diff --git "):
+                self._diff_file_offsets.append(i)
+        self._diff_file_index = 0
+
+        # Build header with file count
+        n_files = len(self._diff_file_offsets)
+        header = Text(f"Commit {commit_hash}")
+        header.stylize("bold cyan")
+        header.append(f"  ({n_files} file{'s' if n_files != 1 else ''})")
+        header.append("  [n] next file  [p] prev file", style="dim")
+        header.append("\n\n")
+
+        styled = render_diff(diff_text, dark=self._is_dark_theme())
+        self._content.update(Group(header, styled))
+        self.scroll_home(animate=False)
+
+    def show_deleted_file_diff(
+        self, file_path: Path, rel_path: str, staged: bool = False
+    ) -> None:
+        """Show a diff for a file that was deleted from the worktree."""
+        self._current_path = file_path
+        self._diff_mode = True
+        self._diff_layout = "unified"
+        self._show_content_view()
+        self._update_border_title(f"{rel_path} (deleted)")
+
+        from perch.services.git import get_diff
+
+        try:
+            diff_text = get_diff(self.worktree_root, rel_path, staged=staged)
+        except RuntimeError:
+            diff_text = ""
+
+        if diff_text:
+            styled = render_diff(diff_text, dark=self._is_dark_theme())
+            header = Text("File deleted — showing diff\n", style="bold red")
+            self._content.update(Group(header, styled))
+        else:
+            self._content.update(
+                Text("File deleted — no diff available", style="bold red")
+            )
+
+    def show_pr_body(self, body: str, title: str = "") -> None:
+        """Render a PR description as markdown in the viewer."""
+        from rich.markdown import Markdown
+
+        self._current_path = None
+        self._diff_mode = False
+        self._show_content_view()
+        self._update_border_title(title or "PR Description")
+
+        if not body.strip():
+            self._content.update(Text("No PR description", style="dim italic"))
+            return
+
+        self._content.update(Markdown(body))
+        self.scroll_home(animate=False)
+
+    def show_review(self, body: str, title: str = "") -> None:
+        """Render a review submission body as markdown in the viewer."""
+        from rich.markdown import Markdown
+
+        self._current_path = None
+        self._diff_mode = False
+        self._show_content_view()
+        self._update_border_title(title or "Review")
+
+        if not body.strip():
+            self._content.update(Text("No review body", style="dim italic"))
+            return
+
+        self._content.update(Markdown(body))
+        self.scroll_home(animate=False)
+
+    def show_ci_loading(self, title: str = "") -> None:
+        """Show a loading indicator while CI logs are being fetched."""
+        self._current_path = None
+        self._diff_mode = False
+        self._show_content_view()
+        self._update_border_title(title or "CI Log")
+        self._content.update(Text("Loading logs...", style="bold yellow"))
+
+    @work(thread=True, exclusive=True, group="ci_log")
+    def fetch_ci_log(self, url: str) -> None:
+        """Fetch a CI job log in the background and display it."""
+        from perch.services.github import get_job_log
+
+        log_text = get_job_log(url, self.worktree_root)
+        self.app.call_from_thread(self.show_ci_log, log_text)
+
+    def show_ci_log(self, log_text: str) -> None:
+        """Parse and display a GitHub Actions log."""
+        self._current_path = None
+        self._diff_mode = False
+        self._show_content_view()
+
+        if not log_text.strip():
+            self._content.update(Text("No log output available", style="dim italic"))
+            return
+
+        result = Text()
+        ansi_re = re.compile(r"\x1b\[[0-9;]*m")
+        for line in log_text.splitlines():
+            # Strip job/step/timestamp prefix: "job\tstep\t{timestamp} msg"
+            parts = line.split("\t", 2)
+            msg = parts[-1] if parts else line
+            # Strip ISO timestamp prefix (e.g. "2026-03-17T01:26:13.1234567Z ")
+            ts_match = re.match(r"\d{4}-\d{2}-\d{2}T[\d:.]+Z\s?", msg)
+            if ts_match:
+                msg = msg[ts_match.end() :]
+            # Strip ANSI escape codes
+            msg = ansi_re.sub("", msg)
+            # Parse GitHub Actions annotations
+            if msg.startswith("##[group]"):
+                group_name = msg[9:]
+                if result.plain:
+                    result.append("\n")
+                result.append(f"  {group_name}\n", style="bold cyan")
+                continue
+            if msg.startswith("##[endgroup]"):
+                continue
+            if msg.startswith("##[error]"):
+                result.append(f"  {msg[9:]}\n", style="bold red")
+                continue
+            if msg.startswith("##[warning]"):
+                result.append(f"  {msg[11:]}\n", style="yellow")
+                continue
+            # Regular log line
+            result.append(f"    {msg}\n")
+
+        self._content.update(result)
+        self.scroll_home(animate=False)
+
+    def show_clean_tree(self) -> None:
+        """Show a message indicating the working tree has no changes."""
+        self._current_path = None
+        self._show_content_view()
+        self._update_border_title()
+        self._content.update(
+            Text("Working tree is clean — no changes to review", style="dim italic")
+        )
+
+    def show_placeholder(self) -> None:
+        """Show the default empty-state message."""
+        self._current_path = None
+        self._show_content_view()
+        self._update_border_title()
+        self._content.update(
+            Text("Select a file in the right pane to view it here", style="dim italic")
+        )
+
+    def refresh_content(self) -> None:
+        """Re-render the current content (e.g. after a theme change)."""
+        if self._current_path is not None:
+            if self._diff_mode:
+                self._load_diff()
+            else:
+                self.load_file(self._current_path)
+
+    # ------------------------------------------------------------------
+    # Diff actions
+    # ------------------------------------------------------------------
 
     def _load_diff(self) -> None:
         """Load and display the diff for the current file."""
@@ -370,48 +591,6 @@ class FileViewer(VerticalScroll):
             "side-by-side" if self._diff_layout == "unified" else "unified"
         )
         self._load_diff()
-
-    def load_commit_diff(self, commit_hash: str) -> None:
-        """Load and display the full diff for a commit with file jump support."""
-        from perch.services.git import get_commit_diff
-
-        if self.worktree_root is None:
-            return
-
-        self._current_path = None
-        self._diff_mode = True
-        self._show_content_view()
-
-        try:
-            diff_text = get_commit_diff(self.worktree_root, commit_hash)
-        except RuntimeError as e:
-            self._content.update(f"Error getting commit diff: {e}")
-            return
-
-        if not diff_text:
-            self._content.update(Text("Empty commit", style="dim italic"))
-            self._diff_file_offsets = []
-            self._diff_file_index = 0
-            return
-
-        # Build file boundary offsets (line numbers where "diff --git" appears)
-        self._diff_file_offsets = []
-        for i, line in enumerate(diff_text.splitlines()):
-            if line.startswith("diff --git "):
-                self._diff_file_offsets.append(i)
-        self._diff_file_index = 0
-
-        # Build header with file count
-        n_files = len(self._diff_file_offsets)
-        header = Text(f"Commit {commit_hash}")
-        header.stylize("bold cyan")
-        header.append(f"  ({n_files} file{'s' if n_files != 1 else ''})")
-        header.append("  [n] next file  [p] prev file", style="dim")
-        header.append("\n\n")
-
-        styled = render_diff(diff_text, dark=self._is_dark_theme())
-        self._content.update(Group(header, styled))
-        self.scroll_home(animate=False)
 
     def action_next_diff_file(self) -> None:
         """Jump to the next file boundary in a multi-file diff."""
