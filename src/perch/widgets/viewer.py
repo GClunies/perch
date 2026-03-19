@@ -16,6 +16,98 @@ from textual.widgets import Static
 
 MAX_LINES = 10_000
 BINARY_CHECK_SIZE = 8192
+_IMAGE_MAX_WIDTH = 60  # columns for rendered terminal images
+
+
+def render_image_halfblocks(path: Path, max_width: int = _IMAGE_MAX_WIDTH) -> Text | None:
+    """Render an image as colored half-block (▀) characters.
+
+    Returns a Rich Text object, or None if the image can't be loaded.
+    Each terminal row encodes two pixel rows using the upper-half-block
+    character with foreground (top pixel) and background (bottom pixel).
+    """
+    try:
+        from PIL import Image as PILImage
+    except ImportError:
+        return None
+
+    try:
+        img = PILImage.open(path).convert("RGB")
+    except Exception:
+        return None
+
+    # Scale to fit terminal width, maintaining aspect ratio
+    w, h = img.size
+    if w > max_width:
+        scale = max_width / w
+        img = img.resize((max_width, int(h * scale)))
+    w, h = img.size
+
+    # Ensure even height for half-block pairing
+    if h % 2:
+        img = img.resize((w, h + 1))
+        h += 1
+
+    pixels = img.load()
+    result = Text()
+    for y in range(0, h, 2):
+        if y > 0:
+            result.append("\n")
+        for x in range(w):
+            top = pixels[x, y]
+            bot = pixels[x, y + 1]
+            result.append(
+                "▀",
+                style=f"rgb({top[0]},{top[1]},{top[2]}) on rgb({bot[0]},{bot[1]},{bot[2]})",
+            )
+    return result
+
+
+def render_markdown_with_images(
+    text: str, base_dir: Path, max_width: int = _IMAGE_MAX_WIDTH
+) -> list:
+    """Parse markdown text and return a list of Rich renderables.
+
+    Images (both ``![alt](src)`` and ``<img src="...">`` HTML tags) are
+    resolved relative to *base_dir* and rendered as half-block art.
+    Non-image sections are rendered as Rich Markdown.
+    """
+    from rich.markdown import Markdown
+
+    # Match markdown images and HTML img tags
+    img_pattern = re.compile(
+        r'!\[([^\]]*)\]\(([^)]+)\)'           # ![alt](src)
+        r'|<img\s[^>]*src=["\']([^"\']+)["\']'  # <img src="...">
+    )
+
+    parts: list = []
+    last_end = 0
+    for m in img_pattern.finditer(text):
+        # Add preceding markdown
+        before = text[last_end : m.start()].strip()
+        if before:
+            parts.append(Markdown(before))
+
+        # Resolve image path
+        src = m.group(2) or m.group(3)
+        img_path = base_dir / src
+        rendered = render_image_halfblocks(img_path, max_width)
+        if rendered:
+            parts.append(Text())  # spacer
+            parts.append(rendered)
+            parts.append(Text())  # spacer
+        else:
+            alt = m.group(1) or src
+            parts.append(Text(f"  [image: {alt}]", style="dim italic"))
+
+        last_end = m.end()
+
+    # Add trailing markdown
+    remainder = text[last_end:].strip()
+    if remainder:
+        parts.append(Markdown(remainder))
+
+    return parts
 
 
 def is_binary(path: Path) -> bool:
@@ -125,6 +217,10 @@ class SyncedDiffView(ScrollableContainer):
         Binding("down", "scroll_down", "Scroll Down", show=False),
         Binding("left", "scroll_left", "Scroll Left", show=False),
         Binding("right", "scroll_right", "Scroll Right", show=False),
+        Binding("k", "scroll_up", "Scroll Up", show=False),
+        Binding("j", "scroll_down", "Scroll Down", show=False),
+        Binding("h", "scroll_left", "Scroll Left", show=False),
+        Binding("l", "scroll_right", "Scroll Right", show=False),
         Binding("home", "scroll_home", "Scroll Home", show=False),
         Binding("end", "scroll_end", "Scroll End", show=False),
         Binding("pageup", "page_up", "Page Up", show=False),
@@ -192,11 +288,17 @@ class Viewer(VerticalScroll):
     """Renders files, diffs, markdown, logs, and status messages."""
 
     BINDINGS = [
-        ("d", "toggle_diff", "Toggle Diff"),
-        ("s", "toggle_diff_layout", "Diff Layout"),
-        ("n", "next_diff_file", "Next File"),
-        ("p", "prev_diff_file", "Prev File"),
-        ("e", "app.open_editor", "Editor"),
+        Binding("d", "toggle_diff", "Diff"),
+        Binding("s", "toggle_diff_layout", "Layout"),
+        Binding("m", "toggle_markdown_preview", "Markdown"),
+        Binding("n", "next_diff_file", "Next File"),
+        Binding("p", "prev_diff_file", "Prev File"),
+        Binding("e", "app.open_editor", "Editor"),
+        Binding("f", "app.toggle_focus_mode", "Focus"),
+        Binding("j", "scroll_down", "Down", show=False),
+        Binding("k", "scroll_up", "Up", show=False),
+        Binding("h", "scroll_left", "Left", show=False),
+        Binding("l", "scroll_right", "Right", show=False),
     ]
 
     def __init__(
@@ -209,7 +311,7 @@ class Viewer(VerticalScroll):
     ) -> None:
         super().__init__(name=name, id=id, classes=classes)
         self._content = Static(
-            Text("Select a file in the right pane to view it here", style="dim italic"),
+            Text("Select a file in the sidebar to view it here", style="dim italic"),
             id="file-content",
         )
         self._current_path: Path | None = None
@@ -218,6 +320,35 @@ class Viewer(VerticalScroll):
         self._diff_layout: str = "unified"
         self._diff_file_offsets: list[int] = []
         self._diff_file_index: int = 0
+        self._markdown_preview: bool = False
+
+    # ------------------------------------------------------------------
+    # Dynamic footer — check_action controls binding visibility
+    # ------------------------------------------------------------------
+
+    def check_action(
+        self, action: str, parameters: tuple[object, ...]
+    ) -> bool | None:
+        if action == "toggle_diff":
+            return self._current_path is not None
+        if action == "toggle_diff_layout":
+            return self._diff_mode
+        if action == "toggle_markdown_preview":
+            return (
+                self._current_path is not None
+                and self._is_markdown(self._current_path)
+                and not self._diff_mode
+            )
+        if action in ("next_diff_file", "prev_diff_file"):
+            return bool(self._diff_file_offsets)
+        return True
+
+    def _refresh_footer(self) -> None:
+        """Trigger footer re-evaluation after state changes."""
+        try:
+            self.screen.refresh_bindings()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Theme helpers
@@ -304,6 +435,10 @@ class Viewer(VerticalScroll):
                 pass
         return str(path)
 
+    @staticmethod
+    def _is_markdown(path: Path) -> bool:
+        return path.suffix.lower() in {".md", ".markdown", ".mdown", ".mkd"}
+
     def load_file(self, path: Path) -> None:
         """Load and display a file with syntax highlighting."""
         self._current_path = path
@@ -328,6 +463,16 @@ class Viewer(VerticalScroll):
             self._content.update(f"Error reading file: {e}")
             return
 
+        if self._markdown_preview and self._is_markdown(path):
+            parts = render_markdown_with_images(text, path.parent)
+            if len(parts) == 1:
+                self._content.update(parts[0])
+            else:
+                self._content.update(Group(*parts))
+            self.scroll_home(animate=False)
+            self._refresh_footer()
+            return
+
         lexer = Syntax.guess_lexer(str(path))
         syntax = Syntax(
             text,
@@ -348,6 +493,7 @@ class Viewer(VerticalScroll):
             self._content.update(syntax)
 
         self.scroll_home(animate=False)
+        self._refresh_footer()
 
     def load_commit_diff(self, commit_hash: str) -> None:
         """Load and display the full diff for a commit with file jump support."""
@@ -391,6 +537,7 @@ class Viewer(VerticalScroll):
         styled = render_diff(diff_text, dark=self._is_dark_theme())
         self._content.update(Group(header, styled))
         self.scroll_home(animate=False)
+        self._refresh_footer()
 
     def show_deleted_file_diff(
         self, file_path: Path, rel_path: str, staged: bool = False
@@ -417,6 +564,7 @@ class Viewer(VerticalScroll):
             self._content.update(
                 Text("File deleted — no diff available", style="bold red")
             )
+        self._refresh_footer()
 
     def show_pr_body(self, body: str, title: str = "") -> None:
         """Render a PR description as markdown in the viewer."""
@@ -433,6 +581,7 @@ class Viewer(VerticalScroll):
 
         self._content.update(Markdown(body))
         self.scroll_home(animate=False)
+        self._refresh_footer()
 
     def show_review(self, body: str, title: str = "") -> None:
         """Render a review submission body as markdown in the viewer."""
@@ -449,6 +598,7 @@ class Viewer(VerticalScroll):
 
         self._content.update(Markdown(body))
         self.scroll_home(animate=False)
+        self._refresh_footer()
 
     def show_ci_loading(self, title: str = "") -> None:
         """Show a loading indicator while CI logs are being fetched."""
@@ -457,6 +607,7 @@ class Viewer(VerticalScroll):
         self._show_content_view()
         self._update_border_title(title or "CI Log")
         self._content.update(Text("Loading logs...", style="bold yellow"))
+        self._refresh_footer()
 
     @work(thread=True, exclusive=True, group="ci_log")
     def fetch_ci_log(self, url: str) -> None:
@@ -508,6 +659,7 @@ class Viewer(VerticalScroll):
 
         self._content.update(result)
         self.scroll_home(animate=False)
+        self._refresh_footer()
 
     def show_clean_tree(self) -> None:
         """Show a message indicating the working tree has no changes."""
@@ -517,6 +669,17 @@ class Viewer(VerticalScroll):
         self._content.update(
             Text("Working tree is clean — no changes to review", style="dim italic")
         )
+        self._refresh_footer()
+
+    def show_empty_directory(self) -> None:
+        """Show a message when the directory contains no files."""
+        self._current_path = None
+        self._show_content_view()
+        self._update_border_title()
+        self._content.update(
+            Text("No files in this directory", style="dim italic")
+        )
+        self._refresh_footer()
 
     def show_placeholder(self) -> None:
         """Show the default empty-state message."""
@@ -524,8 +687,9 @@ class Viewer(VerticalScroll):
         self._show_content_view()
         self._update_border_title()
         self._content.update(
-            Text("Select a file in the right pane to view it here", style="dim italic")
+            Text("Select a file in the sidebar to view it here", style="dim italic")
         )
+        self._refresh_footer()
 
     def refresh_content(self) -> None:
         """Re-render the current content (e.g. after a theme change)."""
@@ -582,6 +746,16 @@ class Viewer(VerticalScroll):
             self._load_diff()
         else:
             self.load_file(self._current_path)
+        self._refresh_footer()
+
+    def action_toggle_markdown_preview(self) -> None:
+        """Toggle between raw and rendered markdown for .md files."""
+        if self._current_path is None or not self._is_markdown(self._current_path):
+            return
+        if self._diff_mode:
+            return
+        self._markdown_preview = not self._markdown_preview
+        self.load_file(self._current_path)
 
     def action_toggle_diff_layout(self) -> None:
         """Toggle between unified and side-by-side diff layout."""
