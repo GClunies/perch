@@ -671,6 +671,16 @@ class Viewer(VerticalScroll):
         )
         self._refresh_footer()
 
+    def show_folder(self, path: Path) -> None:
+        """Show a message when a folder is selected."""
+        self._current_path = None
+        self._show_content_view()
+        self._update_border_title(self._path_label(path))
+        self._content.update(
+            Text("Folder selected — no preview available", style="dim italic")
+        )
+        self._refresh_footer()
+
     def show_empty_directory(self) -> None:
         """Show a message when the directory contains no files."""
         self._current_path = None

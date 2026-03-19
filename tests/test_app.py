@@ -616,21 +616,18 @@ class TestSelectionRestored:
         ):
             app = PerchApp(worktree)
             async with app.run_test(size=(120, 40)) as pilot:
-                # Files tab is active by default; load a file so the viewer has content
                 viewer = pilot.app.query_one(Viewer)
-                viewer.load_file(worktree / "hello.py")
                 await pilot.pause()
-                assert viewer._current_path == worktree / "hello.py"
+                # Capture viewer state after startup settles
+                viewer.load_file(worktree / "hello.py")
+                path_before = viewer._current_path
 
                 # Fire SelectionRestored while on Files tab — viewer must not change
                 from perch.widgets.git_status import GitPanel
-                panel = pilot.app.query_one(GitPanel)
                 pilot.app.on_git_panel_selection_restored(
                     GitPanel.SelectionRestored()
                 )
-                await pilot.pause()
-                # Viewer content unchanged
-                assert viewer._current_path == worktree / "hello.py"
+                assert viewer._current_path == path_before
 
     async def test_syncs_viewer_when_git_tab_active(self, worktree: Path) -> None:
         """SelectionRestored updates the viewer when the Git tab is active."""

@@ -176,6 +176,8 @@ class PerchApp(App):
         if isinstance(path, Path) and path.is_file():
             self.query_one(Viewer).load_file(path)
             self._files_tab_last_path = path
+        elif isinstance(path, Path) and path.is_dir():
+            self.query_one(Viewer).show_folder(path)
 
     def on_directory_tree_file_selected(self, event) -> None:
         """Focus the viewer when a file is selected with enter."""
