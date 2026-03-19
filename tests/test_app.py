@@ -9,9 +9,9 @@ from textual.widgets import Footer, Header, TabbedContent, TabPane
 
 from perch.app import PerchApp
 from perch.commands import DiscoveryCommandProvider
-from perch.widgets.file_tree import WorktreeFileTree
+from perch.widgets.file_tree import FileTree
 from perch.widgets.viewer import Viewer
-from perch.widgets.git_status import GitStatusPanel
+from perch.widgets.git_status import GitPanel
 from perch.widgets.github_panel import GitHubPanel
 from perch.widgets.splitter import DraggableSplitter
 
@@ -84,9 +84,9 @@ class TestPerchAppCompose:
             assert viewer is not None
 
     async def test_has_tabbed_content(self, worktree: Path) -> None:
-        """App should have a TabbedContent as the right pane."""
+        """App should have a TabbedContent as the sidebar."""
         async with PerchApp(worktree).run_test() as pilot:
-            tabs = pilot.app.query_one("#right-pane", TabbedContent)
+            tabs = pilot.app.query_one("#sidebar", TabbedContent)
             assert tabs is not None
 
     async def test_has_three_tabs(self, worktree: Path) -> None:
@@ -96,15 +96,15 @@ class TestPerchAppCompose:
             assert len(panes) == 3
 
     async def test_files_tab_contains_tree(self, worktree: Path) -> None:
-        """Files tab should contain a WorktreeFileTree."""
+        """Files tab should contain a FileTree."""
         async with PerchApp(worktree).run_test() as pilot:
-            tree = pilot.app.query_one(WorktreeFileTree)
+            tree = pilot.app.query_one(FileTree)
             assert tree is not None
 
     async def test_git_tab_has_status_panel(self, worktree: Path) -> None:
-        """Git tab should contain a GitStatusPanel widget."""
+        """Git tab should contain a GitPanel widget."""
         async with PerchApp(worktree).run_test() as pilot:
-            panel = pilot.app.query_one(GitStatusPanel)
+            panel = pilot.app.query_one(GitPanel)
             assert panel is not None
 
     async def test_pr_tab_has_context_panel(self, worktree: Path) -> None:
@@ -115,26 +115,17 @@ class TestPerchAppCompose:
 
 
 class TestTabSwitching:
-    """Tests for tab switching via number keys."""
+    """Tests for tab switching via [ and ] keys."""
 
-    async def test_key_1_activates_files_tab(self, worktree: Path) -> None:
+    async def test_next_tab_from_files_goes_to_git(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
-            # Switch away first, then back
-            pilot.app.query_one(TabbedContent).active = "tab-git"
-            await pilot.pause()
-            await pilot.press("1")
-            await pilot.pause()
-            assert pilot.app.query_one(TabbedContent).active == "tab-files"
-
-    async def test_key_2_activates_git_tab(self, worktree: Path) -> None:
-        async with PerchApp(worktree).run_test() as pilot:
-            await pilot.press("2")
+            await pilot.press("right_square_bracket")
             await pilot.pause()
             assert pilot.app.query_one(TabbedContent).active == "tab-git"
 
-    async def test_key_3_activates_pr_tab(self, worktree: Path) -> None:
+    async def test_prev_tab_from_files_wraps_to_github(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
-            await pilot.press("3")
+            await pilot.press("left_square_bracket")
             await pilot.pause()
             assert pilot.app.query_one(TabbedContent).active == "tab-github"
 
@@ -173,63 +164,67 @@ class TestTitleWithGitBranch:
             assert "\u2014" in pilot.app.title  # em dash separator
 
 
-class TestActionShowTab:
-    """Tests for action_show_tab() — switching tabs and focusing content."""
+class TestTabNavigation:
+    """Tests for [/] tab cycling."""
 
-    async def test_show_tab_switches_to_git(self, worktree: Path) -> None:
-        """action_show_tab('tab-git') should activate the git tab."""
+    async def test_next_tab_cycles_forward(self, worktree: Path) -> None:
+        """action_next_tab should cycle Files -> Git -> GitHub -> Files."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            pilot.app.action_show_tab("tab-git")
+            tabbed = pilot.app.query_one(TabbedContent)
+            assert tabbed.active == "tab-files"
+            pilot.app.action_next_tab()
             await pilot.pause()
-            assert pilot.app.query_one(TabbedContent).active == "tab-git"
+            assert tabbed.active == "tab-git"
+            pilot.app.action_next_tab()
+            await pilot.pause()
+            assert tabbed.active == "tab-github"
+            pilot.app.action_next_tab()
+            await pilot.pause()
+            assert tabbed.active == "tab-files"
 
-    async def test_show_tab_switches_to_pr(self, worktree: Path) -> None:
-        """action_show_tab('tab-github') should activate the pr tab."""
+    async def test_prev_tab_cycles_backward(self, worktree: Path) -> None:
+        """action_prev_tab should cycle Files -> GitHub -> Git -> Files."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            pilot.app.action_show_tab("tab-github")
+            tabbed = pilot.app.query_one(TabbedContent)
+            assert tabbed.active == "tab-files"
+            pilot.app.action_prev_tab()
             await pilot.pause()
-            assert pilot.app.query_one(TabbedContent).active == "tab-github"
+            assert tabbed.active == "tab-github"
+            pilot.app.action_prev_tab()
+            await pilot.pause()
+            assert tabbed.active == "tab-git"
 
-    async def test_show_tab_switches_to_files(self, worktree: Path) -> None:
-        """action_show_tab('tab-files') should activate the files tab."""
+    async def test_next_tab_focuses_git_panel(self, worktree: Path) -> None:
+        """Switching to git tab should focus the GitPanel."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            pilot.app.action_show_tab("tab-git")
+            pilot.app.action_next_tab()
             await pilot.pause()
-            pilot.app.action_show_tab("tab-files")
-            await pilot.pause()
-            assert pilot.app.query_one(TabbedContent).active == "tab-files"
-
-    async def test_show_tab_focuses_git_panel(self, worktree: Path) -> None:
-        """Switching to git tab should focus the GitStatusPanel."""
-        app = PerchApp(worktree)
-        async with app.run_test() as pilot:
-            pilot.app.action_show_tab("tab-git")
-            await pilot.pause()
-            panel = pilot.app.query_one(GitStatusPanel)
+            panel = pilot.app.query_one(GitPanel)
             assert panel.has_focus
 
-    async def test_show_tab_focuses_pr_panel(self, worktree: Path) -> None:
-        """Switching to PR tab should focus the GitHubPanel."""
+    async def test_next_tab_focuses_github_panel(self, worktree: Path) -> None:
+        """Switching to GitHub tab should focus the GitHubPanel."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            pilot.app.action_show_tab("tab-github")
+            pilot.app.action_next_tab()
+            await pilot.pause()
+            pilot.app.action_next_tab()
             await pilot.pause()
             panel = pilot.app.query_one(GitHubPanel)
             assert panel.has_focus
 
-    async def test_show_tab_focuses_file_tree(self, worktree: Path) -> None:
-        """Switching to files tab should focus the WorktreeFileTree."""
+    async def test_prev_tab_focuses_file_tree(self, worktree: Path) -> None:
+        """Switching back to files tab should focus the FileTree."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            # Switch away first
-            pilot.app.action_show_tab("tab-git")
+            pilot.app.action_next_tab()
             await pilot.pause()
-            pilot.app.action_show_tab("tab-files")
+            pilot.app.action_prev_tab()
             await pilot.pause()
-            tree = pilot.app.query_one(WorktreeFileTree)
+            tree = pilot.app.query_one(FileTree)
             assert tree.has_focus
 
 
@@ -237,11 +232,11 @@ class TestFocusPaneToggle:
     """Tests for action_focus_next_pane() and action_focus_prev_pane()."""
 
     async def test_focus_next_pane_from_right_to_left(self, worktree: Path) -> None:
-        """Tab from right pane should move focus to the file viewer."""
+        """Tab from sidebar should move focus to the file viewer."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            # Start: file tree is focused (right pane)
-            tree = pilot.app.query_one(WorktreeFileTree)
+            # Start: file tree is focused (sidebar)
+            tree = pilot.app.query_one(FileTree)
             tree.focus()
             await pilot.pause()
             # Press tab to toggle to left pane
@@ -258,11 +253,11 @@ class TestFocusPaneToggle:
             viewer.focus()
             await pilot.pause()
             assert viewer.has_focus
-            # Press tab to toggle to right pane
+            # Press tab to toggle to sidebar
             pilot.app.action_focus_next_pane()
             await pilot.pause()
             # Should be on the file tree (active tab is files)
-            tree = pilot.app.query_one(WorktreeFileTree)
+            tree = pilot.app.query_one(FileTree)
             assert tree.has_focus
 
 
@@ -270,45 +265,46 @@ class TestFocusActiveTab:
     """Tests for _focus_active_tab() targeting each tab."""
 
     async def test_focus_active_tab_files_sets_cursor(self, worktree: Path) -> None:
-        """_focus_active_tab on files tab should set cursor to 0 if -1."""
+        """_focus_active_tab on files tab should set cursor to a valid position."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            tree = pilot.app.query_one(WorktreeFileTree)
+            tree = pilot.app.query_one(FileTree)
             tree.cursor_line = -1
             pilot.app._focus_active_tab()
             await pilot.pause()
-            assert tree.cursor_line == 0
+            assert tree.cursor_line >= 0
 
     async def test_focus_active_tab_git(self, worktree: Path) -> None:
-        """_focus_active_tab on git tab should focus the GitStatusPanel."""
+        """_focus_active_tab on git tab should focus the GitPanel."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            # Use action_show_tab to switch and focus in one step
-            pilot.app.action_show_tab("tab-git")
+            pilot.app.action_next_tab()  # Files -> Git
             await pilot.pause()
             await pilot.pause()
-            assert pilot.app.query_one(GitStatusPanel).has_focus
+            assert pilot.app.query_one(GitPanel).has_focus
 
     async def test_focus_active_tab_pr(self, worktree: Path) -> None:
         """_focus_active_tab on pr tab should focus the GitHubPanel."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-            pilot.app.action_show_tab("tab-github")
+            pilot.app.action_next_tab()  # Files -> Git
+            await pilot.pause()
+            pilot.app.action_next_tab()  # Git -> GitHub
             await pilot.pause()
             await pilot.pause()
             assert pilot.app.query_one(GitHubPanel).has_focus
 
 
-class TestGitStatusPanelFileSelected:
-    """Tests for on_git_status_panel_file_selected() handler."""
+class TestGitPanelFileSelected:
+    """Tests for on_git_panel_file_selected() handler."""
 
     async def test_file_selected_loads_existing_file(self, git_worktree: Path) -> None:
         """Selecting an existing file should load it in the viewer."""
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
             viewer = pilot.app.query_one(Viewer)
-            event = GitStatusPanel.FileSelected(path="hello.py", staged=False)
-            pilot.app.on_git_status_panel_file_selected(event)
+            event = GitPanel.FileSelected(path="hello.py", staged=False)
+            pilot.app.on_git_panel_file_selected(event)
             await pilot.pause()
             assert viewer._current_path == git_worktree / "hello.py"
 
@@ -321,8 +317,8 @@ class TestGitStatusPanelFileSelected:
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
             viewer = pilot.app.query_one(Viewer)
-            event = GitStatusPanel.FileSelected(path="hello.py", staged=False)
-            pilot.app.on_git_status_panel_file_selected(event)
+            event = GitPanel.FileSelected(path="hello.py", staged=False)
+            pilot.app.on_git_panel_file_selected(event)
             await pilot.pause()
             assert viewer._diff_mode is True
             assert viewer._current_path == git_worktree / "hello.py"
@@ -335,15 +331,15 @@ class TestGitStatusPanelFileSelected:
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
             viewer = pilot.app.query_one(Viewer)
-            event = GitStatusPanel.FileSelected(path=deleted_name, staged=False)
-            pilot.app.on_git_status_panel_file_selected(event)
+            event = GitPanel.FileSelected(path=deleted_name, staged=False)
+            pilot.app.on_git_panel_file_selected(event)
             await pilot.pause()
             assert viewer._diff_mode is True
             assert viewer._current_path == worktree / deleted_name
 
 
-class TestGitStatusPanelCommitSelected:
-    """Tests for on_git_status_panel_commit_selected() handler."""
+class TestGitPanelCommitSelected:
+    """Tests for on_git_panel_commit_selected() handler."""
 
     async def test_commit_selected_loads_commit_diff(self, git_worktree: Path) -> None:
         """Selecting a commit should load its diff in the viewer."""
@@ -360,8 +356,8 @@ class TestGitStatusPanelCommitSelected:
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
             viewer = pilot.app.query_one(Viewer)
-            event = GitStatusPanel.CommitSelected(commit_hash=commit_hash)
-            pilot.app.on_git_status_panel_commit_selected(event)
+            event = GitPanel.CommitSelected(commit_hash=commit_hash)
+            pilot.app.on_git_panel_commit_selected(event)
             await pilot.pause()
             assert viewer._diff_mode is True
             assert viewer.worktree_root == git_worktree
@@ -414,15 +410,15 @@ class TestDiffFileNavigation:
 class TestToggleFocusMode:
     """Tests for action_toggle_focus_mode()."""
 
-    async def test_focus_mode_hides_right_pane(self, worktree: Path) -> None:
-        """Entering focus mode should hide the right pane and splitter."""
+    async def test_focus_mode_hides_sidebar(self, worktree: Path) -> None:
+        """Entering focus mode should hide the sidebar and splitter."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
             pilot.app.action_toggle_focus_mode()
             await pilot.pause()
-            right_pane = pilot.app.query_one("#right-pane", TabbedContent)
+            sidebar = pilot.app.query_one("#sidebar", TabbedContent)
             splitter = pilot.app.query_one(DraggableSplitter)
-            assert right_pane.display is False
+            assert sidebar.display is False
             assert splitter.display is False
             assert pilot.app._focus_mode is True
 
@@ -446,7 +442,7 @@ class TestToggleFocusMode:
             assert viewer.has_focus
 
     async def test_exit_focus_mode_restores_layout(self, worktree: Path) -> None:
-        """Exiting focus mode should restore the right pane and splitter."""
+        """Exiting focus mode should restore the sidebar and splitter."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
             # Enter focus mode
@@ -455,9 +451,9 @@ class TestToggleFocusMode:
             # Exit focus mode
             pilot.app.action_toggle_focus_mode()
             await pilot.pause()
-            right_pane = pilot.app.query_one("#right-pane", TabbedContent)
+            sidebar = pilot.app.query_one("#sidebar", TabbedContent)
             splitter = pilot.app.query_one(DraggableSplitter)
-            assert right_pane.display is True
+            assert sidebar.display is True
             assert splitter.display is True
             assert pilot.app._focus_mode is False
 
@@ -473,26 +469,6 @@ class TestToggleFocusMode:
             assert "75" in str(viewer.styles.width)
 
 
-class TestResizePanes:
-    """Tests for action_shrink_left_pane() and action_grow_left_pane()."""
-
-    async def test_shrink_left_pane_delegates(self, worktree: Path) -> None:
-        """action_shrink_left_pane should call splitter.resize_left_pane(-2)."""
-        app = PerchApp(worktree)
-        async with app.run_test() as pilot:
-            splitter = pilot.app.query_one(DraggableSplitter)
-            with patch.object(splitter, "resize_left_pane") as mock:
-                pilot.app.action_shrink_left_pane()
-                mock.assert_called_once_with(-2)
-
-    async def test_grow_left_pane_delegates(self, worktree: Path) -> None:
-        """action_grow_left_pane should call splitter.resize_left_pane(2)."""
-        app = PerchApp(worktree)
-        async with app.run_test() as pilot:
-            splitter = pilot.app.query_one(DraggableSplitter)
-            with patch.object(splitter, "resize_left_pane") as mock:
-                pilot.app.action_grow_left_pane()
-                mock.assert_called_once_with(2)
 
 
 class TestOnTreeNodeHighlighted:
@@ -576,14 +552,15 @@ class TestFileSearch:
     """Tests for action_file_search and _on_file_selected callback."""
 
     async def test_on_file_selected_none_is_noop(self, worktree: Path) -> None:
-        """_on_file_selected(None) should not load any file."""
+        """_on_file_selected(None) should not change the viewer state."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
             viewer = pilot.app.query_one(Viewer)
-            viewer._current_path = None
+            await pilot.pause()
+            path_before = viewer._current_path
             pilot.app._on_file_selected(None)
             await pilot.pause()
-            assert viewer._current_path is None
+            assert viewer._current_path == path_before
 
     async def test_on_file_selected_loads_valid_file(self, worktree: Path) -> None:
         """_on_file_selected with a valid relative path should load the file."""
@@ -597,14 +574,15 @@ class TestFileSearch:
     async def test_on_file_selected_nonexistent_file_is_noop(
         self, worktree: Path
     ) -> None:
-        """_on_file_selected with a non-existent file should not load it."""
+        """_on_file_selected with a non-existent file should not change state."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
             viewer = pilot.app.query_one(Viewer)
-            viewer._current_path = None
+            await pilot.pause()
+            path_before = viewer._current_path
             pilot.app._on_file_selected("nonexistent.py")
             await pilot.pause()
-            assert viewer._current_path is None
+            assert viewer._current_path == path_before
 
     async def test_file_search_pushes_screen(self, worktree: Path) -> None:
         """action_file_search should push a FileSearchScreen."""
@@ -626,7 +604,7 @@ class TestFileSearch:
 
 
 class TestSelectionRestored:
-    """Tests for on_git_status_panel_selection_restored."""
+    """Tests for on_git_panel_selection_restored."""
 
     async def test_ignored_when_git_tab_not_active(self, worktree: Path) -> None:
         """SelectionRestored is a no-op when the Git tab is not active."""
@@ -645,10 +623,10 @@ class TestSelectionRestored:
                 assert viewer._current_path == worktree / "hello.py"
 
                 # Fire SelectionRestored while on Files tab — viewer must not change
-                from perch.widgets.git_status import GitStatusPanel
-                panel = pilot.app.query_one(GitStatusPanel)
-                pilot.app.on_git_status_panel_selection_restored(
-                    GitStatusPanel.SelectionRestored()
+                from perch.widgets.git_status import GitPanel
+                panel = pilot.app.query_one(GitPanel)
+                pilot.app.on_git_panel_selection_restored(
+                    GitPanel.SelectionRestored()
                 )
                 await pilot.pause()
                 # Viewer content unchanged
@@ -657,7 +635,7 @@ class TestSelectionRestored:
     async def test_syncs_viewer_when_git_tab_active(self, worktree: Path) -> None:
         """SelectionRestored updates the viewer when the Git tab is active."""
         from perch.models import Commit, GitFile, GitStatusData
-        from perch.widgets.git_status import GitStatusPanel
+        from perch.widgets.git_status import GitPanel
 
         status = GitStatusData(
             unstaged=[GitFile(path="hello.py", status="modified", staged=False)]
@@ -674,13 +652,13 @@ class TestSelectionRestored:
                 from textual.widgets import TabbedContent
 
                 pilot.app.query_one(TabbedContent).active = "tab-git"
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 panel._update_display(status, commits)
                 await pilot.pause()
 
                 # SelectionRestored while Git tab is active — viewer should load file
-                pilot.app.on_git_status_panel_selection_restored(
-                    GitStatusPanel.SelectionRestored()
+                pilot.app.on_git_panel_selection_restored(
+                    GitPanel.SelectionRestored()
                 )
                 await pilot.pause()
                 viewer = pilot.app.query_one(Viewer)

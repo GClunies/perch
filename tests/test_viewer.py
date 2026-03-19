@@ -743,3 +743,215 @@ class TestViewerExceptionFallbacks:
             ):
                 viewer.load_file(target)
             assert viewer._current_path == target
+
+
+class TestRenderImageHalfblocks:
+    """Tests for render_image_halfblocks."""
+
+    def test_renders_small_image(self, tmp_path: Path) -> None:
+        from perch.widgets.viewer import render_image_halfblocks
+        from PIL import Image as PILImage
+
+        img = PILImage.new("RGB", (4, 4), color=(255, 0, 0))
+        path = tmp_path / "red.png"
+        img.save(path)
+        result = render_image_halfblocks(path, max_width=10)
+        assert result is not None
+        assert "▀" in result.plain
+
+    def test_returns_none_for_missing_file(self, tmp_path: Path) -> None:
+        from perch.widgets.viewer import render_image_halfblocks
+
+        result = render_image_halfblocks(tmp_path / "nope.png")
+        assert result is None
+
+    def test_scales_wide_image(self, tmp_path: Path) -> None:
+        from perch.widgets.viewer import render_image_halfblocks
+        from PIL import Image as PILImage
+
+        img = PILImage.new("RGB", (200, 100), color=(0, 128, 255))
+        path = tmp_path / "wide.png"
+        img.save(path)
+        result = render_image_halfblocks(path, max_width=20)
+        assert result is not None
+        lines = result.plain.split("\n")
+        assert all(len(line) <= 20 for line in lines)
+
+    def test_odd_height_padded(self, tmp_path: Path) -> None:
+        from perch.widgets.viewer import render_image_halfblocks
+        from PIL import Image as PILImage
+
+        img = PILImage.new("RGB", (4, 3), color=(0, 255, 0))
+        path = tmp_path / "odd.png"
+        img.save(path)
+        result = render_image_halfblocks(path, max_width=10)
+        assert result is not None
+
+
+class TestRenderMarkdownWithImages:
+    """Tests for render_markdown_with_images."""
+
+    def test_plain_markdown_no_images(self, tmp_path: Path) -> None:
+        from perch.widgets.viewer import render_markdown_with_images
+
+        parts = render_markdown_with_images("# Hello\nWorld", tmp_path)
+        assert len(parts) == 1  # just one Markdown renderable
+
+    def test_markdown_image_syntax(self, tmp_path: Path) -> None:
+        from perch.widgets.viewer import render_markdown_with_images
+        from PIL import Image as PILImage
+
+        img = PILImage.new("RGB", (4, 4), color=(255, 0, 0))
+        img.save(tmp_path / "pic.png")
+
+        text = "Before\n\n![alt](pic.png)\n\nAfter"
+        parts = render_markdown_with_images(text, tmp_path)
+        assert len(parts) > 1  # markdown + image + markdown
+
+    def test_html_img_tag(self, tmp_path: Path) -> None:
+        from perch.widgets.viewer import render_markdown_with_images
+        from PIL import Image as PILImage
+
+        img = PILImage.new("RGB", (4, 4), color=(0, 0, 255))
+        img.save(tmp_path / "logo.png")
+
+        text = '<p><img src="logo.png" width="200"></p>\n\n# Title'
+        parts = render_markdown_with_images(text, tmp_path)
+        assert len(parts) > 1
+
+    def test_missing_image_shows_placeholder(self, tmp_path: Path) -> None:
+        from perch.widgets.viewer import render_markdown_with_images
+
+        text = "![my image](missing.png)\n\nSome text"
+        parts = render_markdown_with_images(text, tmp_path)
+        # Should have a placeholder for the missing image
+        has_placeholder = any(
+            "image:" in str(getattr(p, "plain", "")) for p in parts
+        )
+        assert has_placeholder
+
+
+class TestCheckActions:
+    """Tests for dynamic footer binding visibility."""
+
+    async def test_toggle_diff_requires_file(self, tmp_path: Path) -> None:
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            assert viewer.check_action("toggle_diff", ()) is False
+            viewer._current_path = tmp_path / "hello.py"
+            assert viewer.check_action("toggle_diff", ()) is True
+
+    async def test_diff_layout_requires_diff_mode(self, tmp_path: Path) -> None:
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            assert viewer.check_action("toggle_diff_layout", ()) is False
+            viewer._diff_mode = True
+            assert viewer.check_action("toggle_diff_layout", ()) is True
+
+    async def test_markdown_preview_requires_md_file(self, tmp_path: Path) -> None:
+        md = tmp_path / "test.md"
+        md.write_text("# hi\n")
+        py = tmp_path / "test.py"
+        py.write_text("x = 1\n")
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            assert viewer.check_action("toggle_markdown_preview", ()) is False
+            viewer._current_path = py
+            assert viewer.check_action("toggle_markdown_preview", ()) is False
+            viewer._current_path = md
+            assert viewer.check_action("toggle_markdown_preview", ()) is True
+            viewer._diff_mode = True
+            assert viewer.check_action("toggle_markdown_preview", ()) is False
+
+    async def test_diff_file_nav_requires_offsets(self, tmp_path: Path) -> None:
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            assert viewer.check_action("next_diff_file", ()) is False
+            assert viewer.check_action("prev_diff_file", ()) is False
+            viewer._diff_file_offsets = [0, 10, 20]
+            assert viewer.check_action("next_diff_file", ()) is True
+            assert viewer.check_action("prev_diff_file", ()) is True
+
+
+class TestMarkdownPreview:
+    """Tests for the markdown preview toggle."""
+
+    async def test_toggle_renders_markdown(self, tmp_path: Path) -> None:
+        """Toggling markdown preview on a .md file should render it."""
+        md_file = tmp_path / "test.md"
+        md_file.write_text("# Hello\n\nSome **bold** text.\n")
+
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            viewer.load_file(md_file)
+            await pilot.pause()
+
+            # Default: raw syntax-highlighted view
+            assert viewer._markdown_preview is False
+
+            # Toggle to preview
+            viewer.action_toggle_markdown_preview()
+            await pilot.pause()
+            assert viewer._markdown_preview is True
+
+    async def test_toggle_back_to_raw(self, tmp_path: Path) -> None:
+        """Toggling again should return to raw view."""
+        md_file = tmp_path / "test.md"
+        md_file.write_text("# Hello\n")
+
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            viewer.load_file(md_file)
+            await pilot.pause()
+
+            viewer.action_toggle_markdown_preview()
+            viewer.action_toggle_markdown_preview()
+            await pilot.pause()
+            assert viewer._markdown_preview is False
+
+    async def test_noop_on_non_markdown(self, tmp_path: Path) -> None:
+        """Toggle should do nothing for non-markdown files."""
+        py_file = tmp_path / "hello.py"
+        py_file.write_text("print('hello')\n")
+
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            viewer.load_file(py_file)
+            await pilot.pause()
+
+            viewer.action_toggle_markdown_preview()
+            await pilot.pause()
+            assert viewer._markdown_preview is False
+
+    async def test_noop_in_diff_mode(self, tmp_path: Path) -> None:
+        """Toggle should do nothing when in diff mode."""
+        md_file = tmp_path / "test.md"
+        md_file.write_text("# Hello\n")
+
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            viewer.load_file(md_file)
+            viewer._diff_mode = True
+            await pilot.pause()
+
+            viewer.action_toggle_markdown_preview()
+            await pilot.pause()
+            assert viewer._markdown_preview is False
+
+    def test_is_markdown_extensions(self) -> None:
+        """All common markdown extensions should be recognized."""
+        assert Viewer._is_markdown(Path("README.md"))
+        assert Viewer._is_markdown(Path("notes.markdown"))
+        assert Viewer._is_markdown(Path("doc.mdown"))
+        assert Viewer._is_markdown(Path("file.mkd"))
+        assert Viewer._is_markdown(Path("UPPER.MD"))
+        assert not Viewer._is_markdown(Path("app.py"))
+        assert not Viewer._is_markdown(Path("style.css"))
