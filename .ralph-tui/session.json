@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "sessionId": "9e4aaf80-c013-42c3-ad69-a858c611341c",
+  "sessionId": "a25151dc-7737-4596-803d-6fd5636b4e06",
   "status": "running",
-  "startedAt": "2026-03-16T20:45:15.616Z",
-  "updatedAt": "2026-03-16T21:49:37.489Z",
-  "currentIteration": 9,
+  "startedAt": "2026-03-18T22:08:33.213Z",
+  "updatedAt": "2026-03-18T22:08:33.213Z",
+  "currentIteration": 0,
   "maxIterations": 100,
-  "tasksCompleted": 9,
+  "tasksCompleted": 0,
   "isPaused": false,
   "agentPlugin": "claude",
   "trackerState": {
@@ -18,156 +18,65 @@
         "id": "perch-54y.1",
         "title": "US-001: Git Service — Diff and Status Dict Functions",
         "status": "completed",
-        "completedInSession": true
+        "completedInSession": false
       },
       {
         "id": "perch-54y.2",
         "title": "US-002: File Viewer — Theme-Aware Syntax Highlighting",
         "status": "completed",
-        "completedInSession": true
+        "completedInSession": false
       },
       {
         "id": "perch-54y.3",
         "title": "US-003: File Viewer — Unified Diff View",
         "status": "completed",
-        "completedInSession": true
+        "completedInSession": false
       },
       {
         "id": "perch-54y.4",
         "title": "US-004: File Viewer — Side-by-Side Diff Layout",
         "status": "completed",
-        "completedInSession": true
+        "completedInSession": false
       },
       {
         "id": "perch-54y.5",
         "title": "US-005: File Tree — Git Status Indicators",
         "status": "completed",
-        "completedInSession": true
+        "completedInSession": false
       },
       {
         "id": "perch-54y.6",
         "title": "US-006: File Tree — Filesystem Watching for Auto-Refresh",
         "status": "completed",
-        "completedInSession": true
+        "completedInSession": false
       },
       {
         "id": "perch-54y.7",
         "title": "US-007: Git Tab — Interactive ListView Sections",
         "status": "completed",
-        "completedInSession": true
+        "completedInSession": false
       },
       {
         "id": "perch-54y.8",
         "title": "US-008: Git Tab — File Selection Links to File Viewer",
         "status": "completed",
-        "completedInSession": true
+        "completedInSession": false
       },
       {
         "id": "perch-54y.9",
         "title": "US-009: Git Tab — Refresh Stability",
         "status": "completed",
-        "completedInSession": true
+        "completedInSession": false
       },
       {
         "id": "perch-54y.10",
         "title": "US-010: CSS and Command Palette Updates",
-        "status": "open",
+        "status": "completed",
         "completedInSession": false
       }
     ]
   },
-  "iterations": [
-    {
-      "iteration": 1,
-      "status": "completed",
-      "taskId": "perch-54y.1",
-      "taskTitle": "US-001: Git Service — Diff and Status Dict Functions",
-      "taskCompleted": true,
-      "durationMs": 215688,
-      "startedAt": "2026-03-16T21:24:01.054Z",
-      "endedAt": "2026-03-16T21:27:36.742Z"
-    },
-    {
-      "iteration": 2,
-      "status": "completed",
-      "taskId": "perch-54y.2",
-      "taskTitle": "US-002: File Viewer — Theme-Aware Syntax Highlighting",
-      "taskCompleted": true,
-      "durationMs": 98623,
-      "startedAt": "2026-03-16T21:27:40.281Z",
-      "endedAt": "2026-03-16T21:29:18.904Z"
-    },
-    {
-      "iteration": 3,
-      "status": "completed",
-      "taskId": "perch-54y.3",
-      "taskTitle": "US-003: File Viewer — Unified Diff View",
-      "taskCompleted": true,
-      "durationMs": 152942,
-      "startedAt": "2026-03-16T21:29:21.500Z",
-      "endedAt": "2026-03-16T21:31:54.442Z"
-    },
-    {
-      "iteration": 4,
-      "status": "completed",
-      "taskId": "perch-54y.4",
-      "taskTitle": "US-004: File Viewer — Side-by-Side Diff Layout",
-      "taskCompleted": true,
-      "durationMs": 296176,
-      "startedAt": "2026-03-16T21:31:57.004Z",
-      "endedAt": "2026-03-16T21:36:53.180Z"
-    },
-    {
-      "iteration": 5,
-      "status": "completed",
-      "taskId": "perch-54y.5",
-      "taskTitle": "US-005: File Tree — Git Status Indicators",
-      "taskCompleted": true,
-      "durationMs": 122407,
-      "startedAt": "2026-03-16T21:36:56.613Z",
-      "endedAt": "2026-03-16T21:38:59.020Z"
-    },
-    {
-      "iteration": 6,
-      "status": "completed",
-      "taskId": "perch-54y.6",
-      "taskTitle": "US-006: File Tree — Filesystem Watching for Auto-Refresh",
-      "taskCompleted": true,
-      "durationMs": 171386,
-      "startedAt": "2026-03-16T21:39:01.974Z",
-      "endedAt": "2026-03-16T21:41:53.360Z"
-    },
-    {
-      "iteration": 7,
-      "status": "completed",
-      "taskId": "perch-54y.7",
-      "taskTitle": "US-007: Git Tab — Interactive ListView Sections",
-      "taskCompleted": true,
-      "durationMs": 130643,
-      "startedAt": "2026-03-16T21:41:55.944Z",
-      "endedAt": "2026-03-16T21:44:06.587Z"
-    },
-    {
-      "iteration": 8,
-      "status": "completed",
-      "taskId": "perch-54y.8",
-      "taskTitle": "US-008: Git Tab — File Selection Links to File Viewer",
-      "taskCompleted": true,
-      "durationMs": 131721,
-      "startedAt": "2026-03-16T21:44:09.535Z",
-      "endedAt": "2026-03-16T21:46:21.256Z"
-    },
-    {
-      "iteration": 9,
-      "status": "completed",
-      "taskId": "perch-54y.9",
-      "taskTitle": "US-009: Git Tab — Refresh Stability",
-      "taskCompleted": true,
-      "durationMs": 96715,
-      "startedAt": "2026-03-16T21:46:23.890Z",
-      "endedAt": "2026-03-16T21:48:00.605Z"
-    }
-  ],
+  "iterations": [],
   "skippedTaskIds": [],
   "cwd": "/Users/gclunies/.worktrunk/worktrees/perch.mvp",
   "activeTaskIds": [],

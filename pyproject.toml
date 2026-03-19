@@ -11,6 +11,7 @@ dependencies = [
     "textual>=1.0.0",
     "rich>=13.0.0",
     "watchfiles>=1.0.0",
+    "pillow>=12.1.1",
 ]
 
 [project.scripts]

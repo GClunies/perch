@@ -42,7 +42,9 @@
 # Post-Create: Runs after worktree creation, BLOCKS until complete
 # Use for: installing dependencies, setting up databases, copying configs
 #
-# [post-create]
+[post-create]
+copy = "wt step copy-ignored"
+direnv = "direnv allow"
 # deps = "npm ci"
 # env = "cp .env.example .env"
 
@@ -50,8 +52,7 @@
 # Use for: dev servers, file watchers, background builds
 # Output logged to .git/wt-logs/{branch}-project-post-start-{name}.log
 #
-[post-start]
-copy = "wt step copy-ignored"
+# [post-start]
 # server = "npm run dev -- --port {{ branch | hash_port }}"
 # watch = "npm run watch"
 

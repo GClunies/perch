@@ -4,22 +4,23 @@
 
 <h1 align="center">perch</h1>
 
-<p align="center"><em>A perch to view agentic changes in your worktrees.</em></p>
+<p align="center"><em>A vantage point to observe agents in worktrees.</em></p>
 
-A lightweight companion to run alongside coding agents in worktrees. Perch isn't an editor. It's a read-only context pane to help build confidence in your autonomous agentic workflows.
-
-Spin it up and watch the worktree update in realtime, or pop it open as needed. Files, diffs, git status, PR reviews, and CI results — all without leaving your terminal.
+Built for (autonomous) agentic workflows, `perch` is a lightweight terminal context pane to quickly view:
+- Files (syntax highlighted)
+- Git (status, diffs, commits)
+- Pull Requests (reviews, comments, CI status)
 
 ## Features
 
-- **File browser** — Navigate your worktree with a tree view; select a file to preview it with syntax highlighting.
+- **File browser** — Navigate the folfers and files in a worktree; select a file to view.
+- **Viewer** — Renders content based on your selection.
 - **Fuzzy file search** — `Ctrl+P` opens a fast fuzzy finder to jump to any file.
 - **Git status panel** — See staged, unstaged, and untracked changes at a glance.
-- **GitHub panel** — View the PR description, reviews, comments, and GitHub Actions status for the current branch (requires the [GitHub CLI](https://cli.github.com/)).
-- **Viewer** — A unified left pane that renders files, diffs, markdown, CI logs, and reviews based on what you select.
-- **Editor integration** — Press `e` to open the current file in your editor (defaults to `$EDITOR`, then `cursor`).
+- **GitHub panel** — View PR descriptions, reviews, comments, and Actions status.
+- **Editor integration** — Quickly open a file in your `$EDITOR`.
 - **Command palette** — `?` for quick access to all commands.
-- **Draggable splitter** — Resize panes with `[` / `]` or by dragging.
+- **Draggable splitter** — Resize panes with `[` / `]` or by dragging with your mouse.
 
 ## Requirements
 
@@ -50,18 +51,19 @@ uv run perch --editor code
 
 | Key              | Action                 |
 | ---------------- | ---------------------- |
-| `1` / `2` / `3`  | Switch to Files / Git / GitHub tab |
-| `Tab`            | Toggle focus between panes |
+| `[` / `]`        | Previous / next sidebar tab |
+| `Tab`            | Toggle focus between viewer and sidebar |
 | `d`              | Toggle diff view       |
 | `s`              | Toggle diff layout (unified / side-by-side) |
+| `m`              | Toggle markdown preview (`.md` files) |
 | `n` / `p`        | Next / previous file in multi-file diff |
+| `h` / `j` / `k` / `l` | Vim-style navigation |
 | `Ctrl+P`         | Fuzzy file search      |
 | `?`              | Command palette        |
-| `e`              | Open file in editor    |
+| `e`              | Open file in `$EDITOR` |
 | `o` (GitHub tab) | Open item in browser   |
-| `r` (GitHub tab) | Refresh GitHub data    |
-| `f`              | Focus mode (hide right pane) |
-| `[` / `]`        | Shrink / grow left pane |
+| `r` (Git / GitHub tab) | Refresh data     |
+| `f`              | Focus mode (hide sidebar) |
 | `q`              | Quit                   |
 
 ## Theming
