@@ -82,6 +82,9 @@ class GitHubPanel(ListView):
     BINDINGS = [
         ("o", "open_in_browser", "Open"),
         ("r", "refresh", "Refresh"),
+        Binding("f", "app.toggle_focus_mode", "Focus"),
+        Binding("j", "cursor_down", "Down", show=False),
+        Binding("k", "cursor_up", "Up", show=False),
         Binding("pageup", "page_up", "", show=False),
         Binding("pagedown", "page_down", "", show=False),
     ]
@@ -204,9 +207,13 @@ class GitHubPanel(ListView):
                 text.append(f"{c.author}", style="bold")
                 if c.created_at:
                     text.append(f"  {c.created_at}", style="dim")
-                if c.body:
-                    text.append(f"\n  {c.body}")
-                self._append_item(text, url=c.url)
+                self._append_item(
+                    text,
+                    url=c.url,
+                    preview_kind="comment",
+                    preview_title=c.author,
+                    preview_body=c.body or "",
+                )
         else:
             item = ListItem(Label(Text("  No comments", style="dim")))
             item.disabled = True

@@ -44,7 +44,7 @@ def _make_section_header(title: str) -> ListItem:
     return item
 
 
-class GitStatusPanel(ListView):
+class GitPanel(ListView):
     """Displays git status: unstaged/staged/untracked files and recent commits."""
 
     class FileSelected(Message):
@@ -71,6 +71,10 @@ class GitStatusPanel(ListView):
 
     BINDINGS = [
         ("r", "refresh", "Refresh"),
+        Binding("f", "app.toggle_focus_mode", "Focus"),
+        Binding("j", "cursor_down", "Down", show=False),
+        Binding("k", "cursor_up", "Up", show=False),
+        Binding("l", "select_cursor", "Select", show=False),
         Binding("pageup", "page_up", "Page Up", show=False),
         Binding("pagedown", "page_down", "Page Down", show=False),
     ]

@@ -29,7 +29,7 @@ _GIT_INDICATORS: dict[str, tuple[str, str]] = {
 }
 
 
-class WorktreeFileTree(DirectoryTree):
+class FileTree(DirectoryTree):
     """A directory tree that filters out noise directories."""
 
     ICON_FILE = "󰈙 "
@@ -37,8 +37,15 @@ class WorktreeFileTree(DirectoryTree):
     ICON_NODE_EXPANDED = "\U000f0770 "
 
     BINDINGS = [
+        Binding("ctrl+p", "app.file_search", "Search"),
+        Binding("o", "app.open_editor", "Open"),
+        Binding("f", "app.toggle_focus_mode", "Focus"),
         Binding("right", "expand_node", "Expand", show=False),
         Binding("left", "collapse_node", "Collapse", show=False),
+        Binding("l", "expand_node", "Expand", show=False),
+        Binding("h", "collapse_node", "Collapse", show=False),
+        Binding("j", "cursor_down", "Down", show=False),
+        Binding("k", "cursor_up", "Up", show=False),
         Binding("pageup", "page_up", "Page Up", show=False),
         Binding("pagedown", "page_down", "Page Down", show=False),
     ]
