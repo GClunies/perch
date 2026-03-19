@@ -53,35 +53,3 @@ class TestClampWidth:
             assert result == 40
 
 
-class TestKeyboardResize:
-    """Tests for [ and ] keyboard shortcuts."""
-
-    async def test_grow_then_shrink_returns_to_same_width(self, worktree: Path) -> None:
-        """Growing and then shrinking by the same amount restores width."""
-        async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-            left = pilot.app.query_one("#left-pane")
-            pilot.app.action_grow_left_pane()
-            await pilot.pause()
-            after_grow = left.outer_size.width
-            pilot.app.action_shrink_left_pane()
-            await pilot.pause()
-            after_shrink = left.outer_size.width
-            assert after_grow == after_shrink + 2
-
-    async def test_shrink_respects_min_left(self, worktree: Path) -> None:
-        async with PerchApp(worktree).run_test(size=(80, 24)) as pilot:
-            left = pilot.app.query_one("#left-pane")
-            for _ in range(30):
-                await pilot.press("left_square_bracket")
-            await pilot.pause()
-            assert left.outer_size.width >= DraggableSplitter.MIN_LEFT
-
-    async def test_grow_respects_min_right(self, worktree: Path) -> None:
-        async with PerchApp(worktree).run_test(size=(80, 24)) as pilot:
-            left = pilot.app.query_one("#left-pane")
-            for _ in range(30):
-                await pilot.press("right_square_bracket")
-            await pilot.pause()
-            app_width = pilot.app.size.width
-            max_left = app_width - DraggableSplitter.MIN_RIGHT - 1
-            assert left.outer_size.width <= max_left

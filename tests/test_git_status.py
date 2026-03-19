@@ -1,4 +1,4 @@
-"""Tests for GitStatusPanel widget and helpers."""
+"""Tests for GitPanel widget and helpers."""
 
 from pathlib import Path
 from unittest.mock import patch
@@ -7,7 +7,7 @@ from textual.widgets import Label, ListItem
 
 from perch.models import Commit, GitFile, GitStatusData
 from perch.widgets.git_status import (
-    GitStatusPanel,
+    GitPanel,
     _make_file_item,
     _make_section_header,
 )
@@ -62,24 +62,24 @@ class TestMakeSectionHeader:
 
 
 class TestFileSelectedMessage:
-    """Tests for GitStatusPanel.FileSelected message."""
+    """Tests for GitPanel.FileSelected message."""
 
     def test_attributes(self) -> None:
-        msg = GitStatusPanel.FileSelected(path="src/app.py", staged=True)
+        msg = GitPanel.FileSelected(path="src/app.py", staged=True)
         assert msg.path == "src/app.py"
         assert msg.staged is True
 
     def test_unstaged(self) -> None:
-        msg = GitStatusPanel.FileSelected(path="README.md", staged=False)
+        msg = GitPanel.FileSelected(path="README.md", staged=False)
         assert msg.path == "README.md"
         assert msg.staged is False
 
 
 class TestCommitSelectedMessage:
-    """Tests for GitStatusPanel.CommitSelected message."""
+    """Tests for GitPanel.CommitSelected message."""
 
     def test_attributes(self) -> None:
-        msg = GitStatusPanel.CommitSelected(commit_hash="abc123")
+        msg = GitPanel.CommitSelected(commit_hash="abc123")
         assert msg.commit_hash == "abc123"
 
 
@@ -138,17 +138,17 @@ def _init_git_repo(path: Path) -> None:
     )
 
 
-class TestGitStatusPanelIsListView:
-    """GitStatusPanel should be a ListView subclass."""
+class TestGitPanelIsListView:
+    """GitPanel should be a ListView subclass."""
 
     def test_inherits_list_view(self) -> None:
         from textual.widgets import ListView
 
-        assert issubclass(GitStatusPanel, ListView)
+        assert issubclass(GitPanel, ListView)
 
 
 class TestUpdateDisplay:
-    """Tests for GitStatusPanel._update_display()."""
+    """Tests for GitPanel._update_display()."""
 
     async def test_empty_status_shows_placeholders(self, tmp_path: Path) -> None:
         """With no files and no commits, all sections show 'No ...' placeholders."""
@@ -159,7 +159,7 @@ class TestUpdateDisplay:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
                 # Force an update so we don't rely on the threaded worker
@@ -182,7 +182,7 @@ class TestUpdateDisplay:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
                 panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
@@ -207,7 +207,7 @@ class TestUpdateDisplay:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
                 panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
@@ -238,7 +238,7 @@ class TestGetSelectedName:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 panel.clear()
                 panel.index = None
@@ -252,7 +252,7 @@ class TestGetSelectedName:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
                 panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
@@ -277,7 +277,7 @@ class TestRestoreSelection:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
                 panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
@@ -294,7 +294,7 @@ class TestRestoreSelection:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
                 panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
@@ -320,7 +320,7 @@ class TestOnListViewSelected:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
                 panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
@@ -339,7 +339,7 @@ class TestOnListViewSelected:
                     panel.on_list_view_selected(event)
                 assert mock_post.call_count == 1
                 msg = mock_post.call_args[0][0]
-                assert isinstance(msg, GitStatusPanel.FileSelected)
+                assert isinstance(msg, GitPanel.FileSelected)
                 assert msg.path == "file_a.py"
                 assert msg.staged is False
 
@@ -353,7 +353,7 @@ class TestOnListViewSelected:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
 
@@ -366,7 +366,7 @@ class TestOnListViewSelected:
                     panel.on_list_view_selected(event)
                 assert mock_post.call_count == 1
                 msg = mock_post.call_args[0][0]
-                assert isinstance(msg, GitStatusPanel.CommitSelected)
+                assert isinstance(msg, GitPanel.CommitSelected)
                 assert msg.commit_hash == "abc123"
 
     async def test_none_name_is_ignored(self, tmp_path: Path) -> None:
@@ -379,7 +379,7 @@ class TestOnListViewSelected:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
 
@@ -402,7 +402,7 @@ class TestOnListViewSelected:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
 
@@ -417,7 +417,7 @@ class TestOnListViewSelected:
                     panel.on_list_view_selected(event)
                 assert mock_post.call_count == 1
                 msg = mock_post.call_args[0][0]
-                assert isinstance(msg, GitStatusPanel.FileSelected)
+                assert isinstance(msg, GitPanel.FileSelected)
                 assert msg.staged is True
 
 
@@ -432,7 +432,7 @@ class TestPageUpDown:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
                 panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
@@ -455,7 +455,7 @@ class TestPageUpDown:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 await pilot.pause()
                 panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
@@ -477,7 +477,7 @@ class TestPageUpDown:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 panel.clear()
                 panel.index = None
@@ -493,7 +493,7 @@ class TestPageUpDown:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
                 panel.clear()
                 panel.index = None
@@ -512,7 +512,7 @@ class TestShowNotGitRepo:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
 
                 panel._show_not_git_repo()
@@ -536,7 +536,7 @@ class TestDoRefreshRuntimeError:
         ):
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 # Give the threaded worker time to complete and call back
                 for _ in range(20):
                     await pilot.pause()
@@ -544,7 +544,7 @@ class TestDoRefreshRuntimeError:
 
 
 class TestActivateCurrentSelection:
-    """Tests for GitStatusPanel.activate_current_selection()."""
+    """Tests for GitPanel.activate_current_selection()."""
 
     async def test_returns_false_when_no_selection(self, tmp_path: Path) -> None:
         from unittest.mock import MagicMock
@@ -556,7 +556,7 @@ class TestActivateCurrentSelection:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 panel.index = None
                 mock_post = MagicMock()
                 with patch.object(panel, "post_message", mock_post):
@@ -574,7 +574,7 @@ class TestActivateCurrentSelection:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 # _update_display calls _restore_selection which selects the first
                 # enabled item (file_a.py — first unstaged file)
                 panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
@@ -586,7 +586,7 @@ class TestActivateCurrentSelection:
                     result = panel.activate_current_selection()
                 assert result is True
                 msg = mock_post.call_args[0][0]
-                assert isinstance(msg, GitStatusPanel.FileSelected)
+                assert isinstance(msg, GitPanel.FileSelected)
                 assert msg.path == "file_a.py"
 
     async def test_posts_commit_selected_for_commit_item(self, tmp_path: Path) -> None:
@@ -599,7 +599,7 @@ class TestActivateCurrentSelection:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 # With empty status + commits, first enabled item is the first commit
                 panel._update_display(_EMPTY_STATUS, _SAMPLE_COMMITS)
                 await pilot.pause()
@@ -610,7 +610,7 @@ class TestActivateCurrentSelection:
                     result = panel.activate_current_selection()
                 assert result is True
                 msg = mock_post.call_args[0][0]
-                assert isinstance(msg, GitStatusPanel.CommitSelected)
+                assert isinstance(msg, GitPanel.CommitSelected)
                 assert msg.commit_hash in {"aaa111", "bbb222"}
 
 
@@ -625,7 +625,7 @@ class TestActionRefresh:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 await pilot.pause()
 
                 # Patch _do_refresh to track calls
@@ -648,7 +648,7 @@ class TestStaleClickGuard:
         with patches[0], patches[1], patches[2], patches[3]:
             app = PerchApp(tmp_path)
             async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitStatusPanel)
+                panel = pilot.app.query_one(GitPanel)
                 panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
                 await pilot.pause()
 

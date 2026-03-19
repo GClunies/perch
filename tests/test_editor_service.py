@@ -3,7 +3,9 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from perch.services.editor import DEFAULT_EDITOR, open_file, resolve_editor
+import pytest
+
+from perch.services.editor import open_file, resolve_editor
 
 
 class TestResolveEditor:
@@ -15,17 +17,19 @@ class TestResolveEditor:
         with patch.dict("os.environ", {"EDITOR": "nvim"}):
             assert resolve_editor(None) == "nvim"
 
-    def test_default_when_nothing_set(self):
+    def test_raises_when_nothing_set(self):
         with patch.dict("os.environ", {}, clear=True):
-            assert resolve_editor(None) == DEFAULT_EDITOR
+            with pytest.raises(RuntimeError, match="No editor configured"):
+                resolve_editor(None)
 
     def test_empty_string_cli_flag_falls_through(self):
         with patch.dict("os.environ", {"EDITOR": "vim"}):
             assert resolve_editor("") == "vim"
 
-    def test_empty_env_var_falls_to_default(self):
+    def test_empty_env_var_raises(self):
         with patch.dict("os.environ", {"EDITOR": ""}):
-            assert resolve_editor(None) == DEFAULT_EDITOR
+            with pytest.raises(RuntimeError, match="No editor configured"):
+                resolve_editor(None)
 
 
 class TestOpenFile:

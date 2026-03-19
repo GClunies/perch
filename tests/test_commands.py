@@ -30,8 +30,8 @@ def test_all_app_actions_covered():
     assert "quit" in actions
     assert "file_search" in actions
     assert "open_editor" in actions
-    assert "shrink_left_pane" in actions
-    assert "grow_left_pane" in actions
+    assert "prev_tab" in actions
+    assert "next_tab" in actions
     assert "focus_next_pane" in actions
 
 

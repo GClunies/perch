@@ -9,18 +9,16 @@ from textual.command import DiscoveryHit, Hit, Hits, Provider
 COMMANDS: list[tuple[str, str, str]] = [
     ("Quit", "q", "quit"),
     ("Switch Pane", "Tab", "focus_next_pane"),
-    ("Files Tab", "1", "show_tab('tab-files')"),
-    ("Git Tab", "2", "show_tab('tab-git')"),
-    ("GitHub Tab", "3", "show_tab('tab-github')"),
+    ("Previous Tab", "[", "prev_tab"),
+    ("Next Tab", "]", "next_tab"),
     ("Toggle Diff View", "d", "toggle_diff"),
     ("Toggle Diff Layout", "s", "toggle_diff_layout"),
+    ("Markdown Preview", "m", "toggle_markdown_preview"),
     ("Next File in Diff", "n", "next_diff_file"),
     ("Previous File in Diff", "p", "prev_diff_file"),
     ("Focus Mode", "f", "toggle_focus_mode"),
     ("Fuzzy File Search", "Ctrl+P", "file_search"),
     ("Open in Editor", "o", "open_editor"),
-    ("Shrink Left Pane", "[", "shrink_left_pane"),
-    ("Grow Left Pane", "]", "grow_left_pane"),
 ]
 
 
