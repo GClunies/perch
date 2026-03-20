@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from perch.models import Commit, CommitFile, GitFile, GitStatusData
+from perch.models import Commit, CommitFile, CommitSummary, GitFile, GitStatusData
 
 # Porcelain v1 status codes and their human-readable labels
 _STATUS_LABELS: dict[str, str] = {
@@ -165,6 +165,7 @@ def get_status_dict(root: Path) -> dict[str, str]:
 
 _LOG_SEP = "\x1f"  # unit separator — unlikely in commit data
 _LOG_FORMAT = f"%h{_LOG_SEP}%s{_LOG_SEP}%an{_LOG_SEP}%cr"
+_SUMMARY_FORMAT = f"%H{_LOG_SEP}%s{_LOG_SEP}%an{_LOG_SEP}%aI{_LOG_SEP}%b"
 
 
 def get_log(root: Path, n: int = 15, skip: int = 0) -> list[Commit]:
@@ -232,3 +233,29 @@ def parse_log(raw: str) -> list[Commit]:
             )
         )
     return commits
+
+
+def get_commit_summary(root: Path, commit_hash: str) -> CommitSummary:
+    """Return structured metadata and stats for a commit."""
+    meta_result = _run_git(
+        ["show", "--no-color", f"--format={_SUMMARY_FORMAT}", "-s", commit_hash],
+        cwd=root,
+    )
+    if meta_result.returncode != 0:
+        raise RuntimeError(f"git show failed: {meta_result.stderr.strip()}")
+    # Do NOT call .strip() on the whole line — \x1f (unit separator) is stripped
+    # by Python's str.strip(), which would drop an empty body field.
+    raw = meta_result.stdout.rstrip("\n")
+    parts = raw.split(_LOG_SEP, maxsplit=4)
+    if len(parts) < 4:
+        raise RuntimeError(f"Unexpected git show output: {meta_result.stdout!r}")
+    body = parts[4].strip() if len(parts) >= 5 else ""
+    stat_result = _run_git(
+        ["show", "--no-color", "--stat", "--format=", commit_hash],
+        cwd=root,
+    )
+    stats = stat_result.stdout.strip() if stat_result.returncode == 0 else ""
+    return CommitSummary(
+        hash=parts[0], subject=parts[1], author=parts[2],
+        date=parts[3], body=body, stats=stats,
+    )

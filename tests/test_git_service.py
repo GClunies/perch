@@ -405,6 +405,35 @@ class TestGetCommitFileDiff:
         assert "test commit message" not in diff
 
 
+class TestGetCommitSummary:
+    def test_returns_summary(self, git_worktree: Path) -> None:
+        from perch.services.git import get_commit_summary
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        summary = get_commit_summary(git_worktree, head)
+        assert summary.hash == head
+        assert summary.author == "test"
+        assert summary.subject
+        assert summary.date
+
+    def test_stats_contain_file_info(self, git_worktree: Path) -> None:
+        from perch.services.git import get_commit_summary
+        (git_worktree / "stats_test.py").write_text("content\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(["git", "commit", "-m", "add stats_test"], cwd=git_worktree, check=True)
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        summary = get_commit_summary(git_worktree, head)
+        assert "stats_test.py" in summary.stats
+
+    def test_body_with_unit_separator(self, git_worktree: Path) -> None:
+        from perch.services.git import get_commit_summary
+        (git_worktree / "sep.txt").write_text("x\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(["git", "commit", "-m", "subject\n\nbody with \x1f separator"], cwd=git_worktree, check=True)
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        summary = get_commit_summary(git_worktree, head)
+        assert "\x1f" in summary.body
+
+
 class TestCommitFileModel:
     def test_basic_fields(self) -> None:
         cf = CommitFile(path="src/app.py", status="modified", old_path=None)
