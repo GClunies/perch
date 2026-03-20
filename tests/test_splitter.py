@@ -51,5 +51,3 @@ class TestClampWidth:
             splitter = pilot.app.query_one(DraggableSplitter)
             result = splitter._clamp_width(40)
             assert result == 40
-
-

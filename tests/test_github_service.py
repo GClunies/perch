@@ -261,9 +261,7 @@ class TestParseCiLink:
         assert result is None
 
     def test_partial_github_url_no_job(self) -> None:
-        result = parse_ci_link(
-            "https://github.com/org/repo/actions/runs/12345"
-        )
+        result = parse_ci_link("https://github.com/org/repo/actions/runs/12345")
         assert result is None
 
     def test_empty_string(self) -> None:

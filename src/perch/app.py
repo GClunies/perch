@@ -156,9 +156,7 @@ class PerchApp(App):
     # Event handlers — sidebar selections → viewer
     # ------------------------------------------------------------------
 
-    def on_git_panel_file_selected(
-        self, event: GitPanel.FileSelected
-    ) -> None:
+    def on_git_panel_file_selected(self, event: GitPanel.FileSelected) -> None:
         """Handle file selection in the git tab — open in viewer."""
         file_path = self.worktree_path / event.path
         viewer = self.query_one(Viewer)
@@ -190,9 +188,7 @@ class PerchApp(App):
         viewer.load_file(event.path)
         viewer.focus()
 
-    def on_git_panel_commit_selected(
-        self, event: GitPanel.CommitSelected
-    ) -> None:
+    def on_git_panel_commit_selected(self, event: GitPanel.CommitSelected) -> None:
         """Handle commit selection in the git tab — show full commit diff."""
         viewer = self.query_one(Viewer)
         viewer.worktree_root = self.worktree_path
@@ -368,9 +364,7 @@ class PerchApp(App):
             else:
                 viewer.show_deleted_file_diff(file_path, item.name, staged=staged)
 
-    def _show_current_github_item(
-        self, github: GitHubPanel, viewer: Viewer
-    ) -> None:
+    def _show_current_github_item(self, github: GitHubPanel, viewer: Viewer) -> None:
         """Load the GitHub panel's currently highlighted item into the viewer."""
         item = github.highlighted_child
         if not isinstance(item, ClickableItem) or not item.preview_kind:
@@ -463,13 +457,16 @@ class PerchApp(App):
         """Shrink whichever pane is focused."""
         if self._focus_mode:
             return
-        delta = -self._RESIZE_STEP if self._focused_pane_is_left() else self._RESIZE_STEP
+        delta = (
+            -self._RESIZE_STEP if self._focused_pane_is_left() else self._RESIZE_STEP
+        )
         self.query_one(DraggableSplitter).resize_left_pane(delta)
 
     def action_grow_pane(self) -> None:
         """Grow whichever pane is focused."""
         if self._focus_mode:
             return
-        delta = self._RESIZE_STEP if self._focused_pane_is_left() else -self._RESIZE_STEP
+        delta = (
+            self._RESIZE_STEP if self._focused_pane_is_left() else -self._RESIZE_STEP
+        )
         self.query_one(DraggableSplitter).resize_left_pane(delta)
-

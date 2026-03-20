@@ -19,7 +19,9 @@ BINARY_CHECK_SIZE = 8192
 _IMAGE_MAX_WIDTH = 60  # columns for rendered terminal images
 
 
-def render_image_halfblocks(path: Path, max_width: int = _IMAGE_MAX_WIDTH) -> Text | None:
+def render_image_halfblocks(
+    path: Path, max_width: int = _IMAGE_MAX_WIDTH
+) -> Text | None:
     """Render an image as colored half-block (▀) characters.
 
     Returns a Rich Text object, or None if the image can't be loaded.
@@ -79,7 +81,7 @@ def render_markdown_with_images(
 
     # Match markdown images and HTML img tags
     img_pattern = re.compile(
-        r'!\[([^\]]*)\]\(([^)]+)\)'           # ![alt](src)
+        r"!\[([^\]]*)\]\(([^)]+)\)"  # ![alt](src)
         r'|<img\s[^>]*src=["\']([^"\']+)["\']'  # <img src="...">
     )
 
@@ -355,9 +357,7 @@ class Viewer(VerticalScroll):
     # Dynamic footer — check_action controls binding visibility
     # ------------------------------------------------------------------
 
-    def check_action(
-        self, action: str, parameters: tuple[object, ...]
-    ) -> bool | None:
+    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action == "toggle_diff":
             return self._current_path is not None
         if action == "toggle_diff_layout":
@@ -737,9 +737,7 @@ class Viewer(VerticalScroll):
         self._current_path = None
         self._show_content_view()
         self._update_border_title()
-        self._content.update(
-            Text("No files in this directory", style="dim italic")
-        )
+        self._content.update(Text("No files in this directory", style="dim italic"))
         self._refresh_footer()
 
     def show_placeholder(self) -> None:

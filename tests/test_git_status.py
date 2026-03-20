@@ -665,8 +665,10 @@ class TestActionCopy:
 
                 mock_clipboard = MagicMock()
                 mock_notify = MagicMock()
-                with patch.object(pilot.app, "copy_to_clipboard", mock_clipboard), \
-                     patch.object(pilot.app, "notify", mock_notify):
+                with (
+                    patch.object(pilot.app, "copy_to_clipboard", mock_clipboard),
+                    patch.object(pilot.app, "notify", mock_notify),
+                ):
                     panel.action_copy()
 
                 expected_path = str(tmp_path / "file_a.py")
@@ -698,8 +700,10 @@ class TestActionCopy:
 
                 mock_clipboard = MagicMock()
                 mock_notify = MagicMock()
-                with patch.object(pilot.app, "copy_to_clipboard", mock_clipboard), \
-                     patch.object(pilot.app, "notify", mock_notify):
+                with (
+                    patch.object(pilot.app, "copy_to_clipboard", mock_clipboard),
+                    patch.object(pilot.app, "notify", mock_notify),
+                ):
                     panel.action_copy()
 
                 mock_clipboard.assert_called_once_with("aaa111")
@@ -813,7 +817,9 @@ class TestUpdateCopyBinding:
                 assert len(c_bindings) > 0
                 assert c_bindings[-1].description == "Copy Hash"
 
-    async def test_binding_shows_copy_path_when_no_selection(self, tmp_path: Path) -> None:
+    async def test_binding_shows_copy_path_when_no_selection(
+        self, tmp_path: Path
+    ) -> None:
         """When nothing is selected, binding defaults to 'Copy Path'."""
         from perch.app import PerchApp
 
@@ -862,7 +868,10 @@ class TestUpdateCopyBinding:
                 mock_screen = MagicMock()
                 mock_screen.refresh_bindings.side_effect = RuntimeError("no screen")
                 with patch.object(
-                    type(panel), "screen", new_callable=PropertyMock, return_value=mock_screen
+                    type(panel),
+                    "screen",
+                    new_callable=PropertyMock,
+                    return_value=mock_screen,
                 ):
                     # Should not raise despite refresh_bindings failure
                     panel._update_copy_binding()

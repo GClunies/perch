@@ -825,9 +825,7 @@ class TestRenderMarkdownWithImages:
         text = "![my image](missing.png)\n\nSome text"
         parts = render_markdown_with_images(text, tmp_path)
         # Should have a placeholder for the missing image
-        has_placeholder = any(
-            "image:" in str(getattr(p, "plain", "")) for p in parts
-        )
+        has_placeholder = any("image:" in str(getattr(p, "plain", "")) for p in parts)
         assert has_placeholder
 
 
@@ -1199,12 +1197,7 @@ class TestLoadCommitDiffDedup:
     async def test_same_hash_returns_early(self, worktree: Path) -> None:
         """Calling load_commit_diff with the same hash should skip reload."""
         diff_text = (
-            "diff --git a/f.py b/f.py\n"
-            "--- a/f.py\n"
-            "+++ b/f.py\n"
-            "@@ -1 +1 @@\n"
-            "-old\n"
-            "+new"
+            "diff --git a/f.py b/f.py\n--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-old\n+new"
         )
         app = PerchApp(worktree)
         async with app.run_test():
@@ -1223,12 +1216,7 @@ class TestLoadCommitDiffDedup:
     async def test_different_hash_reloads(self, worktree: Path) -> None:
         """Calling load_commit_diff with a different hash should reload."""
         diff_text = (
-            "diff --git a/f.py b/f.py\n"
-            "--- a/f.py\n"
-            "+++ b/f.py\n"
-            "@@ -1 +1 @@\n"
-            "-old\n"
-            "+new"
+            "diff --git a/f.py b/f.py\n--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-old\n+new"
         )
         app = PerchApp(worktree)
         async with app.run_test():

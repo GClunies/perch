@@ -517,9 +517,7 @@ class TestHighlightReview:
 class TestActivateCurrentPreview:
     """Tests for GitHubPanel.activate_current_preview()."""
 
-    async def test_no_op_when_no_preview_item_highlighted(
-        self, worktree: Path
-    ) -> None:
+    async def test_no_op_when_no_preview_item_highlighted(self, worktree: Path) -> None:
         """activate_current_preview does nothing when no previewable item is active."""
         from unittest.mock import MagicMock
 
@@ -552,7 +550,10 @@ class TestActivateCurrentPreview:
                 from perch.widgets.github_panel import ClickableItem
 
                 for i, child in enumerate(panel.children):
-                    if isinstance(child, ClickableItem) and child.preview_kind == "pr_body":
+                    if (
+                        isinstance(child, ClickableItem)
+                        and child.preview_kind == "pr_body"
+                    ):
                         panel.index = i
                         break
                 await pilot.pause()
@@ -720,9 +721,7 @@ class TestCopyUrl:
                     patch.object(pilot.app, "notify", mock_notify),
                 ):
                     panel.action_copy_url()
-                mock_copy.assert_called_once_with(
-                    "https://github.com/org/repo/pull/42"
-                )
+                mock_copy.assert_called_once_with("https://github.com/org/repo/pull/42")
                 mock_notify.assert_called_once()
 
     async def test_copy_url_noop_on_header(self, worktree: Path) -> None:
@@ -791,9 +790,7 @@ class TestOnListViewHighlightedPrBody:
                 mock_post = MagicMock()
                 with patch.object(panel, "post_message", mock_post):
                     # Fabricate a Highlighted event for the PR title item
-                    event = GitHubPanel.Highlighted(
-                        panel, panel._nodes[pr_item_idx]
-                    )
+                    event = GitHubPanel.Highlighted(panel, panel._nodes[pr_item_idx])
                     panel.on_list_view_highlighted(event)
 
                 mock_post.assert_called_once()

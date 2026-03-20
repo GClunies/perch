@@ -469,8 +469,6 @@ class TestToggleFocusMode:
             assert "75" in str(viewer.styles.width)
 
 
-
-
 class TestOnTreeNodeHighlighted:
     """Tests for on_tree_node_highlighted() handler."""
 
@@ -609,7 +607,12 @@ class TestSelectionRestored:
     async def test_ignored_when_git_tab_not_active(self, worktree: Path) -> None:
         """SelectionRestored is a no-op when the Git tab is not active."""
         with (
-            patch("perch.services.git.get_status", return_value=__import__("perch.models", fromlist=["GitStatusData"]).GitStatusData()),
+            patch(
+                "perch.services.git.get_status",
+                return_value=__import__(
+                    "perch.models", fromlist=["GitStatusData"]
+                ).GitStatusData(),
+            ),
             patch("perch.services.git.get_log", return_value=[]),
             patch("perch.services.github.get_pr_context", return_value=None),
             patch("perch.services.github.get_checks", return_value=[]),
@@ -624,9 +627,8 @@ class TestSelectionRestored:
 
                 # Fire SelectionRestored while on Files tab — viewer must not change
                 from perch.widgets.git_status import GitPanel
-                pilot.app.on_git_panel_selection_restored(
-                    GitPanel.SelectionRestored()
-                )
+
+                pilot.app.on_git_panel_selection_restored(GitPanel.SelectionRestored())
                 assert viewer._current_path == path_before
 
     async def test_syncs_viewer_when_git_tab_active(self, worktree: Path) -> None:
@@ -654,9 +656,7 @@ class TestSelectionRestored:
                 await pilot.pause()
 
                 # SelectionRestored while Git tab is active — viewer should load file
-                pilot.app.on_git_panel_selection_restored(
-                    GitPanel.SelectionRestored()
-                )
+                pilot.app.on_git_panel_selection_restored(GitPanel.SelectionRestored())
                 await pilot.pause()
                 viewer = pilot.app.query_one(Viewer)
                 assert viewer._current_path == worktree / "hello.py"
@@ -686,7 +686,9 @@ class TestAutoSelectBailout:
 class TestAutoSelectEmptyDir:
     """Tests for _auto_select_first_node when the directory has no files."""
 
-    async def test_auto_select_selects_folder_when_no_files(self, tmp_path: Path) -> None:
+    async def test_auto_select_selects_folder_when_no_files(
+        self, tmp_path: Path
+    ) -> None:
         """A directory with only subdirs should select the first subfolder."""
         (tmp_path / "emptydir").mkdir()
         app = PerchApp(tmp_path)
@@ -834,9 +836,7 @@ class TestOnListViewHighlighted:
 
         status = GitStatusData()
         commits = [
-            Commit(
-                hash=commit_hash, message="init", author="Test", relative_time="now"
-            )
+            Commit(hash=commit_hash, message="init", author="Test", relative_time="now")
         ]
         with (
             patch("perch.services.git.get_status", return_value=status),
@@ -852,9 +852,7 @@ class TestOnListViewHighlighted:
                 viewer = pilot.app.query_one(Viewer)
                 with patch.object(viewer, "load_commit_diff") as mock:
                     item = ListItem(name=f"commit:{commit_hash}")
-                    event = ListView.Highlighted(
-                        pilot.app.query_one(GitPanel), item
-                    )
+                    event = ListView.Highlighted(pilot.app.query_one(GitPanel), item)
                     pilot.app.on_list_view_highlighted(event)
                     mock.assert_called_once_with(commit_hash)
                     assert viewer.worktree_root == git_worktree
@@ -885,9 +883,7 @@ class TestOnListViewHighlighted:
                 viewer = pilot.app.query_one(Viewer)
                 with patch.object(viewer, "show_deleted_file_diff") as mock:
                     item = ListItem(name="hello.py")
-                    event = ListView.Highlighted(
-                        pilot.app.query_one(GitPanel), item
-                    )
+                    event = ListView.Highlighted(pilot.app.query_one(GitPanel), item)
                     pilot.app.on_list_view_highlighted(event)
                     mock.assert_called_once_with(
                         git_worktree / "hello.py", "hello.py", staged=False

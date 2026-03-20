@@ -114,7 +114,12 @@ class TestRootNodeProtection:
 
         _init_git_repo_with_commit(tmp_path)
         with (
-            patch("perch.services.git.get_status", return_value=__import__("perch.models", fromlist=["GitStatusData"]).GitStatusData()),
+            patch(
+                "perch.services.git.get_status",
+                return_value=__import__(
+                    "perch.models", fromlist=["GitStatusData"]
+                ).GitStatusData(),
+            ),
             patch("perch.services.git.get_log", return_value=[]),
             patch("perch.services.github.get_pr_context", return_value=None),
             patch("perch.services.github.get_checks", return_value=[]),
@@ -131,16 +136,19 @@ class TestRootNodeProtection:
                 await pilot.pause()
                 assert tree.root.is_expanded, "Root should never be collapsed"
 
-    async def test_on_tree_node_collapsed_reexpands_root(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_on_tree_node_collapsed_reexpands_root(self, tmp_path: Path) -> None:
         from unittest.mock import patch
 
         from perch.app import PerchApp
 
         _init_git_repo_with_commit(tmp_path)
         with (
-            patch("perch.services.git.get_status", return_value=__import__("perch.models", fromlist=["GitStatusData"]).GitStatusData()),
+            patch(
+                "perch.services.git.get_status",
+                return_value=__import__(
+                    "perch.models", fromlist=["GitStatusData"]
+                ).GitStatusData(),
+            ),
             patch("perch.services.git.get_log", return_value=[]),
             patch("perch.services.github.get_pr_context", return_value=None),
             patch("perch.services.github.get_checks", return_value=[]),
@@ -186,7 +194,11 @@ class TestActionCopyPath:
                 for line_idx in range(tree.last_line + 1):
                     tree.cursor_line = line_idx
                     node = tree.cursor_node
-                    if node is not None and node.data is not None and not node._allow_expand:
+                    if (
+                        node is not None
+                        and node.data is not None
+                        and not node._allow_expand
+                    ):
                         break
 
                 with patch.object(pilot.app, "copy_to_clipboard") as mock_copy:
@@ -220,7 +232,12 @@ class TestActionCopyPath:
                 fake_node.data = "not-a-path-object"
                 del fake_node.path  # ensure hasattr(data, "path") is False
                 with (
-                    patch.object(type(tree), "cursor_node", new_callable=PropertyMock, return_value=fake_node),
+                    patch.object(
+                        type(tree),
+                        "cursor_node",
+                        new_callable=PropertyMock,
+                        return_value=fake_node,
+                    ),
                     patch.object(pilot.app, "copy_to_clipboard") as mock_copy,
                 ):
                     tree.action_copy_path()
@@ -251,7 +268,12 @@ class TestActionCopyPath:
                 fake_node = MagicMock()
                 fake_node.data = None
                 with (
-                    patch.object(type(tree), "cursor_node", new_callable=PropertyMock, return_value=fake_node),
+                    patch.object(
+                        type(tree),
+                        "cursor_node",
+                        new_callable=PropertyMock,
+                        return_value=fake_node,
+                    ),
                     patch.object(pilot.app, "copy_to_clipboard") as mock_copy,
                 ):
                     tree.action_copy_path()
@@ -290,7 +312,11 @@ class TestActionExpandNode:
                 for line_idx in range(tree.last_line + 1):
                     tree.cursor_line = line_idx
                     node = tree.cursor_node
-                    if node is not None and node._allow_expand and node is not tree.root:
+                    if (
+                        node is not None
+                        and node._allow_expand
+                        and node is not tree.root
+                    ):
                         folder_node = node
                         break
 
@@ -374,7 +400,9 @@ class TestActionCollapseNode:
 
                 folder_node.collapse = spy_collapse
                 tree.action_collapse_node()
-                assert collapse_called, "node.collapse() should have been called for expanded non-root folder"
+                assert collapse_called, (
+                    "node.collapse() should have been called for expanded non-root folder"
+                )
 
     async def test_collapse_navigates_to_parent_from_file(self, tmp_path: Path) -> None:
         from unittest.mock import patch
@@ -599,8 +627,13 @@ class TestRenderLabel:
                     tree.cursor_line = line_idx
                     node = tree.cursor_node
                     if node is not None and node.data is not None:
-                        data_path = node.data.path if hasattr(node.data, "path") else node.data
-                        if isinstance(data_path, Path) and data_path.name == ".hidden_file":
+                        data_path = (
+                            node.data.path if hasattr(node.data, "path") else node.data
+                        )
+                        if (
+                            isinstance(data_path, Path)
+                            and data_path.name == ".hidden_file"
+                        ):
                             hidden_node = node
                             break
 
@@ -611,7 +644,9 @@ class TestRenderLabel:
                 # Check that some part of the label has dim style
                 has_dim = any("dim" in str(span.style) for span in label._spans)
                 # Or the whole label was stylized with dim
-                assert has_dim or "dim" in str(label.style), f"Expected dim label for .hidden_file, got spans: {label._spans}"
+                assert has_dim or "dim" in str(label.style), (
+                    f"Expected dim label for .hidden_file, got spans: {label._spans}"
+                )
 
     async def test_render_label_unknown_git_status(self, tmp_path: Path) -> None:
         from unittest.mock import patch
@@ -646,8 +681,13 @@ class TestRenderLabel:
                     tree.cursor_line = line_idx
                     node = tree.cursor_node
                     if node is not None and node.data is not None:
-                        data_path = node.data.path if hasattr(node.data, "path") else node.data
-                        if isinstance(data_path, Path) and data_path.name == "tracked.py":
+                        data_path = (
+                            node.data.path if hasattr(node.data, "path") else node.data
+                        )
+                        if (
+                            isinstance(data_path, Path)
+                            and data_path.name == "tracked.py"
+                        ):
                             target_node = node
                             break
 
@@ -686,7 +726,9 @@ class TestRenderLabel:
                     tree.cursor_line = line_idx
                     node = tree.cursor_node
                     if node is not None and node.data is not None:
-                        data_path = node.data.path if hasattr(node.data, "path") else node.data
+                        data_path = (
+                            node.data.path if hasattr(node.data, "path") else node.data
+                        )
                         if isinstance(data_path, Path) and data_path.name == "hello.py":
                             target_node = node
                             break

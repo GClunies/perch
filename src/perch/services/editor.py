@@ -6,6 +6,7 @@ import os
 import subprocess
 from pathlib import Path
 
+
 def resolve_editor(cli_editor: str | None) -> str:
     """Resolve the editor command.
 
@@ -15,9 +16,7 @@ def resolve_editor(cli_editor: str | None) -> str:
         return cli_editor
     editor = os.environ.get("EDITOR")
     if not editor:
-        raise RuntimeError(
-            "No editor configured. Set $EDITOR or pass --editor."
-        )
+        raise RuntimeError("No editor configured. Set $EDITOR or pass --editor.")
     return editor
 
 

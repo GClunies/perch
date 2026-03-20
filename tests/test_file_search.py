@@ -137,7 +137,12 @@ def _create_worktree(tmp_path: Path) -> Path:
 def _service_patches():
     """Patch git/github services to prevent real subprocess calls."""
     return (
-        patch("perch.services.git.get_status", return_value=__import__("perch.models", fromlist=["GitStatusData"]).GitStatusData()),
+        patch(
+            "perch.services.git.get_status",
+            return_value=__import__(
+                "perch.models", fromlist=["GitStatusData"]
+            ).GitStatusData(),
+        ),
         patch("perch.services.git.get_log", return_value=[]),
         patch("perch.services.github.get_pr_context", return_value=None),
         patch("perch.services.github.get_checks", return_value=[]),
@@ -236,6 +241,7 @@ class TestFileSearchScreen:
                 assert not isinstance(pilot.app.screen, FileSearchScreen)
                 # The viewer should have loaded the selected file
                 from perch.widgets.viewer import Viewer
+
                 viewer = pilot.app.query_one(Viewer)
                 assert viewer._current_path == worktree / expected_name
 
@@ -249,6 +255,7 @@ class TestFileSearchScreen:
                 await pilot.pause()
                 # Load a file first so we can verify escape doesn't change it
                 from perch.widgets.viewer import Viewer
+
                 viewer = pilot.app.query_one(Viewer)
                 viewer.load_file(worktree / "hello.py")
                 await pilot.pause()
@@ -321,5 +328,6 @@ class TestFileSearchScreen:
                 assert not isinstance(pilot.app.screen, FileSearchScreen)
                 # The viewer should have loaded the selected file
                 from perch.widgets.viewer import Viewer
+
                 viewer = pilot.app.query_one(Viewer)
                 assert viewer._current_path == worktree / expected_name
