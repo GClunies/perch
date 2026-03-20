@@ -384,6 +384,27 @@ class TestGetCommitFiles:
         assert any(f.path == "hello.py" and f.status == "deleted" for f in files)
 
 
+class TestGetCommitFileDiff:
+    def test_returns_diff_for_file(self, git_worktree: Path) -> None:
+        from perch.services.git import get_commit_file_diff
+        (git_worktree / "hello.py").write_text("modified\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(["git", "commit", "-m", "modify hello"], cwd=git_worktree, check=True)
+        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        diff = get_commit_file_diff(git_worktree, head, "hello.py")
+        assert "diff --git" in diff
+        assert "hello.py" in diff
+
+    def test_no_commit_metadata_in_output(self, git_worktree: Path) -> None:
+        from perch.services.git import get_commit_file_diff
+        (git_worktree / "hello.py").write_text("changed\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(["git", "commit", "-m", "test commit message"], cwd=git_worktree, check=True)
+        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        diff = get_commit_file_diff(git_worktree, head, "hello.py")
+        assert "test commit message" not in diff
+
+
 class TestCommitFileModel:
     def test_basic_fields(self) -> None:
         cf = CommitFile(path="src/app.py", status="modified", old_path=None)

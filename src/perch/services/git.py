@@ -182,6 +182,17 @@ def get_log(root: Path, n: int = 15, skip: int = 0) -> list[Commit]:
     return parse_log(result.stdout)
 
 
+def get_commit_file_diff(root: Path, commit_hash: str, path: str) -> str:
+    """Return the diff for a single file within a commit."""
+    result = _run_git(
+        ["show", "--no-color", "--format=", commit_hash, "--", path],
+        cwd=root,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"git show failed: {result.stderr.strip()}")
+    return result.stdout
+
+
 def get_commit_files(root: Path, commit_hash: str) -> list[CommitFile]:
     """Return files changed in *commit_hash* with their status."""
     result = _run_git(
