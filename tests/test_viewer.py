@@ -1,5 +1,6 @@
 """Tests for the Viewer widget's helper functions."""
 
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -7,6 +8,7 @@ import pytest
 from rich.text import Text
 
 from perch.app import PerchApp
+from perch.models import CommitSummary
 from perch.widgets.viewer import (
     BINARY_CHECK_SIZE,
     MAX_LINES,
@@ -1279,3 +1281,51 @@ class TestPathLabel:
             some_path = Path("/any/file.py")
             label = viewer._path_label(some_path)
             assert label == str(some_path)
+
+
+# ---------------------------------------------------------------------------
+# Viewer.show_commit_summary — Task 6
+# ---------------------------------------------------------------------------
+class TestCommitSummaryViewer:
+    async def test_show_commit_summary_sets_state(self, worktree: Path) -> None:
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            summary = CommitSummary(
+                hash="abc1234",
+                subject="fix login",
+                body="Detailed fix",
+                author="Alice",
+                date="2026-03-20T10:00:00+00:00",
+                stats=" 1 file changed, 5 insertions(+)",
+            )
+            viewer.show_commit_summary(summary)
+            assert viewer._diff_mode is False
+            assert viewer._current_path is None
+            assert viewer._commit_file_context is None
+            assert viewer._current_summary is summary
+
+
+# ---------------------------------------------------------------------------
+# Viewer.load_commit_file_diff — Task 6
+# ---------------------------------------------------------------------------
+class TestCommitFileDiffViewer:
+    async def test_load_commit_file_diff_sets_state(self, git_worktree: Path) -> None:
+        (git_worktree / "hello.py").write_text("changed\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(["git", "commit", "-m", "change"], cwd=git_worktree, check=True)
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        app = PerchApp(git_worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.load_commit_file_diff(head, "hello.py")
+            assert viewer._diff_mode is True
+            assert viewer._current_path is None
+            assert viewer._commit_file_context == (head, "hello.py")
+            assert viewer._current_summary is None

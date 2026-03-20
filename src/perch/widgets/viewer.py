@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from rich.console import Group
 from rich.syntax import Syntax
@@ -13,6 +14,9 @@ from textual import work
 from textual.binding import Binding
 from textual.containers import Horizontal, ScrollableContainer, VerticalScroll
 from textual.widgets import Static
+
+if TYPE_CHECKING:
+    from perch.models import CommitSummary
 
 MAX_LINES = 10_000
 BINARY_CHECK_SIZE = 8192
@@ -405,6 +409,8 @@ class Viewer(VerticalScroll):
         self._diff_file_index: int = 0
         self._markdown_preview: bool = False
         self._current_commit: str | None = None
+        self._commit_file_context: tuple[str, str] | None = None  # (hash, path)
+        self._current_summary: CommitSummary | None = None
 
     # ------------------------------------------------------------------
     # Scroll overrides — disable animation so held keys scroll smoothly
@@ -682,6 +688,60 @@ class Viewer(VerticalScroll):
             self._content.update(
                 Text("File deleted — no diff available", style="bold red")
             )
+        self._refresh_footer()
+
+    def show_commit_summary(self, summary: CommitSummary) -> None:
+        """Show a commit summary card in the viewer."""
+        self._current_path = None
+        self._diff_mode = False
+        self._commit_file_context = None
+        self._current_summary = summary
+        self._show_content_view()
+        self._update_border_title(f"commit {summary.hash[:8]}")
+
+        header = Text()
+        header.append(f"commit {summary.hash}\n", style="bold cyan")
+        header.append(f"Author: {summary.author}\n", style="")
+        header.append(f"Date:   {summary.date}\n\n", style="dim")
+        header.append(f"    {summary.subject}\n", style="bold")
+        if summary.body:
+            header.append(f"\n    {summary.body}\n", style="")
+        header.append(f"\n{summary.stats}\n", style="")
+
+        self._content.update(header)
+        self.scroll_home(animate=False)
+        self._refresh_footer()
+
+    def load_commit_file_diff(self, commit_hash: str, path: str) -> None:
+        """Load and display a single file's diff within a commit."""
+        from perch.services.git import get_commit_file_diff
+
+        if self.worktree_root is None:
+            return
+
+        self._current_path = None
+        self._diff_mode = True
+        self._current_summary = None
+        self._commit_file_context = (commit_hash, path)
+        self._update_border_title(f"{commit_hash[:8]}:{path}")
+
+        try:
+            diff_text = get_commit_file_diff(self.worktree_root, commit_hash, path)
+        except RuntimeError as e:
+            self._show_content_view()
+            self._content.update(f"Error getting diff: {e}")
+            return
+
+        if not diff_text:
+            self._show_content_view()
+            self._content.update(Text("No changes", style="dim italic"))
+        elif self._diff_layout == "side-by-side":
+            self._show_side_by_side_view(diff_text)
+        else:
+            self._show_content_view()
+            styled = render_diff(diff_text, dark=self._is_dark_theme())
+            self._content.update(styled)
+        self.scroll_home(animate=False)
         self._refresh_footer()
 
     def show_pr_body(self, body: str, title: str = "") -> None:
