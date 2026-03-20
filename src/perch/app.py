@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
@@ -188,12 +189,6 @@ class PerchApp(App):
         viewer.load_file(event.path)
         viewer.focus()
 
-    def on_git_panel_commit_selected(self, event: GitPanel.CommitSelected) -> None:
-        """Handle commit selection in the git tab — show full commit diff."""
-        viewer = self.query_one(Viewer)
-        viewer.worktree_root = self.worktree_path
-        viewer.load_commit_diff(event.commit_hash)
-
     def on_git_hub_panel_preview_requested(
         self, event: GitHubPanel.PreviewRequested
     ) -> None:
@@ -211,10 +206,31 @@ class PerchApp(App):
             viewer.show_ci_loading(title=event.title)
             viewer.fetch_ci_log(event.url)
 
+    @work(thread=True)
+    def _load_commit_summary(self, commit_hash: str) -> None:
+        """Load commit summary in background and update viewer."""
+        from perch.services.git import get_commit_summary
+
+        try:
+            summary = get_commit_summary(self.worktree_path, commit_hash)
+        except RuntimeError:
+            return
+        self.call_from_thread(self.query_one(Viewer).show_commit_summary, summary)
+
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        """Focus the viewer when an item is explicitly selected (Enter/l)."""
+        """Handle selection (Enter/l) in the sidebar."""
         try:
             if self.query_one(TabbedContent).active == "tab-git":
+                item = event.item
+                if isinstance(item, ListItem) and item.name:
+                    if item.name.startswith("commit:"):
+                        commit_hash = item.name.removeprefix("commit:")
+                        panel = self.query_one(GitPanel)
+                        panel.toggle_commit(commit_hash)
+                        return
+                    elif item.name.startswith("commit-file:"):
+                        self.query_one(Viewer).focus()
+                        return
                 self.query_one(Viewer).focus()
         except Exception:
             pass
@@ -233,7 +249,14 @@ class PerchApp(App):
         if item.name.startswith("commit:"):
             commit_hash = item.name.removeprefix("commit:")
             viewer.worktree_root = self.worktree_path
-            viewer.load_commit_diff(commit_hash)
+            self._load_commit_summary(commit_hash)
+        elif item.name.startswith("commit-file:"):
+            parts = item.name.removeprefix("commit-file:").split(":", 1)
+            if len(parts) == 2:
+                viewer.worktree_root = self.worktree_path
+                viewer.load_commit_file_diff(parts[0], parts[1])
+        elif item.name == "load-more-commits":
+            self.query_one(GitPanel)._load_more_commits()
         else:
             file_path = self.worktree_path / item.name
             staged = getattr(item, "_staged", False)
@@ -355,7 +378,12 @@ class PerchApp(App):
         if item.name.startswith("commit:"):
             commit_hash = item.name.removeprefix("commit:")
             viewer.worktree_root = self.worktree_path
-            viewer.load_commit_diff(commit_hash)
+            self._load_commit_summary(commit_hash)
+        elif item.name.startswith("commit-file:"):
+            parts = item.name.removeprefix("commit-file:").split(":", 1)
+            if len(parts) == 2:
+                viewer.worktree_root = self.worktree_path
+                viewer.load_commit_file_diff(parts[0], parts[1])
         else:
             file_path = self.worktree_path / item.name
             staged = getattr(item, "_staged", False)

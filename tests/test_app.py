@@ -780,3 +780,33 @@ class TestOnListViewHighlighted:
                     mock.assert_called_once_with(
                         git_worktree / "hello.py", "hello.py", staged=False
                     )
+
+
+class TestCommitExpandFromApp:
+    async def test_select_commit_toggles_expand(self, git_worktree: Path) -> None:
+        """Pressing Enter on a commit item should expand it."""
+        app = PerchApp(git_worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            # Wait for the background git refresh to complete
+            for _ in range(20):
+                await pilot.pause()
+
+            panel = pilot.app.query_one(GitPanel)
+
+            commit_idx = None
+            for i, node in enumerate(panel._nodes):
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:"):
+                    commit_idx = i
+                    break
+            assert commit_idx is not None
+
+            # Switch to git tab so on_list_view_selected recognizes the context
+            pilot.app.query_one(TabbedContent).active = "tab-git"
+            await pilot.pause()
+            panel.index = commit_idx
+            await pilot.pause()
+
+            panel.action_select_cursor()
+            await pilot.pause()
+
+            assert panel._expanded_commit is not None

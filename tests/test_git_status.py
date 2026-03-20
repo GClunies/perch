@@ -77,14 +77,6 @@ class TestFileSelectedMessage:
         assert msg.staged is False
 
 
-class TestCommitSelectedMessage:
-    """Tests for GitPanel.CommitSelected message."""
-
-    def test_attributes(self) -> None:
-        msg = GitPanel.CommitSelected(commit_hash="abc123")
-        assert msg.commit_hash == "abc123"
-
-
 # ---------------------------------------------------------------------------
 # Helpers for async widget tests
 # ---------------------------------------------------------------------------
@@ -310,7 +302,7 @@ class TestRestoreSelection:
 
 
 class TestOnListViewSelected:
-    """Tests for on_list_view_selected dispatching FileSelected / CommitSelected."""
+    """Tests for on_list_view_selected dispatching FileSelected."""
 
     async def test_file_selected_message(self, tmp_path: Path) -> None:
         from unittest.mock import MagicMock
@@ -345,7 +337,8 @@ class TestOnListViewSelected:
                 assert msg.path == "file_a.py"
                 assert msg.staged is False
 
-    async def test_commit_selected_message(self, tmp_path: Path) -> None:
+    async def test_commit_item_returns_early(self, tmp_path: Path) -> None:
+        """Commit items should not post a message (handled by app.py)."""
         from unittest.mock import MagicMock
 
         from perch.app import PerchApp
@@ -366,10 +359,7 @@ class TestOnListViewSelected:
                 event = ListView.Selected(panel, commit_item, index=0)
                 with patch.object(panel, "post_message", mock_post):
                     panel.on_list_view_selected(event)
-                assert mock_post.call_count == 1
-                msg = mock_post.call_args[0][0]
-                assert isinstance(msg, GitPanel.CommitSelected)
-                assert msg.commit_hash == "abc123"
+                mock_post.assert_not_called()
 
     async def test_none_name_is_ignored(self, tmp_path: Path) -> None:
         from unittest.mock import MagicMock
@@ -591,7 +581,8 @@ class TestActivateCurrentSelection:
                 assert isinstance(msg, GitPanel.FileSelected)
                 assert msg.path == "file_a.py"
 
-    async def test_posts_commit_selected_for_commit_item(self, tmp_path: Path) -> None:
+    async def test_returns_false_for_commit_item(self, tmp_path: Path) -> None:
+        """Commit items should return False (handled by app.py)."""
         from unittest.mock import MagicMock
 
         from perch.app import PerchApp
@@ -610,10 +601,8 @@ class TestActivateCurrentSelection:
                 mock_post = MagicMock()
                 with patch.object(panel, "post_message", mock_post):
                     result = panel.activate_current_selection()
-                assert result is True
-                msg = mock_post.call_args[0][0]
-                assert isinstance(msg, GitPanel.CommitSelected)
-                assert msg.commit_hash in {"aaa111", "bbb222"}
+                assert result is False
+                mock_post.assert_not_called()
 
 
 class TestActionRefresh:

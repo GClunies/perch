@@ -55,13 +55,6 @@ class GitPanel(ListView):
             self.path = path
             self.staged = staged
 
-    class CommitSelected(Message):
-        """Posted when a commit is selected in the git status panel."""
-
-        def __init__(self, commit_hash: str) -> None:
-            super().__init__()
-            self.commit_hash = commit_hash
-
     class SelectionRestored(Message):
         """Posted after each data refresh once the selection has been set.
 
@@ -196,25 +189,21 @@ class GitPanel(ListView):
         item = self.highlighted_child
         if not isinstance(item, ListItem) or item.name is None:
             return False
-        if item.name.startswith("commit:"):
-            commit_hash = item.name.removeprefix("commit:")
-            self.post_message(self.CommitSelected(commit_hash=commit_hash))
-        else:
-            staged = getattr(item, "_staged", False)
-            self.post_message(self.FileSelected(path=item.name, staged=staged))
+        if item.name.startswith("commit:") or item.name.startswith("commit-file:"):
+            return False  # Handled by app.py
+        staged = getattr(item, "_staged", False)
+        self.post_message(self.FileSelected(path=item.name, staged=staged))
         return True
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        """Handle file or commit selection."""
+        """Handle file selection."""
         item = event.item
         if item.name is None:
             return
-        if item.name.startswith("commit:"):
-            commit_hash = item.name.removeprefix("commit:")
-            self.post_message(self.CommitSelected(commit_hash=commit_hash))
-        else:
-            staged = getattr(item, "_staged", False)
-            self.post_message(self.FileSelected(path=item.name, staged=staged))
+        if item.name.startswith("commit:") or item.name.startswith("commit-file:"):
+            return  # Handled by app.py
+        staged = getattr(item, "_staged", False)
+        self.post_message(self.FileSelected(path=item.name, staged=staged))
 
     def _page_size(self) -> int:
         """Return the number of items visible in the viewport."""
