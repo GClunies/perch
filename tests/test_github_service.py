@@ -1,7 +1,17 @@
 import json
+import subprocess
+from pathlib import Path
+from unittest.mock import call, patch
 
 from perch.models import CICheck, PRComment, PRReview
-from perch.services.github import parse_checks, parse_pr_view
+from perch.services.github import (
+    get_checks,
+    get_job_log,
+    get_pr_context,
+    parse_checks,
+    parse_ci_link,
+    parse_pr_view,
+)
 
 
 class TestParsePrView:
@@ -205,3 +215,122 @@ class TestParseChecks:
         assert result[0].name == ""
         assert result[0].state == ""
         assert result[0].workflow == ""
+
+
+class TestGetPrContext:
+    """Tests for get_pr_context when _run_gh fails."""
+
+    @patch("perch.services.github._run_gh")
+    def test_returns_none_on_failure(self, mock_run: object) -> None:
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["gh", "pr", "view"],
+            returncode=1,
+            stdout="",
+            stderr="no pull requests found",
+        )
+        result = get_pr_context(Path("/tmp"))
+        assert result is None
+
+
+class TestGetChecks:
+    """Tests for get_checks when _run_gh fails."""
+
+    @patch("perch.services.github._run_gh")
+    def test_returns_empty_list_on_failure(self, mock_run: object) -> None:
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["gh", "pr", "checks"],
+            returncode=1,
+            stdout="",
+            stderr="no pull requests found",
+        )
+        result = get_checks(Path("/tmp"))
+        assert result == []
+
+
+class TestParseCiLink:
+    """Tests for parse_ci_link with non-matching URLs."""
+
+    def test_valid_link(self) -> None:
+        result = parse_ci_link(
+            "https://github.com/org/repo/actions/runs/12345/job/67890"
+        )
+        assert result == ("12345", "67890")
+
+    def test_non_github_actions_url(self) -> None:
+        result = parse_ci_link("https://circleci.com/gh/org/repo/123")
+        assert result is None
+
+    def test_partial_github_url_no_job(self) -> None:
+        result = parse_ci_link(
+            "https://github.com/org/repo/actions/runs/12345"
+        )
+        assert result is None
+
+    def test_empty_string(self) -> None:
+        result = parse_ci_link("")
+        assert result is None
+
+    def test_random_string(self) -> None:
+        result = parse_ci_link("not-a-url-at-all")
+        assert result is None
+
+
+class TestGetJobLog:
+    """Tests for get_job_log with mocked _run_gh."""
+
+    @patch("perch.services.github._run_gh")
+    def test_success_on_first_call(self, mock_run: object) -> None:
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["gh", "run", "view"],
+            returncode=0,
+            stdout="Build succeeded\nAll tests passed\n",
+            stderr="",
+        )
+        link = "https://github.com/org/repo/actions/runs/111/job/222"
+        result = get_job_log(link, Path("/tmp"))
+        assert result == "Build succeeded\nAll tests passed\n"
+        mock_run.assert_called_once_with(  # type: ignore[attr-defined]
+            ["run", "view", "111", "--log", "-j", "222"],
+            cwd=Path("/tmp"),
+        )
+
+    @patch("perch.services.github._run_gh")
+    def test_fallback_to_log_failed(self, mock_run: object) -> None:
+        """When first call fails, falls back to --log-failed."""
+        fail = subprocess.CompletedProcess(
+            args=["gh"], returncode=1, stdout="", stderr="error"
+        )
+        success = subprocess.CompletedProcess(
+            args=["gh"], returncode=0, stdout="Failed step log\n", stderr=""
+        )
+        mock_run.side_effect = [fail, success]  # type: ignore[attr-defined]
+
+        link = "https://github.com/org/repo/actions/runs/111/job/222"
+        result = get_job_log(link, Path("/tmp"))
+        assert result == "Failed step log\n"
+        assert mock_run.call_count == 2  # type: ignore[attr-defined]
+        # Second call should use --log-failed
+        mock_run.assert_called_with(  # type: ignore[attr-defined]
+            ["run", "view", "111", "--log-failed", "-j", "222"],
+            cwd=Path("/tmp"),
+        )
+
+    @patch("perch.services.github._run_gh")
+    def test_both_calls_fail(self, mock_run: object) -> None:
+        """When both --log and --log-failed fail, returns error message."""
+        fail1 = subprocess.CompletedProcess(
+            args=["gh"], returncode=1, stdout="", stderr="log error"
+        )
+        fail2 = subprocess.CompletedProcess(
+            args=["gh"], returncode=1, stdout="", stderr="log-failed error"
+        )
+        mock_run.side_effect = [fail1, fail2]  # type: ignore[attr-defined]
+
+        link = "https://github.com/org/repo/actions/runs/111/job/222"
+        result = get_job_log(link, Path("/tmp"))
+        assert result == "Failed to fetch logs: log-failed error"
+
+    def test_unparseable_link(self) -> None:
+        """When the link can't be parsed, returns error without calling gh."""
+        result = get_job_log("https://example.com/not-actions", Path("/tmp"))
+        assert result.startswith("Cannot parse job URL:")

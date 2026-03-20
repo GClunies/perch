@@ -1,7 +1,18 @@
+import subprocess
 from pathlib import Path
+from unittest.mock import patch
 
 from perch.models import Commit, GitFile, GitStatusData
-from perch.services.git import get_diff, get_status_dict, parse_log, parse_status
+from perch.services.git import (
+    get_commit_diff,
+    get_current_branch,
+    get_diff,
+    get_ignored_paths,
+    get_log,
+    get_status_dict,
+    parse_log,
+    parse_status,
+)
 
 
 class TestParseStatus:
@@ -234,3 +245,90 @@ class TestGetStatusDict:
         root = self._make_repo(tmp_path)
         result = get_status_dict(root)
         assert result == {}
+
+
+class TestGetIgnoredPaths:
+    """Tests for get_ignored_paths edge cases."""
+
+    def test_path_not_under_root_falls_back_to_str(self, tmp_path: Path) -> None:
+        """When a path is not relative to root, relative_to raises ValueError
+        and the code falls back to str(p). Verify no crash and result is valid."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        # Initialize a git repo so git check-ignore works
+        subprocess.run(["git", "init"], cwd=root, capture_output=True, check=True)
+
+        # Path completely outside root
+        outside_path = Path("/some/other/location/file.txt")
+        result = get_ignored_paths(root, [outside_path])
+        # The outside path won't be gitignored, so result should be empty
+        assert isinstance(result, set)
+        assert outside_path not in result
+
+    def test_gitignored_directory_found(self, tmp_path: Path) -> None:
+        """Verify that gitignored directories are correctly identified via
+        the trailing-slash key in path_map."""
+        root = tmp_path / "repo"
+        root.mkdir()
+        subprocess.run(["git", "init"], cwd=root, capture_output=True, check=True)
+
+        # Create .gitignore that ignores a directory
+        (root / ".gitignore").write_text("build/\n")
+        build_dir = root / "build"
+        build_dir.mkdir()
+
+        result = get_ignored_paths(root, [build_dir])
+        assert build_dir in result
+
+    def test_empty_paths_returns_empty_set(self) -> None:
+        result = get_ignored_paths(Path("/tmp"), [])
+        assert result == set()
+
+
+class TestGetCurrentBranch:
+    """Tests for get_current_branch error path."""
+
+    @patch("perch.services.git._run_git")
+    def test_raises_on_failure(self, mock_run: object) -> None:
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            returncode=128,
+            stdout="",
+            stderr="fatal: not a git repository",
+        )
+        import pytest
+
+        with pytest.raises(RuntimeError, match="Failed to get branch"):
+            get_current_branch(Path("/tmp"))
+
+
+class TestGetCommitDiff:
+    """Tests for get_commit_diff error path."""
+
+    @patch("perch.services.git._run_git")
+    def test_raises_on_failure(self, mock_run: object) -> None:
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["git", "show"],
+            returncode=128,
+            stdout="",
+            stderr="fatal: bad object abc123",
+        )
+        import pytest
+
+        with pytest.raises(RuntimeError, match="git show failed"):
+            get_commit_diff(Path("/tmp"), "abc123")
+
+
+class TestGetLog:
+    """Tests for get_log error path."""
+
+    @patch("perch.services.git._run_git")
+    def test_returns_empty_list_on_failure(self, mock_run: object) -> None:
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["git", "log"],
+            returncode=128,
+            stdout="",
+            stderr="fatal: bad default revision 'HEAD'",
+        )
+        result = get_log(Path("/tmp"))
+        assert result == []

@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from textual.widgets import Footer, Header, TabbedContent, TabPane
+from textual.widgets import Footer, Header, ListItem, ListView, TabbedContent, TabPane
 
 from perch.app import PerchApp
 from perch.commands import DiscoveryCommandProvider
@@ -660,3 +660,235 @@ class TestSelectionRestored:
                 await pilot.pause()
                 viewer = pilot.app.query_one(Viewer)
                 assert viewer._current_path == worktree / "hello.py"
+
+
+class TestAutoSelectBailout:
+    """Tests for _auto_select_first_file bailing when a path is already loaded."""
+
+    async def test_auto_select_skips_when_path_already_set(
+        self, worktree: Path
+    ) -> None:
+        """Auto-select should not override a path that was set before the timer fires."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            # Reset auto-select state so we can trigger the bail-out path ourselves
+            pilot.app._auto_select_done = False
+            # Set a path to trigger the bailout condition at line 122
+            sentinel = worktree / "sub" / "world.txt"
+            viewer._current_path = sentinel
+            # Directly call the method to hit the branch
+            pilot.app._auto_select_first_file()
+            # Auto-select should NOT have overridden the sentinel path
+            assert viewer._current_path == sentinel
+
+
+class TestAutoSelectEmptyDir:
+    """Tests for _auto_select_first_file when the directory has no files."""
+
+    async def test_auto_select_empty_dir_shows_message(self, tmp_path: Path) -> None:
+        """An empty directory (only subdirs) should call show_empty_directory."""
+        # Create a directory that has only a subdirectory, no files
+        (tmp_path / "emptydir").mkdir()
+        app = PerchApp(tmp_path)
+        async with app.run_test(size=(120, 40)) as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            with patch.object(viewer, "show_empty_directory", wraps=viewer.show_empty_directory) as mock:
+                # Wait long enough for auto-select to exhaust retries
+                for _ in range(30):
+                    await pilot.pause()
+                mock.assert_called()
+
+
+class TestOnDirectoryTreeFileSelected:
+    """Tests for on_directory_tree_file_selected() handler."""
+
+    async def test_file_selected_loads_file_and_focuses_viewer(
+        self, worktree: Path
+    ) -> None:
+        """A FileSelected event should load the file and focus the viewer."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            viewer = pilot.app.query_one(Viewer)
+
+            class FakeEvent:
+                path = worktree / "hello.py"
+
+            pilot.app.on_directory_tree_file_selected(FakeEvent())
+            await pilot.pause()
+            assert viewer._current_path == worktree / "hello.py"
+            assert viewer.has_focus
+
+
+class TestCommentPreview:
+    """Tests for on_git_hub_panel_preview_requested with comment kind."""
+
+    async def test_comment_preview_shows_in_viewer(self, worktree: Path) -> None:
+        """A PreviewRequested with preview_kind='comment' should call show_review."""
+        with (
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                # Use action to switch to github tab (ensures internal state is consistent)
+                pilot.app.action_next_tab()  # files -> git
+                await pilot.pause()
+                pilot.app.action_next_tab()  # git -> github
+                await pilot.pause()
+                assert pilot.app.query_one(TabbedContent).active == "tab-github"
+
+                viewer = pilot.app.query_one(Viewer)
+                with patch.object(viewer, "show_review") as mock:
+                    event = GitHubPanel.PreviewRequested(
+                        preview_kind="comment",
+                        url="",
+                        body="This is a comment body",
+                        title="alice",
+                    )
+                    pilot.app.on_git_hub_panel_preview_requested(event)
+                    mock.assert_called_once_with(
+                        "This is a comment body", title="alice"
+                    )
+
+
+class TestListViewSelectedFocusesViewer:
+    """Tests for on_list_view_selected focusing the viewer on the git tab."""
+
+    async def test_list_view_selected_on_git_tab_focuses_viewer(
+        self, worktree: Path
+    ) -> None:
+        """ListView.Selected on the git tab should focus the viewer."""
+        from perch.models import GitFile, GitStatusData
+
+        status = GitStatusData(
+            unstaged=[GitFile(path="hello.py", status="modified", staged=False)]
+        )
+        with (
+            patch("perch.services.git.get_status", return_value=status),
+            patch("perch.services.git.get_log", return_value=[]),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                pilot.app.query_one(TabbedContent).active = "tab-git"
+                await pilot.pause()
+
+                # Build a fake Selected event
+                item = ListItem(name="hello.py")
+                event = ListView.Selected(pilot.app.query_one(GitPanel), item, 0)
+                pilot.app.on_list_view_selected(event)
+                await pilot.pause()
+                viewer = pilot.app.query_one(Viewer)
+                assert viewer.has_focus
+
+
+class TestSelectionRestoredCleanTree:
+    """Tests for on_git_panel_selection_restored showing clean tree."""
+
+    async def test_clean_tree_shown_when_no_selection(self, worktree: Path) -> None:
+        """Empty git status should result in show_clean_tree via SelectionRestored."""
+        from perch.models import GitStatusData
+
+        status = GitStatusData()  # no files at all
+        with (
+            patch("perch.services.git.get_status", return_value=status),
+            patch("perch.services.git.get_log", return_value=[]),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                pilot.app.query_one(TabbedContent).active = "tab-git"
+                panel = pilot.app.query_one(GitPanel)
+                panel._update_display(status, [])
+                await pilot.pause()
+
+                viewer = pilot.app.query_one(Viewer)
+                with patch.object(viewer, "show_clean_tree") as mock:
+                    # Fire SelectionRestored — panel has no selectable item
+                    pilot.app.on_git_panel_selection_restored(
+                        GitPanel.SelectionRestored()
+                    )
+                    mock.assert_called_once()
+
+
+class TestOnListViewHighlighted:
+    """Tests for on_list_view_highlighted handling commit and deleted-file items."""
+
+    async def test_highlighted_commit_loads_diff(self, git_worktree: Path) -> None:
+        """Highlighting a commit item on the git tab should call load_commit_diff."""
+        import subprocess as _sp
+
+        result = _sp.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        commit_hash = result.stdout.strip()
+
+        from perch.models import Commit, GitFile, GitStatusData
+
+        status = GitStatusData()
+        commits = [
+            Commit(
+                hash=commit_hash, message="init", author="Test", relative_time="now"
+            )
+        ]
+        with (
+            patch("perch.services.git.get_status", return_value=status),
+            patch("perch.services.git.get_log", return_value=commits),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(git_worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                pilot.app.action_next_tab()  # files -> git
+                await pilot.pause()
+
+                viewer = pilot.app.query_one(Viewer)
+                with patch.object(viewer, "load_commit_diff") as mock:
+                    item = ListItem(name=f"commit:{commit_hash}")
+                    event = ListView.Highlighted(
+                        pilot.app.query_one(GitPanel), item
+                    )
+                    pilot.app.on_list_view_highlighted(event)
+                    mock.assert_called_once_with(commit_hash)
+                    assert viewer.worktree_root == git_worktree
+
+    async def test_highlighted_deleted_file_shows_diff(
+        self, git_worktree: Path
+    ) -> None:
+        """Highlighting a deleted file item should call show_deleted_file_diff."""
+        # Delete the file so file_path.is_file() is False
+        (git_worktree / "hello.py").unlink()
+
+        from perch.models import GitFile, GitStatusData
+
+        status = GitStatusData(
+            unstaged=[GitFile(path="hello.py", status="deleted", staged=False)]
+        )
+        with (
+            patch("perch.services.git.get_status", return_value=status),
+            patch("perch.services.git.get_log", return_value=[]),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(git_worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                pilot.app.action_next_tab()  # files -> git
+                await pilot.pause()
+
+                viewer = pilot.app.query_one(Viewer)
+                with patch.object(viewer, "show_deleted_file_diff") as mock:
+                    item = ListItem(name="hello.py")
+                    event = ListView.Highlighted(
+                        pilot.app.query_one(GitPanel), item
+                    )
+                    pilot.app.on_list_view_highlighted(event)
+                    mock.assert_called_once_with(
+                        git_worktree / "hello.py", "hello.py", staged=False
+                    )

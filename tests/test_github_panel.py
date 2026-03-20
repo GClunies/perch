@@ -620,3 +620,216 @@ class TestTwoPhaseLoading:
                 text = _get_all_text(panel)
                 assert "#42" in text
                 assert "Fix bug" in text
+
+
+class TestStaleClickGuard:
+    """Firing _on_list_item__child_clicked with a stale item should not crash."""
+
+    async def test_stale_click_does_not_crash(self, worktree: Path) -> None:
+        pr = _make_pr_context()
+        p1, p2 = _patches(pr=pr, checks=_make_checks())
+        with p1, p2:
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                await pilot.pause()
+                panel = pilot.app.query_one(GitHubPanel)
+                # Grab a reference to an item currently in the list
+                from perch.widgets.github_panel import ClickableItem
+
+                stale_item = None
+                for child in panel.children:
+                    if isinstance(child, ClickableItem):
+                        stale_item = child
+                        break
+                assert stale_item is not None
+
+                # Trigger a display rebuild, which clears and re-populates
+                panel._update_display()
+                await pilot.pause()
+
+                # Fabricate a _ChildClicked event from the now-stale item
+                event = ListItem._ChildClicked(stale_item)
+                # This should silently swallow the ValueError
+                panel._on_list_item__child_clicked(event)
+
+
+class TestPageNavigation:
+    """Tests for action_page_up / action_page_down."""
+
+    @staticmethod
+    async def _activate_github_tab(pilot) -> GitHubPanel:
+        from textual.widgets import TabbedContent
+
+        await pilot.pause()
+        await pilot.pause()
+        pilot.app.query_one(TabbedContent).active = "tab-github"
+        await pilot.pause()
+        panel = pilot.app.query_one(GitHubPanel)
+        panel.focus()
+        await pilot.pause()
+        return panel
+
+    async def test_page_down(self, worktree: Path) -> None:
+        pr = _make_pr_context()
+        checks = _make_checks()
+        p1, p2 = _patches(pr=pr, checks=checks)
+        with p1, p2:
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                panel = await self._activate_github_tab(pilot)
+                # Ensure index starts at the first enabled item (0 or small)
+                assert panel.index is not None
+                start = panel.index
+                panel.action_page_down()
+                await pilot.pause()
+                assert panel.index is not None
+                assert panel.index >= start
+
+    async def test_page_up_after_page_down(self, worktree: Path) -> None:
+        pr = _make_pr_context()
+        checks = _make_checks()
+        p1, p2 = _patches(pr=pr, checks=checks)
+        with p1, p2:
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                panel = await self._activate_github_tab(pilot)
+                # Move down first so there's room to go back up
+                panel.action_page_down()
+                await pilot.pause()
+                after_down = panel.index
+                assert after_down is not None
+                panel.action_page_up()
+                await pilot.pause()
+                assert panel.index is not None
+                assert panel.index <= after_down
+
+    async def test_page_up_at_top(self, worktree: Path) -> None:
+        pr = _make_pr_context()
+        p1, p2 = _patches(pr=pr)
+        with p1, p2:
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                panel = await self._activate_github_tab(pilot)
+                panel.index = 0
+                await pilot.pause()
+                panel.action_page_up()
+                await pilot.pause()
+                assert panel.index == 0
+
+
+class TestCopyUrl:
+    """Tests for action_copy_url."""
+
+    @staticmethod
+    async def _activate_github_tab(pilot) -> GitHubPanel:
+        from textual.widgets import TabbedContent
+
+        await pilot.pause()
+        await pilot.pause()
+        pilot.app.query_one(TabbedContent).active = "tab-github"
+        await pilot.pause()
+        panel = pilot.app.query_one(GitHubPanel)
+        panel.focus()
+        await pilot.pause()
+        return panel
+
+    async def test_copy_url_copies_pr_url(self, worktree: Path) -> None:
+        from unittest.mock import MagicMock
+
+        pr = _make_pr_context(url="https://github.com/org/repo/pull/42")
+        p1, p2 = _patches(pr=pr)
+        with p1, p2:
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                panel = await self._activate_github_tab(pilot)
+                # Navigate to the PR title item
+                pr_item = _find_item_with_text(panel, "#42")
+                assert pr_item is not None
+                panel.index = list(panel.children).index(pr_item)
+                await pilot.pause()
+
+                mock_copy = MagicMock()
+                mock_notify = MagicMock()
+                with (
+                    patch.object(pilot.app, "copy_to_clipboard", mock_copy),
+                    patch.object(pilot.app, "notify", mock_notify),
+                ):
+                    panel.action_copy_url()
+                mock_copy.assert_called_once_with(
+                    "https://github.com/org/repo/pull/42"
+                )
+                mock_notify.assert_called_once()
+
+    async def test_copy_url_noop_on_header(self, worktree: Path) -> None:
+        from unittest.mock import MagicMock
+
+        pr = _make_pr_context()
+        p1, p2 = _patches(pr=pr)
+        with p1, p2:
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                panel = await self._activate_github_tab(pilot)
+                # Navigate to a disabled section header
+                for i, child in enumerate(panel.children):
+                    if isinstance(child, ListItem) and child.disabled:
+                        panel.index = i
+                        break
+                await pilot.pause()
+
+                mock_copy = MagicMock()
+                with patch.object(pilot.app, "copy_to_clipboard", mock_copy):
+                    panel.action_copy_url()
+                mock_copy.assert_not_called()
+
+
+class TestOnListViewHighlightedPrBody:
+    """Highlighting the PR title item posts a preview with the PR body."""
+
+    @staticmethod
+    async def _activate_github_tab(pilot) -> GitHubPanel:
+        from textual.widgets import TabbedContent
+
+        await pilot.pause()
+        await pilot.pause()
+        pilot.app.query_one(TabbedContent).active = "tab-github"
+        await pilot.pause()
+        panel = pilot.app.query_one(GitHubPanel)
+        panel.focus()
+        await pilot.pause()
+        return panel
+
+    async def test_highlight_pr_title_uses_pr_context_body(
+        self, worktree: Path
+    ) -> None:
+        """When a pr_body item is highlighted, body comes from _pr_context.body."""
+        from unittest.mock import MagicMock
+
+        pr = _make_pr_context(body="## Full PR Body\nWith details")
+        p1, p2 = _patches(pr=pr, checks=[])
+        with p1, p2:
+            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
+                panel = await self._activate_github_tab(pilot)
+
+                from perch.widgets.github_panel import ClickableItem
+
+                # Find the PR title item (preview_kind == "pr_body")
+                pr_item_idx = None
+                for i, child in enumerate(panel.children):
+                    if (
+                        isinstance(child, ClickableItem)
+                        and child.preview_kind == "pr_body"
+                    ):
+                        pr_item_idx = i
+                        break
+                assert pr_item_idx is not None
+
+                # Capture the PreviewRequested message
+                mock_post = MagicMock()
+                with patch.object(panel, "post_message", mock_post):
+                    # Fabricate a Highlighted event for the PR title item
+                    event = GitHubPanel.Highlighted(
+                        panel, panel._nodes[pr_item_idx]
+                    )
+                    panel.on_list_view_highlighted(event)
+
+                mock_post.assert_called_once()
+                msg = mock_post.call_args[0][0]
+                assert isinstance(msg, GitHubPanel.PreviewRequested)
+                assert msg.preview_kind == "pr_body"
+                # Body should come from the full _pr_context.body, not item
+                assert "Full PR Body" in msg.body

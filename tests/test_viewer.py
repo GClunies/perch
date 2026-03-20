@@ -955,3 +955,324 @@ class TestMarkdownPreview:
         assert Viewer._is_markdown(Path("UPPER.MD"))
         assert not Viewer._is_markdown(Path("app.py"))
         assert not Viewer._is_markdown(Path("style.css"))
+
+
+# ---------------------------------------------------------------------------
+# Viewer.show_ci_log — CI log annotation parsing (lines 671-713)
+# ---------------------------------------------------------------------------
+class TestShowCiLog:
+    """Covers annotation parsing in show_ci_log."""
+
+    async def test_group_annotation(self, worktree: Path) -> None:
+        """##[group]Name should render as bold cyan group header."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_ci_log("##[group]Run tests\n##[endgroup]")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "Run tests" in text.plain
+
+    async def test_endgroup_annotation(self, worktree: Path) -> None:
+        """##[endgroup] lines should be skipped (not rendered)."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_ci_log("##[endgroup]")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "endgroup" not in text.plain
+
+    async def test_error_annotation(self, worktree: Path) -> None:
+        """##[error]msg should render the error message."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_ci_log("##[error]Something broke")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "Something broke" in text.plain
+
+    async def test_warning_annotation(self, worktree: Path) -> None:
+        """##[warning]msg should render the warning message."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_ci_log("##[warning]Deprecation notice")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "Deprecation notice" in text.plain
+
+    async def test_ansi_stripping(self, worktree: Path) -> None:
+        """ANSI escape codes should be stripped from log lines."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_ci_log("\x1b[32mGreen text\x1b[0m")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "Green text" in text.plain
+            assert "\x1b[" not in text.plain
+
+    async def test_timestamp_stripping(self, worktree: Path) -> None:
+        """ISO timestamp prefixes should be stripped."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_ci_log("2026-03-17T01:26:13.1234567Z Hello world")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "Hello world" in text.plain
+            assert "2026-03-17" not in text.plain
+
+    async def test_tab_delimited_prefix_stripping(self, worktree: Path) -> None:
+        """Tab-delimited job/step/timestamp prefixes should be stripped."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_ci_log("myjob\tstep1\t2026-03-17T01:26:13.1234567Z Actual msg")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "Actual msg" in text.plain
+            assert "myjob" not in text.plain
+
+    async def test_empty_log(self, worktree: Path) -> None:
+        """Empty or whitespace-only log shows 'No log output available'."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_ci_log("   ")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "No log output" in text.plain
+
+    async def test_mixed_annotations(self, worktree: Path) -> None:
+        """A log with mixed annotations and regular lines is parsed correctly."""
+        log = (
+            "##[group]Setup\n"
+            "    Installing deps\n"
+            "##[endgroup]\n"
+            "##[warning]Something looks odd\n"
+            "##[error]Fatal failure\n"
+            "Normal line"
+        )
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_ci_log(log)
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "Setup" in text.plain
+            assert "Installing deps" in text.plain
+            assert "Something looks odd" in text.plain
+            assert "Fatal failure" in text.plain
+            assert "Normal line" in text.plain
+            # endgroup should not appear
+            assert "endgroup" not in text.plain
+
+
+# ---------------------------------------------------------------------------
+# Viewer.show_pr_body — empty body (lines 628-629)
+# ---------------------------------------------------------------------------
+class TestShowPrBody:
+    async def test_empty_body_shows_no_description(self, worktree: Path) -> None:
+        """show_pr_body('') should display 'No PR description'."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_pr_body("")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "No PR description" in text.plain
+
+    async def test_whitespace_body_shows_no_description(self, worktree: Path) -> None:
+        """show_pr_body with only whitespace should also show 'No PR description'."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_pr_body("   \n  ")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "No PR description" in text.plain
+
+    async def test_nonempty_body_renders_markdown(self, worktree: Path) -> None:
+        """show_pr_body with actual content should render markdown."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_pr_body("# Hello\n\nSome text", title="PR #42")
+            await app._animator.wait_for_idle()
+            # Should not show the "no description" message
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = str(content._Static__content)
+            assert "No PR description" not in text
+
+
+# ---------------------------------------------------------------------------
+# Viewer.show_review — empty body (line 667)
+# ---------------------------------------------------------------------------
+class TestShowReview:
+    async def test_empty_body_shows_no_review(self, worktree: Path) -> None:
+        """show_review('') should display 'No review body'."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_review("")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "No review body" in text.plain
+
+    async def test_whitespace_body_shows_no_review(self, worktree: Path) -> None:
+        """show_review with only whitespace should also show 'No review body'."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_review("  \n  ")
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "No review body" in text.plain
+
+
+# ---------------------------------------------------------------------------
+# Viewer.show_empty_directory — lines 735-743
+# ---------------------------------------------------------------------------
+class TestShowEmptyDirectory:
+    async def test_shows_no_files_message(self, worktree: Path) -> None:
+        """show_empty_directory should display 'No files in this directory'."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.show_empty_directory()
+            await app._animator.wait_for_idle()
+            from textual.widgets import Static
+
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "No files in this directory" in text.plain
+
+
+# ---------------------------------------------------------------------------
+# Viewer.load_commit_diff — dedup guard (line 538)
+# ---------------------------------------------------------------------------
+class TestLoadCommitDiffDedup:
+    async def test_same_hash_returns_early(self, worktree: Path) -> None:
+        """Calling load_commit_diff with the same hash should skip reload."""
+        diff_text = (
+            "diff --git a/f.py b/f.py\n"
+            "--- a/f.py\n"
+            "+++ b/f.py\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new"
+        )
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = worktree
+            with patch(
+                "perch.services.git.get_commit_diff",
+                return_value=diff_text,
+            ) as mock_diff:
+                viewer.load_commit_diff("abc123")
+                assert mock_diff.call_count == 1
+                # Second call with same hash should return early
+                viewer.load_commit_diff("abc123")
+                assert mock_diff.call_count == 1  # not called again
+
+    async def test_different_hash_reloads(self, worktree: Path) -> None:
+        """Calling load_commit_diff with a different hash should reload."""
+        diff_text = (
+            "diff --git a/f.py b/f.py\n"
+            "--- a/f.py\n"
+            "+++ b/f.py\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new"
+        )
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = worktree
+            with patch(
+                "perch.services.git.get_commit_diff",
+                return_value=diff_text,
+            ) as mock_diff:
+                viewer.load_commit_diff("abc123")
+                viewer.load_commit_diff("def456")
+                assert mock_diff.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# Viewer._path_label — fallback when path not relative to worktree (lines 463-465)
+# ---------------------------------------------------------------------------
+class TestPathLabel:
+    async def test_path_not_relative_to_worktree(self, worktree: Path) -> None:
+        """When path is outside worktree_root, _path_label returns str(path)."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = worktree
+            outside_path = Path("/some/other/place/file.py")
+            label = viewer._path_label(outside_path)
+            assert label == str(outside_path)
+
+    async def test_path_relative_to_worktree(self, worktree: Path) -> None:
+        """When path is inside worktree_root, _path_label returns relative path."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = worktree
+            inside_path = worktree / "src" / "main.py"
+            label = viewer._path_label(inside_path)
+            assert label == "src/main.py"
+
+    async def test_path_label_no_worktree_root(self, worktree: Path) -> None:
+        """When worktree_root is None, _path_label returns str(path)."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = None
+            some_path = Path("/any/file.py")
+            label = viewer._path_label(some_path)
+            assert label == str(some_path)
