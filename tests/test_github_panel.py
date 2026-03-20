@@ -318,12 +318,14 @@ class TestHighlightPreview:
     async def _activate_pr_tab(pilot) -> GitHubPanel:
         from textual.widgets import TabbedContent
 
-        await pilot.pause()
-        await pilot.pause()
-        pilot.app.query_one(TabbedContent).active = "tab-github"
-        await pilot.pause()
+        # Wait for both phases of the async refresh to complete
         panel = pilot.app.query_one(GitHubPanel)
-        panel.focus()
+        for _ in range(30):
+            await pilot.pause()
+            if panel._actions_loaded:
+                break
+        pilot.app.query_one(TabbedContent).active = "tab-github"
+        pilot.app._focus_active_tab()
         await pilot.pause()
         return panel
 
@@ -434,12 +436,14 @@ class TestHighlightReview:
     async def _activate_pr_tab(pilot) -> GitHubPanel:
         from textual.widgets import TabbedContent
 
-        await pilot.pause()
-        await pilot.pause()
-        pilot.app.query_one(TabbedContent).active = "tab-github"
-        await pilot.pause()
+        # Wait for both phases of the async refresh to complete
         panel = pilot.app.query_one(GitHubPanel)
-        panel.focus()
+        for _ in range(30):
+            await pilot.pause()
+            if panel._actions_loaded:
+                break
+        pilot.app.query_one(TabbedContent).active = "tab-github"
+        pilot.app._focus_active_tab()
         await pilot.pause()
         return panel
 

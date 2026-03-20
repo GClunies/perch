@@ -301,7 +301,8 @@ class TestGitPanelFileSelected:
     async def test_file_selected_loads_existing_file(self, git_worktree: Path) -> None:
         """Selecting an existing file should load it in the viewer."""
         app = PerchApp(git_worktree)
-        async with app.run_test() as pilot:
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             event = GitPanel.FileSelected(path="hello.py", staged=False)
             pilot.app.on_git_panel_file_selected(event)
@@ -315,7 +316,8 @@ class TestGitPanelFileSelected:
         # Delete a file so it becomes a "deleted" change
         (git_worktree / "hello.py").unlink()
         app = PerchApp(git_worktree)
-        async with app.run_test() as pilot:
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             event = GitPanel.FileSelected(path="hello.py", staged=False)
             pilot.app.on_git_panel_file_selected(event)
@@ -354,7 +356,8 @@ class TestGitPanelCommitSelected:
         commit_hash = result.stdout.strip()
 
         app = PerchApp(git_worktree)
-        async with app.run_test() as pilot:
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             event = GitPanel.CommitSelected(commit_hash=commit_hash)
             pilot.app.on_git_panel_commit_selected(event)
