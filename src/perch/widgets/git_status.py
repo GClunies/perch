@@ -36,10 +36,10 @@ def _make_file_item(f: GitFile, staged: bool = False) -> ListItem:
     return item
 
 
-def _make_section_header(title: str) -> ListItem:
+def _make_section_header(title: str, name: str | None = None) -> ListItem:
     """Create a non-selectable section header ListItem."""
     text = Text(f"\n{title}", style="bold")
-    item = ListItem(Label(text), classes="section-header")
+    item = ListItem(Label(text), classes="section-header", name=name)
     item.disabled = True
     return item
 
@@ -90,6 +90,7 @@ class GitPanel(ListView):
         super().__init__(name=name, id=id, classes=classes)
         self._worktree_root = worktree_root
         self._is_git_repo = True
+        self._expanded_commit: str | None = None
 
     def on_mount(self) -> None:
         self.append(_make_section_header("Loading git status..."))
@@ -152,9 +153,10 @@ class GitPanel(ListView):
             self.append(item)
 
         # Recent commits
-        self.append(_make_section_header("Recent Commits"))
+        self.append(_make_section_header("Recent Commits", name="section-commits"))
         for c in commits:
             text = Text()
+            text.append("\u25b8 ")  # collapsed chevron
             text.append(c.hash, style="cyan")
             text.append(f" {c.message}  ")
             text.append(c.author, style="dim")
@@ -230,3 +232,79 @@ class GitPanel(ListView):
 
     def action_refresh(self) -> None:
         self._do_refresh()
+
+    def toggle_commit(self, commit_hash: str) -> None:
+        """Expand or collapse a commit's file list (accordion pattern)."""
+        if self._expanded_commit == commit_hash:
+            self._collapse_commit(commit_hash)
+            self._expanded_commit = None
+        else:
+            if self._expanded_commit is not None:
+                self._collapse_commit(self._expanded_commit)
+            self._expand_commit(commit_hash)
+            self._expanded_commit = commit_hash
+
+    def _expand_commit(self, commit_hash: str) -> None:
+        """Insert child file items below the commit item."""
+        from perch.services.git import get_commit_files
+
+        commit_idx = None
+        for i, node in enumerate(self._nodes):
+            if isinstance(node, ListItem) and node.name == f"commit:{commit_hash}":
+                commit_idx = i
+                break
+        if commit_idx is None:
+            return
+
+        self._set_commit_chevron(commit_idx, expanded=True)
+
+        try:
+            files = get_commit_files(self._worktree_root, commit_hash)
+        except RuntimeError:
+            return
+
+        for j, f in enumerate(files):
+            text = Text()
+            text.append("  ")  # indent
+            style = _STATUS_STYLES.get(f.status, "")
+            text.append(f"{f.status:<10}", style=style)
+            text.append(f" {f.path}")
+            child = ListItem(
+                Label(text),
+                name=f"commit-file:{commit_hash}:{f.path}",
+            )
+            self.insert(commit_idx + 1 + j, [child])
+
+    def _collapse_commit(self, commit_hash: str) -> None:
+        """Remove child file items for a commit."""
+        prefix = f"commit-file:{commit_hash}:"
+        to_remove = [
+            node for node in self._nodes
+            if isinstance(node, ListItem) and node.name and node.name.startswith(prefix)
+        ]
+        for node in to_remove:
+            node.remove()
+
+        for i, node in enumerate(self._nodes):
+            if isinstance(node, ListItem) and node.name == f"commit:{commit_hash}":
+                self._set_commit_chevron(i, expanded=False)
+                break
+
+    def _set_commit_chevron(self, index: int, expanded: bool) -> None:
+        """Update the chevron indicator on a commit item."""
+        node = self._nodes[index]
+        if not isinstance(node, ListItem) or not node.name:
+            return
+        label = node.query_one(Label)
+        # Access the internal content stored by Static (name-mangled __content)
+        text = getattr(label, "_Static__content", None)
+        if not isinstance(text, Text):
+            return
+        plain = text.plain
+        if not plain.startswith(("\u25b8 ", "\u25be ")):
+            return
+        chevron = "\u25be " if expanded else "\u25b8 "
+        new_text = Text()
+        new_text.append(chevron)
+        new_text.append(plain[2:])
+        label.update(new_text)

@@ -1,8 +1,10 @@
 """Tests for GitPanel widget and helpers."""
 
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from textual.widgets import Label, ListItem
 
 from perch.models import Commit, GitFile, GitStatusData
@@ -635,3 +637,109 @@ class TestActionRefresh:
 
                 panel.action_refresh()
                 assert len(called) == 1
+
+
+class TestCommitExpandCollapse:
+    async def test_toggle_commit_expands(self, git_worktree: Path) -> None:
+        """toggle_commit should insert child file items below the commit."""
+        from perch.app import PerchApp
+
+        # Create a second commit so diff-tree can compare against a parent
+        (git_worktree / "extra.txt").write_text("extra\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add extra file"],
+            cwd=git_worktree, check=True,
+        )
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            await pilot.pause()
+
+            commit_item = None
+            for node in panel._nodes:
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:"):
+                    commit_item = node
+                    break
+            assert commit_item is not None
+            commit_hash = commit_item.name.removeprefix("commit:")
+
+            panel.toggle_commit(commit_hash)
+            await pilot.pause()
+
+            assert panel._expanded_commit == commit_hash
+            found_child = any(
+                isinstance(node, ListItem) and node.name and node.name.startswith("commit-file:")
+                for node in panel._nodes
+            )
+            assert found_child
+
+    async def test_toggle_commit_collapses(self, git_worktree: Path) -> None:
+        """Toggling an already expanded commit should remove children."""
+        from perch.app import PerchApp
+
+        # Create a second commit so diff-tree can compare against a parent
+        (git_worktree / "extra.txt").write_text("extra\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add extra file"],
+            cwd=git_worktree, check=True,
+        )
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            await pilot.pause()
+
+            commit_item = None
+            for node in panel._nodes:
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:"):
+                    commit_item = node
+                    break
+            assert commit_item is not None
+            commit_hash = commit_item.name.removeprefix("commit:")
+
+            panel.toggle_commit(commit_hash)
+            await pilot.pause()
+            panel.toggle_commit(commit_hash)
+            await pilot.pause()
+
+            assert panel._expanded_commit is None
+            for node in panel._nodes:
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit-file:"):
+                    pytest.fail("Child items should be removed after collapse")
+
+    async def test_accordion_collapses_previous(self, git_worktree: Path) -> None:
+        """Expanding a new commit should collapse the previously expanded one."""
+        from perch.app import PerchApp
+
+        (git_worktree / "second.txt").write_text("second\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "second commit"],
+            cwd=git_worktree, check=True,
+        )
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            await pilot.pause()
+
+            commits = []
+            for node in panel._nodes:
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:"):
+                    commits.append(node.name.removeprefix("commit:"))
+            assert len(commits) >= 2
+
+            panel.toggle_commit(commits[0])
+            await pilot.pause()
+            panel.toggle_commit(commits[1])
+            await pilot.pause()
+
+            assert panel._expanded_commit == commits[1]
+            for node in panel._nodes:
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit-file:"):
+                    assert node.name.startswith(f"commit-file:{commits[1]}:")
