@@ -714,6 +714,7 @@ class TestOnDirectoryTreeFileSelected:
         """A FileSelected event should load the file and focus the viewer."""
         app = PerchApp(worktree)
         async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
 
             class FakeEvent:
