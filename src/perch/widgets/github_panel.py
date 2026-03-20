@@ -81,6 +81,7 @@ class GitHubPanel(ListView):
 
     BINDINGS = [
         ("o", "open_in_browser", "Open"),
+        ("c", "copy_url", "Copy URL"),
         ("r", "refresh", "Refresh"),
         Binding("f", "app.toggle_focus_mode", "Focus"),
         Binding("j", "cursor_down", "Down", show=False),
@@ -207,6 +208,12 @@ class GitHubPanel(ListView):
                 text.append(f"{c.author}", style="bold")
                 if c.created_at:
                     text.append(f"  {c.created_at}", style="dim")
+                if c.body:
+                    # Show a one-line snippet of the comment body
+                    snippet = c.body.strip().split("\n", 1)[0]
+                    if len(snippet) > 80:
+                        snippet = snippet[:77] + "..."
+                    text.append(f"\n  {snippet}", style="dim italic")
                 self._append_item(
                     text,
                     url=c.url,
@@ -283,6 +290,13 @@ class GitHubPanel(ListView):
 
     def action_refresh(self) -> None:
         self._do_refresh()
+
+    def action_copy_url(self) -> None:
+        """Copy the highlighted item's URL to clipboard."""
+        item = self.highlighted_child
+        if isinstance(item, ClickableItem) and item.url:
+            self.app.copy_to_clipboard(item.url)
+            self.app.notify(f"Copied: {item.url}")
 
     def action_open_in_browser(self) -> None:
         """Open the highlighted item's URL in the browser."""
