@@ -1329,3 +1329,51 @@ class TestCommitFileDiffViewer:
             assert viewer._current_path is None
             assert viewer._commit_file_context == (head, "hello.py")
             assert viewer._current_summary is None
+
+
+# ---------------------------------------------------------------------------
+# Viewer commit-file context integration — Task 7
+# ---------------------------------------------------------------------------
+class TestCommitFileDiffIntegration:
+    async def test_check_action_toggle_diff_with_commit_context(
+        self, git_worktree: Path
+    ) -> None:
+        app = PerchApp(git_worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer._commit_file_context = ("abc123", "file.py")
+            assert viewer.check_action("toggle_diff", ()) is True
+
+    async def test_toggle_diff_off_shows_summary(self, worktree: Path) -> None:
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            summary = CommitSummary(
+                hash="abc",
+                subject="s",
+                body="",
+                author="a",
+                date="d",
+                stats="stats",
+            )
+            viewer._commit_file_context = ("abc", "file.py")
+            viewer._current_summary = summary
+            viewer._diff_mode = True
+            viewer.action_toggle_diff()
+            assert viewer._diff_mode is False
+            assert viewer._commit_file_context is None
+
+    async def test_refresh_content_with_summary(self, worktree: Path) -> None:
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            summary = CommitSummary(
+                hash="abc",
+                subject="s",
+                body="",
+                author="a",
+                date="d",
+                stats="stats",
+            )
+            viewer.show_commit_summary(summary)
+            viewer.refresh_content()  # should not crash

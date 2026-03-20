@@ -434,7 +434,7 @@ class Viewer(VerticalScroll):
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action == "toggle_diff":
-            return self._current_path is not None
+            return self._current_path is not None or self._commit_file_context is not None
         if action == "toggle_diff_layout":
             return self._diff_mode
         if action == "toggle_markdown_preview":
@@ -881,7 +881,12 @@ class Viewer(VerticalScroll):
 
     def refresh_content(self) -> None:
         """Re-render the current content (e.g. after a theme change)."""
-        if self._current_path is not None:
+        if self._commit_file_context is not None:
+            commit_hash, path = self._commit_file_context
+            self.load_commit_file_diff(commit_hash, path)
+        elif self._current_summary is not None:
+            self.show_commit_summary(self._current_summary)
+        elif self._current_path is not None:
             if self._diff_mode:
                 self._load_diff()
             else:
@@ -893,6 +898,10 @@ class Viewer(VerticalScroll):
 
     def _load_diff(self) -> None:
         """Load and display the diff for the current file."""
+        if self._commit_file_context is not None:
+            commit_hash, path = self._commit_file_context
+            self.load_commit_file_diff(commit_hash, path)
+            return
         if self._current_path is None or self.worktree_root is None:
             self._show_content_view()
             self._content.update(Text("No file selected", style="dim italic"))
@@ -927,11 +936,14 @@ class Viewer(VerticalScroll):
 
     def action_toggle_diff(self) -> None:
         """Toggle between normal file view and diff view."""
-        if self._current_path is None:
+        if self._current_path is None and self._commit_file_context is None:
             return
         self._diff_mode = not self._diff_mode
         if self._diff_mode:
             self._load_diff()
+        elif self._commit_file_context is not None:
+            if self._current_summary is not None:
+                self.show_commit_summary(self._current_summary)
         else:
             self.load_file(self._current_path)
         self._refresh_footer()
