@@ -1,14 +1,13 @@
-"""Draggable vertical splitter widget for resizing panes."""
+"""Vertical splitter widget for visually separating panes."""
 
 from __future__ import annotations
 
 from rich.text import Text
-from textual.events import MouseDown, MouseMove, MouseUp
 from textual.widget import Widget
 
 
 class DraggableSplitter(Widget):
-    """A vertical splitter bar that can be dragged to resize adjacent panes."""
+    """A vertical splitter bar between panes. Resized via keyboard (- / =)."""
 
     DEFAULT_CSS = """
     DraggableSplitter {
@@ -17,28 +16,10 @@ class DraggableSplitter(Widget):
         background: $surface;
         color: $text-muted;
     }
-    DraggableSplitter:hover {
-        background: $accent;
-        color: $text;
-    }
-    DraggableSplitter.-dragging {
-        background: $accent;
-        color: $text;
-    }
     """
 
     MIN_LEFT = 20
     MIN_RIGHT = 25
-
-    def __init__(
-        self,
-        *,
-        name: str | None = None,
-        id: str | None = None,
-        classes: str | None = None,
-    ) -> None:
-        super().__init__(name=name, id=id, classes=classes)
-        self._dragging = False
 
     def render(self) -> Text:
         """Render a vertical line of │ characters."""
@@ -56,23 +37,3 @@ class DraggableSplitter(Widget):
         current_width = left_pane.outer_size.width
         new_width = self._clamp_width(current_width + delta)
         left_pane.styles.width = new_width
-
-    def on_mouse_down(self, event: MouseDown) -> None:
-        self.capture_mouse()
-        self._dragging = True
-        self.add_class("-dragging")
-        event.stop()
-
-    def on_mouse_move(self, event: MouseMove) -> None:
-        if not self._dragging:
-            return
-        new_width = self._clamp_width(event.screen_x)
-        self.app.query_one("#left-pane").styles.width = new_width
-        event.stop()
-
-    def on_mouse_up(self, event: MouseUp) -> None:
-        if self._dragging:
-            self.release_mouse()
-            self._dragging = False
-            self.remove_class("-dragging")
-            event.stop()

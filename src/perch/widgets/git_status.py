@@ -92,13 +92,6 @@ class GitPanel(ListView):
         self._worktree_root = worktree_root
         self._is_git_repo = True
 
-    def _on_list_item__child_clicked(self, event: ListItem._ChildClicked) -> None:
-        """Guard against stale item references after an auto-refresh."""
-        try:
-            super()._on_list_item__child_clicked(event)
-        except ValueError:
-            pass  # Item was replaced by a concurrent refresh
-
     def on_mount(self) -> None:
         self.append(_make_section_header("Loading git status..."))
         self._do_refresh()

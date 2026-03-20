@@ -637,32 +637,6 @@ class TestActionRefresh:
                 assert len(called) == 1
 
 
-class TestStaleClickGuard:
-    """The click guard should swallow ValueError from stale item references."""
-
-    async def test_stale_click_does_not_raise(self, tmp_path: Path) -> None:
-        from perch.app import PerchApp
-
-        _init_git_repo(tmp_path)
-        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
-        with patches[0], patches[1], patches[2], patches[3]:
-            app = PerchApp(tmp_path)
-            async with app.run_test(size=(120, 40)) as pilot:
-                panel = pilot.app.query_one(GitPanel)
-                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
-                await pilot.pause()
-
-                # Grab a reference to an item, then replace the list contents
-                old_item = panel.children[1]
-                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
-                await pilot.pause()
-
-                # Simulate a click on the now-stale old_item
-                event = ListItem._ChildClicked(old_item)
-                # Should not raise ValueError
-                panel._on_list_item__child_clicked(event)
-
-
 class TestActionCopy:
     """Tests for GitPanel.action_copy()."""
 

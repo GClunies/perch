@@ -10,7 +10,7 @@ from perch.services.editor import open_file
 from perch.widgets.file_search import FileSearchScreen
 from perch.widgets.file_tree import FileTree
 from perch.widgets.git_status import GitPanel
-from perch.widgets.github_panel import GitHubPanel
+from perch.widgets.github_panel import ClickableItem, GitHubPanel
 from perch.widgets.splitter import DraggableSplitter
 from perch.widgets.viewer import Viewer
 
@@ -36,6 +36,8 @@ class PerchApp(App):
         Binding("n", "next_diff_file", "Next File", show=False),
         Binding("p", "prev_diff_file", "Prev File", show=False),
         Binding("o", "open_editor", "Open", show=False),
+        Binding("minus", "shrink_pane", "Shrink", show=False, key_display="-"),
+        Binding("equals_sign", "grow_pane", "Grow", show=False, key_display="="),
         Binding(
             "question_mark", "command_palette", "Help", key_display="?", priority=True
         ),
@@ -48,7 +50,6 @@ class PerchApp(App):
         self._focus_mode = False
         self._branch: str | None = None
         self._files_tab_last_path: Path | None = None
-        self._git_tab_first_visit = True
         try:
             from perch.services.git import get_current_branch, get_worktree_root
 
@@ -75,7 +76,7 @@ class PerchApp(App):
         self._focus_active_tab()
         self._auto_select_done = False
         self._auto_select_attempts = 0
-        self.set_timer(_AUTO_SELECT_INTERVAL, self._auto_select_first_file)
+        self.set_timer(_AUTO_SELECT_INTERVAL, self._auto_select_first_node)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -95,8 +96,8 @@ class PerchApp(App):
     # Auto-select first file on startup
     # ------------------------------------------------------------------
 
-    def _auto_select_first_file(self) -> None:
-        """Find and highlight the first file in the tree after it loads."""
+    def _auto_select_first_node(self) -> None:
+        """Highlight the first non-root node in the tree after it loads."""
         if self._auto_select_done:
             return
 
@@ -110,7 +111,7 @@ class PerchApp(App):
 
         if tree.last_line <= 0:
             if self._auto_select_attempts < _AUTO_SELECT_MAX_ATTEMPTS:
-                self.set_timer(_AUTO_SELECT_INTERVAL, self._auto_select_first_file)
+                self.set_timer(_AUTO_SELECT_INTERVAL, self._auto_select_first_node)
             else:
                 self._auto_select_done = True
                 viewer.show_empty_directory()
@@ -122,14 +123,13 @@ class PerchApp(App):
         if viewer._current_path is not None or viewer._diff_mode:
             return
 
+        # Select the first non-root node (file or folder)
         for line in range(tree.last_line + 1):
             node = tree.get_node_at_line(line)
-            if node is None or node.data is None:
+            if node is None or node.data is None or node is tree.root:
                 continue
-            path = node.data.path if hasattr(node.data, "path") else node.data
-            if isinstance(path, Path) and path.is_file():
-                tree.cursor_line = line
-                return
+            tree.cursor_line = line
+            return
 
         viewer.show_empty_directory()
 
@@ -173,11 +173,16 @@ class PerchApp(App):
         if node.data is None:
             return
         path = node.data.path if hasattr(node.data, "path") else node.data
+        try:
+            viewer = self.query_one(Viewer)
+        except Exception:
+            return  # Viewer not yet composed during early startup
         if isinstance(path, Path) and path.is_file():
-            self.query_one(Viewer).load_file(path)
+            viewer.load_file(path)
             self._files_tab_last_path = path
         elif isinstance(path, Path) and path.is_dir():
-            self.query_one(Viewer).show_folder(path)
+            viewer.show_folder(path)
+            self._files_tab_last_path = path
 
     def on_directory_tree_file_selected(self, event) -> None:
         """Focus the viewer when a file is selected with enter."""
@@ -249,10 +254,10 @@ class PerchApp(App):
             if self.query_one(TabbedContent).active != "tab-git":
                 return
             panel = self.query_one(GitPanel)
+            viewer = self.query_one(Viewer)
         except Exception:
             return
-        if not panel.activate_current_selection():
-            self.query_one(Viewer).show_clean_tree()
+        self._show_current_git_item(panel, viewer)
 
     # ------------------------------------------------------------------
     # Tab navigation
@@ -289,38 +294,98 @@ class PerchApp(App):
             viewer.focus()
 
     def _focus_active_tab(self) -> None:
-        """Focus the first navigable widget inside the active sidebar tab."""
+        """Focus the active sidebar tab and restore its viewer content."""
         tabbed = self.query_one(TabbedContent)
         active = tabbed.active
+        viewer = self.query_one(Viewer)
 
         if active == "tab-files":
             tree = self.query_one(FileTree)
             tree.focus()
             if tree.cursor_line == -1:
                 tree.cursor_line = 0
-            # Restore the last file viewed in the Files context
-            viewer = self.query_one(Viewer)
-            if self._files_tab_last_path and self._files_tab_last_path.is_file():
-                viewer.load_file(self._files_tab_last_path)
+            # Restore the viewer from cached path or current tree cursor
+            if self._files_tab_last_path and self._files_tab_last_path.exists():
+                if self._files_tab_last_path.is_file():
+                    viewer.load_file(self._files_tab_last_path)
+                else:
+                    viewer.show_folder(self._files_tab_last_path)
                 self._sync_tree_to_path(self._files_tab_last_path)
             else:
-                viewer.show_placeholder()
+                self._show_current_tree_node(tree, viewer)
         elif active == "tab-git":
             panel = self.query_one(GitPanel)
             panel.focus()
-            if self._git_tab_first_visit or panel.index is None:
-                panel._restore_selection(None)
-                self._git_tab_first_visit = False
-            # Data may still be loading; SelectionRestored will sync the viewer
-            # once the async refresh completes. Handle the already-loaded case now.
-            if not panel.activate_current_selection():
-                self.query_one(Viewer).show_clean_tree()
+            # Reset and re-select so the highlight CSS is applied even
+            # when items were selected while the panel was hidden.
+            saved = panel._get_selected_name()
+            panel.index = None
+            panel._restore_selection(saved)
+            self._show_current_git_item(panel, viewer)
         elif active == "tab-github":
             github = self.query_one(GitHubPanel)
             github.focus()
-            github.activate_current_preview()
+            # Re-apply highlight by toggling the index so the reactive
+            # watcher fires and renders the highlight on the visible tab.
+            idx = github.index
+            if idx is not None:
+                github.index = None
+                github.index = idx
+            self._show_current_github_item(github, viewer)
         else:
             self.query_one(FileTree).focus()
+
+    def _show_current_tree_node(self, tree: FileTree, viewer: Viewer) -> None:
+        """Load the tree's currently highlighted node into the viewer."""
+        node = tree.get_node_at_line(tree.cursor_line)
+        if node is None or node.data is None:
+            viewer.show_placeholder()
+            return
+        path = node.data.path if hasattr(node.data, "path") else node.data
+        if isinstance(path, Path) and path.is_file():
+            viewer.load_file(path)
+            self._files_tab_last_path = path
+        elif isinstance(path, Path) and path.is_dir():
+            viewer.show_folder(path)
+        else:
+            viewer.show_placeholder()
+
+    def _show_current_git_item(self, panel: GitPanel, viewer: Viewer) -> None:
+        """Load the git panel's currently highlighted item into the viewer."""
+        item = panel.highlighted_child
+        if not isinstance(item, ListItem) or item.name is None:
+            viewer.show_clean_tree()
+            return
+        if item.name.startswith("commit:"):
+            commit_hash = item.name.removeprefix("commit:")
+            viewer.worktree_root = self.worktree_path
+            viewer.load_commit_diff(commit_hash)
+        else:
+            file_path = self.worktree_path / item.name
+            staged = getattr(item, "_staged", False)
+            if file_path.is_file():
+                viewer.load_file(file_path)
+            else:
+                viewer.show_deleted_file_diff(file_path, item.name, staged=staged)
+
+    def _show_current_github_item(
+        self, github: GitHubPanel, viewer: Viewer
+    ) -> None:
+        """Load the GitHub panel's currently highlighted item into the viewer."""
+        item = github.highlighted_child
+        if not isinstance(item, ClickableItem) or not item.preview_kind:
+            viewer.show_placeholder()
+            return
+        body = item.preview_body
+        if item.preview_kind == "pr_body" and github._pr_context:
+            body = github._pr_context.body
+        if item.preview_kind == "pr_body":
+            viewer.show_pr_body(body, title=item.preview_title)
+        elif item.preview_kind in ("review", "comment"):
+            viewer.show_review(body, title=item.preview_title)
+        elif item.preview_kind == "ci_check":
+            viewer.show_ci_loading(title=item.preview_title)
+            viewer.fetch_ci_log(item.url)
 
     # ------------------------------------------------------------------
     # File search
@@ -386,4 +451,25 @@ class PerchApp(App):
             splitter.display = True
             viewer.styles.width = "75%"
             self._focus_active_tab()
+
+    _RESIZE_STEP = 5  # columns per keypress
+
+    def _focused_pane_is_left(self) -> bool:
+        """Return True if the left pane (viewer) currently has focus."""
+        viewer = self.query_one("#left-pane", Viewer)
+        return viewer.has_focus
+
+    def action_shrink_pane(self) -> None:
+        """Shrink whichever pane is focused."""
+        if self._focus_mode:
+            return
+        delta = -self._RESIZE_STEP if self._focused_pane_is_left() else self._RESIZE_STEP
+        self.query_one(DraggableSplitter).resize_left_pane(delta)
+
+    def action_grow_pane(self) -> None:
+        """Grow whichever pane is focused."""
+        if self._focus_mode:
+            return
+        delta = self._RESIZE_STEP if self._focused_pane_is_left() else -self._RESIZE_STEP
+        self.query_one(DraggableSplitter).resize_left_pane(delta)
 

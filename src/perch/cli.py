@@ -24,4 +24,4 @@ def main() -> None:
     from perch.app import PerchApp
 
     app = PerchApp(worktree_path=args.path.resolve(), editor=args.editor)
-    app.run()
+    app.run(mouse=False)

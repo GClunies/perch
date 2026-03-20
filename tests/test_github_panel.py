@@ -355,8 +355,8 @@ class TestHighlightPreview:
                 _find_item = _find_item_with_text(panel, "#42")
                 assert _find_item is not None
                 panel.index = list(panel.children).index(_find_item)
-                await pilot.pause()
-                await pilot.pause()
+                for _ in range(5):
+                    await pilot.pause()
                 content = self._viewer_text(pilot)
                 assert "PR Description" in content or "My PR" in content
 
@@ -620,37 +620,6 @@ class TestTwoPhaseLoading:
                 text = _get_all_text(panel)
                 assert "#42" in text
                 assert "Fix bug" in text
-
-
-class TestStaleClickGuard:
-    """Firing _on_list_item__child_clicked with a stale item should not crash."""
-
-    async def test_stale_click_does_not_crash(self, worktree: Path) -> None:
-        pr = _make_pr_context()
-        p1, p2 = _patches(pr=pr, checks=_make_checks())
-        with p1, p2:
-            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                await pilot.pause()
-                await pilot.pause()
-                panel = pilot.app.query_one(GitHubPanel)
-                # Grab a reference to an item currently in the list
-                from perch.widgets.github_panel import ClickableItem
-
-                stale_item = None
-                for child in panel.children:
-                    if isinstance(child, ClickableItem):
-                        stale_item = child
-                        break
-                assert stale_item is not None
-
-                # Trigger a display rebuild, which clears and re-populates
-                panel._update_display()
-                await pilot.pause()
-
-                # Fabricate a _ChildClicked event from the now-stale item
-                event = ListItem._ChildClicked(stale_item)
-                # This should silently swallow the ValueError
-                panel._on_list_item__child_clicked(event)
 
 
 class TestPageNavigation:

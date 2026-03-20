@@ -9,6 +9,10 @@
     border: solid $border;
 }
 
+#left-pane:focus-within {
+    border: solid $accent;
+}
+
 Viewer {
     overflow-x: auto;
     overflow-y: auto;
@@ -22,6 +26,11 @@ Viewer {
 #sidebar {
     width: 1fr;
     height: 100%;
+    border: solid $border;
+}
+
+#sidebar:focus-within {
+    border: solid $accent;
 }
 
 #sidebar Tab {

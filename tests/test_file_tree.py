@@ -377,7 +377,7 @@ class TestActionCollapseNode:
                 assert collapse_called, "node.collapse() should have been called for expanded non-root folder"
 
     async def test_collapse_navigates_to_parent_from_file(self, tmp_path: Path) -> None:
-        from unittest.mock import patch, call
+        from unittest.mock import patch
 
         from perch.app import PerchApp
         from perch.models import GitStatusData
@@ -611,7 +611,6 @@ class TestRenderLabel:
                 # Check that some part of the label has dim style
                 has_dim = any("dim" in str(span.style) for span in label._spans)
                 # Or the whole label was stylized with dim
-                plain = label.plain
                 assert has_dim or "dim" in str(label.style), f"Expected dim label for .hidden_file, got spans: {label._spans}"
 
     async def test_render_label_unknown_git_status(self, tmp_path: Path) -> None:
@@ -658,7 +657,7 @@ class TestRenderLabel:
                 assert " X" not in label.plain
 
     async def test_render_label_path_outside_tree_root(self, tmp_path: Path) -> None:
-        from unittest.mock import patch, PropertyMock
+        from unittest.mock import patch
 
         from perch.app import PerchApp
         from perch.models import GitStatusData
@@ -708,7 +707,7 @@ class TestRenderLabel:
                 assert label.plain  # label exists and is non-empty
 
     async def test_render_label_node_data_none(self, tmp_path: Path) -> None:
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch
 
         from perch.app import PerchApp
         from perch.models import GitStatusData

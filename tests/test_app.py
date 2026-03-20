@@ -663,7 +663,7 @@ class TestSelectionRestored:
 
 
 class TestAutoSelectBailout:
-    """Tests for _auto_select_first_file bailing when a path is already loaded."""
+    """Tests for _auto_select_first_node bailing when a path is already loaded."""
 
     async def test_auto_select_skips_when_path_already_set(
         self, worktree: Path
@@ -678,26 +678,26 @@ class TestAutoSelectBailout:
             sentinel = worktree / "sub" / "world.txt"
             viewer._current_path = sentinel
             # Directly call the method to hit the branch
-            pilot.app._auto_select_first_file()
+            pilot.app._auto_select_first_node()
             # Auto-select should NOT have overridden the sentinel path
             assert viewer._current_path == sentinel
 
 
 class TestAutoSelectEmptyDir:
-    """Tests for _auto_select_first_file when the directory has no files."""
+    """Tests for _auto_select_first_node when the directory has no files."""
 
-    async def test_auto_select_empty_dir_shows_message(self, tmp_path: Path) -> None:
-        """An empty directory (only subdirs) should call show_empty_directory."""
-        # Create a directory that has only a subdirectory, no files
+    async def test_auto_select_selects_folder_when_no_files(self, tmp_path: Path) -> None:
+        """A directory with only subdirs should select the first subfolder."""
         (tmp_path / "emptydir").mkdir()
         app = PerchApp(tmp_path)
         async with app.run_test(size=(120, 40)) as pilot:
-            viewer = pilot.app.query_one(Viewer)
-            with patch.object(viewer, "show_empty_directory", wraps=viewer.show_empty_directory) as mock:
-                # Wait long enough for auto-select to exhaust retries
-                for _ in range(30):
-                    await pilot.pause()
-                mock.assert_called()
+            tree = pilot.app.query_one(FileTree)
+            for _ in range(30):
+                await pilot.pause()
+                if tree.cursor_line > 0:
+                    break
+            # The subfolder node should be selected (not root at line 0)
+            assert tree.cursor_line > 0
 
 
 class TestOnDirectoryTreeFileSelected:
@@ -830,7 +830,7 @@ class TestOnListViewHighlighted:
         )
         commit_hash = result.stdout.strip()
 
-        from perch.models import Commit, GitFile, GitStatusData
+        from perch.models import Commit, GitStatusData
 
         status = GitStatusData()
         commits = [

@@ -104,13 +104,6 @@ class GitHubPanel(ListView):
         self._actions: list[CICheck] = []
         self._actions_loaded = True
 
-    def _on_list_item__child_clicked(self, event: ListItem._ChildClicked) -> None:
-        """Guard against stale item references after an auto-refresh."""
-        try:
-            super()._on_list_item__child_clicked(event)
-        except ValueError:
-            pass  # Item was replaced by a concurrent refresh
-
     def on_mount(self) -> None:
         self.append(_make_section_header("Loading PR context..."))
         self._do_refresh()
@@ -304,15 +297,16 @@ class GitHubPanel(ListView):
         if isinstance(item, ClickableItem) and item.url:
             webbrowser.open(item.url)
 
-    def activate_current_preview(self) -> None:
+    def activate_current_preview(self) -> bool:
         """Post PreviewRequested for the currently highlighted item.
 
         Called by the app when switching back to the GitHub tab to restore
-        the viewer to whatever was last shown.
+        the viewer to whatever was last shown.  Returns True if a preview
+        was posted, False otherwise.
         """
         item = self.highlighted_child
         if not isinstance(item, ClickableItem) or not item.preview_kind:
-            return
+            return False
         body = item.preview_body
         if item.preview_kind == "pr_body" and self._pr_context:
             body = self._pr_context.body
@@ -324,6 +318,7 @@ class GitHubPanel(ListView):
                 title=item.preview_title,
             )
         )
+        return True
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         """Post a preview message when the user highlights an item."""

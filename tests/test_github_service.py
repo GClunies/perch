@@ -1,7 +1,7 @@
 import json
 import subprocess
 from pathlib import Path
-from unittest.mock import call, patch
+from unittest.mock import patch
 
 from perch.models import CICheck, PRComment, PRReview
 from perch.services.github import (

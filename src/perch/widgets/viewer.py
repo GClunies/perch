@@ -421,6 +421,7 @@ class Viewer(VerticalScroll):
 
     def _show_content_view(self) -> None:
         """Show the main content area and hide the diff container."""
+        self._current_commit = None
         self._content.display = True
         try:
             self.query_one("#diff-container").display = False
@@ -471,7 +472,6 @@ class Viewer(VerticalScroll):
     def load_file(self, path: Path) -> None:
         """Load and display a file with syntax highlighting."""
         self._current_path = path
-        self._current_commit = None
         self._diff_mode = False
         self._diff_layout = "unified"
         self._show_content_view()
@@ -538,9 +538,9 @@ class Viewer(VerticalScroll):
             return
 
         self._current_path = None
-        self._current_commit = commit_hash
         self._diff_mode = True
         self._show_content_view()
+        self._current_commit = commit_hash
         self._update_border_title(f"commit {commit_hash[:8]}")
 
         try:
