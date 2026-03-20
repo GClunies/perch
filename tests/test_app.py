@@ -331,7 +331,8 @@ class TestGitPanelFileSelected:
         # Remove file so it is not found
         deleted_name = "gone.py"
         app = PerchApp(worktree)
-        async with app.run_test() as pilot:
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             event = GitPanel.FileSelected(path=deleted_name, staged=False)
             pilot.app.on_git_panel_file_selected(event)
