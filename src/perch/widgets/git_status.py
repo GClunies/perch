@@ -6,9 +6,12 @@ from pathlib import Path
 
 from rich.text import Text
 from textual import work
-from textual.message import Message
+from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.widgets import Label, ListItem, ListView
+from textual.containers import Vertical
+from textual.message import Message
+from textual.widgets import Label, ListItem, ListView, Tree
+
 
 from perch.models import GitFile, GitStatusData
 
@@ -44,8 +47,22 @@ def _make_section_header(title: str, name: str | None = None) -> ListItem:
     return item
 
 
-class GitPanel(ListView):
-    """Displays git status: unstaged/staged/untracked files and recent commits."""
+class CommitTree(Tree[str]):
+    """Tree widget for commit history. GitPanel handles j/k navigation."""
+
+    can_focus = True
+
+    BINDINGS = [
+        Binding("l", "select_cursor", "Select", show=False),
+        Binding("pageup", "page_up", "Page Up", show=False),
+        Binding("pagedown", "page_down", "Page Down", show=False),
+    ]
+
+
+class GitPanel(Vertical):
+    """Compound widget: ListView (files) + Tree (commits)."""
+
+    can_focus = False  # children receive focus, not the container
 
     class FileSelected(Message):
         """Posted when a file is selected in the git status panel."""
@@ -54,6 +71,28 @@ class GitPanel(ListView):
             super().__init__()
             self.path = path
             self.staged = staged
+
+    class CommitHighlighted(Message):
+        """Posted when a commit node is highlighted in the tree."""
+
+        def __init__(self, commit_hash: str) -> None:
+            super().__init__()
+            self.commit_hash = commit_hash
+
+    class CommitFileHighlighted(Message):
+        """Posted when a commit-file node is highlighted in the tree."""
+
+        def __init__(self, commit_hash: str, path: str) -> None:
+            super().__init__()
+            self.commit_hash = commit_hash
+            self.path = path
+
+    class CommitToggled(Message):
+        """Posted when Enter/l is pressed on a commit node."""
+
+        def __init__(self, commit_hash: str) -> None:
+            super().__init__()
+            self.commit_hash = commit_hash
 
     class SelectionRestored(Message):
         """Posted after each data refresh once the selection has been set.
@@ -87,12 +126,170 @@ class GitPanel(ListView):
         self._commit_page_size: int = 50
         self._commits_loaded: int = 0
         self._loading_more: bool = False
+        self._file_list = ListView(id="git-file-list")
+        self._commit_tree = CommitTree("Commits", id="git-commit-tree")
+        self._commit_tree.show_root = False
+
+    def compose(self) -> ComposeResult:
+        yield self._file_list
+        yield Label("\nRecent Commits", classes="section-header commits-header")
+        yield self._commit_tree
+
+    @property
+    def has_focus(self) -> bool:  # type: ignore[override]
+        """Return True if either child widget has focus."""
+        return self._file_list.has_focus or self._commit_tree.has_focus
 
     def on_mount(self) -> None:
-        self.append(_make_section_header("Loading git status..."))
+        self._file_list.append(_make_section_header("Loading git status..."))
         self._do_refresh()  # initial full refresh
-        self.set_interval(5, self._refresh_file_status_worker)  # auto-refresh files only
+        self.set_interval(5, self._refresh_file_status_worker)  # auto-refresh files
         self._start_ref_watcher()
+
+    # ------------------------------------------------------------------
+    # Delegate API
+    # ------------------------------------------------------------------
+
+    def highlighted_item_name(self) -> str | None:
+        """Return data from whichever internal widget has focus."""
+        if self._commit_tree.has_focus:
+            node = self._commit_tree.cursor_node
+            if node is not None and node.data is not None:
+                return node.data
+            return None
+        # Default to file list
+        item = self._file_list.highlighted_child
+        if isinstance(item, ListItem) and item.name is not None:
+            return item.name
+        return None
+
+    def refresh_files(self) -> None:
+        """Refresh file sections only."""
+        self._refresh_file_status_worker()
+
+    def refresh_commits(self) -> None:
+        """Refresh commit tree only."""
+        self._refresh_commits_section()
+
+    def refresh_all(self) -> None:
+        """Force-refresh everything."""
+        self._do_refresh()
+
+    def activate_current_selection(self) -> bool:
+        """Post the appropriate message for the currently selected item.
+
+        Returns True if an item was activated, False if nothing is selected.
+        """
+        item = self._file_list.highlighted_child
+        if not isinstance(item, ListItem) or item.name is None:
+            return False
+        if item.name.startswith("commit:") or item.name.startswith("commit-file:"):
+            return False  # Handled by app.py
+        staged = getattr(item, "_staged", False)
+        self.post_message(self.FileSelected(path=item.name, staged=staged))
+        return True
+
+    # ------------------------------------------------------------------
+    # Navigation: j/k cross-widget boundary handling
+    # ------------------------------------------------------------------
+
+    def action_cursor_down(self) -> None:
+        """Move down -- transfer focus from file list to tree at boundary."""
+        if self._file_list.has_focus:
+            if (
+                self._file_list.index is not None
+                and self._file_list.index >= len(self._file_list) - 1
+            ):
+                if len(self._commit_tree.root.children) > 0:
+                    self._commit_tree.focus()
+                    return
+            self._file_list.action_cursor_down()
+        elif self._commit_tree.has_focus:
+            self._commit_tree.action_cursor_down()
+
+    def action_cursor_up(self) -> None:
+        """Move up -- transfer focus from tree to file list at boundary."""
+        if self._commit_tree.has_focus:
+            if self._commit_tree.cursor_line <= 0:
+                self._file_list.focus()
+                return
+            self._commit_tree.action_cursor_up()
+        elif self._file_list.has_focus:
+            self._file_list.action_cursor_up()
+
+    def action_select_cursor(self) -> None:
+        """Forward select to whichever child has focus."""
+        if self._commit_tree.has_focus:
+            self._commit_tree.action_select_cursor()
+        elif self._file_list.has_focus:
+            self._file_list.action_select_cursor()
+
+    def action_page_up(self) -> None:
+        """Forward page up to the focused child."""
+        if self._commit_tree.has_focus:
+            self._commit_tree.action_page_up()
+        elif self._file_list.has_focus:
+            if self._file_list.index is not None:
+                page = max(1, self._file_list.scrollable_content_region.height)
+                self._file_list.index = max(0, self._file_list.index - page)
+
+    def action_page_down(self) -> None:
+        """Forward page down to the focused child."""
+        if self._commit_tree.has_focus:
+            self._commit_tree.action_page_down()
+        elif self._file_list.has_focus:
+            if self._file_list.index is not None:
+                page = max(1, self._file_list.scrollable_content_region.height)
+                self._file_list.index = min(
+                    len(self._file_list) - 1, self._file_list.index + page
+                )
+
+    # ------------------------------------------------------------------
+    # Tree event handling
+    # ------------------------------------------------------------------
+
+    def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
+        """Post messages when tree nodes are highlighted."""
+        node = event.node
+        if node.data is None:
+            return
+        if node.data.startswith("commit:"):
+            commit_hash = node.data.removeprefix("commit:")
+            self.post_message(self.CommitHighlighted(commit_hash))
+        elif node.data.startswith("commit-file:"):
+            parts = node.data.removeprefix("commit-file:").split(":", 1)
+            if len(parts) == 2:
+                self.post_message(self.CommitFileHighlighted(parts[0], parts[1]))
+        elif node.data == "load-more-commits":
+            self._load_more_commits()
+
+    def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
+        """Post CommitToggled when Enter is pressed on a commit node."""
+        node = event.node
+        if node.data and node.data.startswith("commit:"):
+            commit_hash = node.data.removeprefix("commit:")
+            self.post_message(self.CommitToggled(commit_hash))
+
+    # ------------------------------------------------------------------
+    # File list event handling
+    # ------------------------------------------------------------------
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        """Handle file selection in the internal ListView."""
+        item = event.item
+        if item.name is None:
+            return
+        if item.name.startswith("commit:") or item.name.startswith("commit-file:"):
+            return  # Should not happen in new design, but guard anyway
+        staged = getattr(item, "_staged", False)
+        self.post_message(self.FileSelected(path=item.name, staged=staged))
+
+    # ------------------------------------------------------------------
+    # Refresh logic
+    # ------------------------------------------------------------------
+
+    def action_refresh(self) -> None:
+        self.refresh_all()
 
     @work(thread=True)
     def _do_refresh(self) -> None:
@@ -109,9 +306,9 @@ class GitPanel(ListView):
 
     def _show_not_git_repo(self) -> None:
         self._is_git_repo = False
-        self.clear()
+        self._file_list.clear()
         text = Text("Not a git repository", style="bold red")
-        self.append(ListItem(Label(text)))
+        self._file_list.append(ListItem(Label(text)))
 
     def _build_file_items(self, status: GitStatusData) -> list[ListItem]:
         """Build the file section ListItems (unstaged, staged, untracked)."""
@@ -142,6 +339,60 @@ class GitPanel(ListView):
             items.append(item)
         return items
 
+    def _update_display(self, status: GitStatusData, commits: list) -> None:
+        """Full refresh: rebuild file list and commit tree."""
+        saved_name = self._get_selected_name()
+        # Rebuild file list
+        self._file_list.clear()
+        for item in self._build_file_items(status):
+            self._file_list.append(item)
+        # Rebuild commit tree
+        self._build_commit_nodes(commits)
+        self._restore_selection(saved_name)
+        self.post_message(self.SelectionRestored())
+
+    def _build_commit_nodes(self, commits: list) -> None:
+        """Populate the tree root with commit nodes."""
+        self._commit_tree.root.remove_children()
+        self._commits_loaded = len(commits)
+        for c in commits:
+            label = Text()
+            label.append(c.hash, style="cyan")
+            label.append(f" {c.message}  ")
+            label.append(c.author, style="dim")
+            label.append(f"  {c.relative_time}", style="dim")
+            self._commit_tree.root.add(label, data=f"commit:{c.hash}")
+        if len(commits) == self._commit_page_size:
+            sentinel_label = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
+            self._commit_tree.root.add_leaf(
+                sentinel_label, data="load-more-commits"
+            )
+        self._expanded_commit = None
+
+    def _get_selected_name(self) -> str | None:
+        """Get the name of the currently selected file list item."""
+        item = self._file_list.highlighted_child
+        if isinstance(item, ListItem) and item.name is not None:
+            return item.name
+        return None
+
+    def _restore_selection(self, saved_name: str | None) -> None:
+        """Restore selection by file name, or select the first enabled item."""
+        if saved_name is not None:
+            for i, node in enumerate(self._file_list._nodes):
+                if isinstance(node, ListItem) and node.name == saved_name:
+                    self._file_list.index = i
+                    return
+        # Select first enabled item
+        for i, node in enumerate(self._file_list._nodes):
+            if isinstance(node, ListItem) and not node.disabled:
+                self._file_list.index = i
+                return
+
+    # ------------------------------------------------------------------
+    # File-only refresh (5s timer)
+    # ------------------------------------------------------------------
+
     @work(thread=True)
     def _refresh_file_status_worker(self) -> None:
         """Background worker to refresh file sections only."""
@@ -154,112 +405,17 @@ class GitPanel(ListView):
         self.app.call_from_thread(self._update_file_sections, status)
 
     def _update_file_sections(self, status: GitStatusData) -> None:
-        """Replace file sections (above section-commits header), keep commits intact."""
-        boundary = None
-        for i, node in enumerate(self._nodes):
-            if isinstance(node, ListItem) and node.name == "section-commits":
-                boundary = i
-                break
-        if boundary is None:
-            return  # Commits section not built yet
-
+        """Replace file list contents; commit tree is untouched."""
         saved_name = self._get_selected_name()
-
-        # Collect and remove items before the boundary
-        items_to_remove = [self._nodes[i] for i in range(boundary)]
-        for item in items_to_remove:
-            item.remove()
-
-        # Build and insert new file sections
-        new_items = self._build_file_items(status)
-        for j, item in enumerate(new_items):
-            self.insert(j, [item])
-
-        self._restore_selection(saved_name)
-        self.post_message(self.SelectionRestored())
-
-    def _update_display(self, status: GitStatusData, commits: list) -> None:
-        saved_name = self._get_selected_name()
-        self.clear()
+        self._file_list.clear()
         for item in self._build_file_items(status):
-            self.append(item)
-        # Recent commits
-        self.append(_make_section_header("Recent Commits", name="section-commits"))
-        for c in commits:
-            text = Text()
-            text.append("\u25b8 ")
-            text.append(c.hash, style="cyan")
-            text.append(f" {c.message}  ")
-            text.append(c.author, style="dim")
-            text.append(f"  {c.relative_time}", style="dim")
-            self.append(ListItem(Label(text), name=f"commit:{c.hash}"))
-        self._commits_loaded = len(commits)
-        if len(commits) == self._commit_page_size:
-            sentinel_text = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
-            self.append(ListItem(Label(sentinel_text), name="load-more-commits"))
+            self._file_list.append(item)
         self._restore_selection(saved_name)
         self.post_message(self.SelectionRestored())
 
-    def _get_selected_name(self) -> str | None:
-        """Get the file name of the currently selected item."""
-        item = self.highlighted_child
-        if isinstance(item, ListItem) and item.name is not None:
-            return item.name
-        return None
-
-    def _restore_selection(self, saved_name: str | None) -> None:
-        """Restore selection by file name, or select the first enabled item."""
-        if saved_name is not None:
-            for i, node in enumerate(self._nodes):
-                if isinstance(node, ListItem) and node.name == saved_name:
-                    self.index = i
-                    return
-        # Select first enabled item
-        for i, node in enumerate(self._nodes):
-            if isinstance(node, ListItem) and not node.disabled:
-                self.index = i
-                return
-
-    def activate_current_selection(self) -> bool:
-        """Post the appropriate message for the currently selected item.
-
-        Returns True if an item was activated, False if nothing is selected.
-        """
-        item = self.highlighted_child
-        if not isinstance(item, ListItem) or item.name is None:
-            return False
-        if item.name.startswith("commit:") or item.name.startswith("commit-file:"):
-            return False  # Handled by app.py
-        staged = getattr(item, "_staged", False)
-        self.post_message(self.FileSelected(path=item.name, staged=staged))
-        return True
-
-    def on_list_view_selected(self, event: ListView.Selected) -> None:
-        """Handle file selection."""
-        item = event.item
-        if item.name is None:
-            return
-        if item.name.startswith("commit:") or item.name.startswith("commit-file:"):
-            return  # Handled by app.py
-        staged = getattr(item, "_staged", False)
-        self.post_message(self.FileSelected(path=item.name, staged=staged))
-
-    def _page_size(self) -> int:
-        """Return the number of items visible in the viewport."""
-        return max(1, self.scrollable_content_region.height)
-
-    def action_page_up(self) -> None:
-        """Move selection up by a page."""
-        if self.index is not None:
-            self.index = max(0, self.index - self._page_size())
-
-    def action_page_down(self) -> None:
-        """Move selection down by a page."""
-        if self.index is not None:
-            self.index = min(len(self) - 1, self.index + self._page_size())
-
-    def action_refresh(self) -> None:
-        self._do_refresh()
+    # ------------------------------------------------------------------
+    # Commit tree refresh (ref watcher triggered)
+    # ------------------------------------------------------------------
 
     @work(thread=True)
     def _refresh_commits_section(self) -> None:
@@ -284,43 +440,38 @@ class GitPanel(ListView):
         self, commits: list, expanded: str | None, expanded_files: list | None
     ) -> None:
         """Apply commit section rebuild on the main thread."""
-        to_remove = [
-            node for node in self._nodes
-            if isinstance(node, ListItem) and node.name and (
-                node.name.startswith("commit:") or
-                node.name.startswith("commit-file:") or
-                node.name == "load-more-commits"
-            )
-        ]
-        for node in to_remove:
-            node.remove()
+        self._commit_tree.root.remove_children()
         self._expanded_commit = expanded
         self._commits_loaded = len(commits)
         for c in commits:
-            chevron = "\u25be " if c.hash == expanded else "\u25b8 "
-            text = Text()
-            text.append(chevron)
-            text.append(c.hash, style="cyan")
-            text.append(f" {c.message}  ")
-            text.append(c.author, style="dim")
-            text.append(f"  {c.relative_time}", style="dim")
-            self.append(ListItem(Label(text), name=f"commit:{c.hash}"))
+            label = Text()
+            label.append(c.hash, style="cyan")
+            label.append(f" {c.message}  ")
+            label.append(c.author, style="dim")
+            label.append(f"  {c.relative_time}", style="dim")
+            node = self._commit_tree.root.add(label, data=f"commit:{c.hash}")
             if c.hash == expanded and expanded_files:
                 for ef in expanded_files:
-                    child_text = Text()
-                    child_text.append("  ")
+                    child_label = Text()
                     style = _STATUS_STYLES.get(ef.status, "")
-                    child_text.append(f"{ef.status:<10}", style=style)
-                    child_text.append(f" {ef.path}")
-                    self.append(ListItem(
-                        Label(child_text),
-                        name=f"commit-file:{c.hash}:{ef.path}",
-                    ))
+                    child_label.append(f"{ef.status:<10}", style=style)
+                    child_label.append(f" {ef.path}")
+                    node.add_leaf(
+                        child_label,
+                        data=f"commit-file:{c.hash}:{ef.path}",
+                    )
+                node.expand()
         if len(commits) == self._commit_page_size:
-            sentinel_text = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
-            self.append(ListItem(Label(sentinel_text), name="load-more-commits"))
+            sentinel_label = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
+            self._commit_tree.root.add_leaf(
+                sentinel_label, data="load-more-commits"
+            )
         if not expanded:
             self._expanded_commit = None
+
+    # ------------------------------------------------------------------
+    # Pagination
+    # ------------------------------------------------------------------
 
     @work(thread=True)
     def _load_more_commits(self) -> None:
@@ -337,99 +488,75 @@ class GitPanel(ListView):
 
     def _apply_more_commits(self, commits: list) -> None:
         """Apply loaded commits on the main thread."""
-        for node in self._nodes:
-            if isinstance(node, ListItem) and node.name == "load-more-commits":
+        # Remove the sentinel node
+        for node in list(self._commit_tree.root.children):
+            if node.data == "load-more-commits":
                 node.remove()
                 break
         self._commits_loaded += len(commits)
         for c in commits:
-            text = Text()
-            text.append("\u25b8 ")
-            text.append(c.hash, style="cyan")
-            text.append(f" {c.message}  ")
-            text.append(c.author, style="dim")
-            text.append(f"  {c.relative_time}", style="dim")
-            self.append(ListItem(Label(text), name=f"commit:{c.hash}"))
+            label = Text()
+            label.append(c.hash, style="cyan")
+            label.append(f" {c.message}  ")
+            label.append(c.author, style="dim")
+            label.append(f"  {c.relative_time}", style="dim")
+            self._commit_tree.root.add(label, data=f"commit:{c.hash}")
         if len(commits) == self._commit_page_size:
-            sentinel_text = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
-            self.append(ListItem(Label(sentinel_text), name="load-more-commits"))
+            sentinel_label = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
+            self._commit_tree.root.add_leaf(
+                sentinel_label, data="load-more-commits"
+            )
         self._loading_more = False
 
-    def toggle_commit(self, commit_hash: str) -> None:
-        """Expand or collapse a commit's file list (accordion pattern)."""
-        if self._expanded_commit == commit_hash:
-            self._collapse_commit(commit_hash)
-            self._expanded_commit = None
-        else:
-            if self._expanded_commit is not None:
-                self._collapse_commit(self._expanded_commit)
-            self._expand_commit(commit_hash)
-            self._expanded_commit = commit_hash
+    # ------------------------------------------------------------------
+    # Toggle commit (accordion, using native Tree expand/collapse)
+    # ------------------------------------------------------------------
 
-    def _expand_commit(self, commit_hash: str) -> None:
-        """Insert child file items below the commit item."""
+    def toggle_commit(self, commit_hash: str) -> None:
+        """Expand or collapse a commit with accordion behavior."""
         from perch.services.git import get_commit_files
 
-        commit_idx = None
-        for i, node in enumerate(self._nodes):
-            if isinstance(node, ListItem) and node.name == f"commit:{commit_hash}":
-                commit_idx = i
+        target = None
+        for node in self._commit_tree.root.children:
+            if node.data == f"commit:{commit_hash}":
+                target = node
                 break
-        if commit_idx is None:
+        if target is None:
             return
 
-        self._set_commit_chevron(commit_idx, expanded=True)
+        if target.is_expanded:
+            target.collapse()
+            self._expanded_commit = None
+        else:
+            # Accordion: collapse previous
+            if self._expanded_commit:
+                for node in self._commit_tree.root.children:
+                    if (
+                        node.data == f"commit:{self._expanded_commit}"
+                        and node.is_expanded
+                    ):
+                        node.collapse()
+                        break
+            # Expand and populate children
+            target.remove_children()
+            try:
+                files = get_commit_files(self._worktree_root, commit_hash)
+            except RuntimeError:
+                return
+            for f in files:
+                style = _STATUS_STYLES.get(f.status, "")
+                child_label = Text()
+                child_label.append(f"{f.status:<10}", style=style)
+                child_label.append(f" {f.path}")
+                target.add_leaf(
+                    child_label, data=f"commit-file:{commit_hash}:{f.path}"
+                )
+            target.expand()
+            self._expanded_commit = commit_hash
 
-        try:
-            files = get_commit_files(self._worktree_root, commit_hash)
-        except RuntimeError:
-            return
-
-        for j, f in enumerate(files):
-            text = Text()
-            text.append("  ")  # indent
-            style = _STATUS_STYLES.get(f.status, "")
-            text.append(f"{f.status:<10}", style=style)
-            text.append(f" {f.path}")
-            child = ListItem(
-                Label(text),
-                name=f"commit-file:{commit_hash}:{f.path}",
-            )
-            self.insert(commit_idx + 1 + j, [child])
-
-    def _collapse_commit(self, commit_hash: str) -> None:
-        """Remove child file items for a commit."""
-        prefix = f"commit-file:{commit_hash}:"
-        to_remove = [
-            node for node in self._nodes
-            if isinstance(node, ListItem) and node.name and node.name.startswith(prefix)
-        ]
-        for node in to_remove:
-            node.remove()
-
-        for i, node in enumerate(self._nodes):
-            if isinstance(node, ListItem) and node.name == f"commit:{commit_hash}":
-                self._set_commit_chevron(i, expanded=False)
-                break
-
-    def _set_commit_chevron(self, index: int, expanded: bool) -> None:
-        """Update the chevron indicator on a commit item."""
-        node = self._nodes[index]
-        if not isinstance(node, ListItem) or not node.name:
-            return
-        label = node.query_one(Label)
-        # Access the internal content stored by Static (name-mangled __content)
-        text = getattr(label, "_Static__content", None)
-        if not isinstance(text, Text):
-            return
-        plain = text.plain
-        if not plain.startswith(("\u25b8 ", "\u25be ")):
-            return
-        chevron = "\u25be " if expanded else "\u25b8 "
-        new_text = Text()
-        new_text.append(chevron)
-        new_text.append(plain[2:])
-        label.update(new_text)
+    # ------------------------------------------------------------------
+    # Ref watcher (unchanged from original)
+    # ------------------------------------------------------------------
 
     def _start_ref_watcher(self) -> None:
         """Start polling git refs for new commits."""
@@ -464,8 +591,12 @@ class GitPanel(ListView):
             self._last_ref_mtime = None
             head_file = git_dir / "HEAD"
             packed_file = git_dir / "packed-refs"
-            self._last_head_mtime = head_file.stat().st_mtime if head_file.exists() else None
-            self._last_packed_mtime = packed_file.stat().st_mtime if packed_file.exists() else None
+            self._last_head_mtime = (
+                head_file.stat().st_mtime if head_file.exists() else None
+            )
+            self._last_packed_mtime = (
+                packed_file.stat().st_mtime if packed_file.exists() else None
+            )
 
     def _check_refs(self) -> None:
         """Poll ref mtimes and refresh commits if changed."""
@@ -482,8 +613,13 @@ class GitPanel(ListView):
             head_file = git_dir / "HEAD"
             packed_file = git_dir / "packed-refs"
             head_mtime = head_file.stat().st_mtime if head_file.exists() else None
-            packed_mtime = packed_file.stat().st_mtime if packed_file.exists() else None
-            if head_mtime != self._last_head_mtime or packed_mtime != self._last_packed_mtime:
+            packed_mtime = (
+                packed_file.stat().st_mtime if packed_file.exists() else None
+            )
+            if (
+                head_mtime != self._last_head_mtime
+                or packed_mtime != self._last_packed_mtime
+            ):
                 changed = True
         if changed:
             try:
