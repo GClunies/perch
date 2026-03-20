@@ -16,7 +16,8 @@ from textual.widgets import Static
 
 MAX_LINES = 10_000
 BINARY_CHECK_SIZE = 8192
-_IMAGE_MAX_WIDTH = 60  # columns for rendered terminal images
+_IMAGE_MAX_WIDTH = 40  # columns for rendered terminal images
+_PIXEL_TO_COL = 10  # rough px-to-terminal-column ratio
 
 
 def render_image_halfblocks(
@@ -68,6 +69,45 @@ def render_image_halfblocks(
     return result
 
 
+def _strip_html_for_markdown(text: str) -> str:
+    """Pre-process HTML blocks that Rich Markdown cannot render.
+
+    * ``<p>`` / ``<h1>``–``<h6>`` wrappers used only for alignment are
+      unwrapped so the inner content is treated as normal markdown.
+    * ``<em>`` / ``<strong>`` / ``<code>`` are converted to their markdown
+      equivalents.
+    * ``<img …>`` tags are left intact (handled separately by the image
+      renderer).
+    """
+    # Strip <p …>…</p> wrappers — keep inner content
+    text = re.sub(
+        r"<p\b[^>]*>(.*?)</p>",
+        lambda m: m.group(1).strip(),
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+
+    # Convert <h1>…</h1> through <h6>…</h6> to markdown headings
+    def _heading_repl(m: re.Match) -> str:
+        level = int(m.group(1))
+        inner = m.group(2).strip()
+        return f"{'#' * level} {inner}"
+
+    text = re.sub(
+        r"<h([1-6])\b[^>]*>(.*?)</h\1>",
+        _heading_repl,
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    # Inline HTML → markdown equivalents
+    text = re.sub(r"<em>(.*?)</em>", r"*\1*", text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(
+        r"<strong>(.*?)</strong>", r"**\1**", text, flags=re.DOTALL | re.IGNORECASE
+    )
+    text = re.sub(r"<code>(.*?)</code>", r"`\1`", text, flags=re.DOTALL | re.IGNORECASE)
+    return text
+
+
 def render_markdown_with_images(
     text: str, base_dir: Path, max_width: int = _IMAGE_MAX_WIDTH
 ) -> list:
@@ -77,12 +117,16 @@ def render_markdown_with_images(
     resolved relative to *base_dir* and rendered as half-block art.
     Non-image sections are rendered as Rich Markdown.
     """
+    from rich.align import Align
     from rich.markdown import Markdown
+
+    # Pre-process HTML blocks into markdown equivalents
+    text = _strip_html_for_markdown(text)
 
     # Match markdown images and HTML img tags
     img_pattern = re.compile(
         r"!\[([^\]]*)\]\(([^)]+)\)"  # ![alt](src)
-        r'|<img\s[^>]*src=["\']([^"\']+)["\']'  # <img src="...">
+        r'|<img\s[^>]*src=["\']([^"\']+)["\'][^>]*/?>'  # <img src="...">
     )
 
     parts: list = []
@@ -96,14 +140,23 @@ def render_markdown_with_images(
         # Resolve image path
         src = m.group(2) or m.group(3)
         img_path = base_dir / src
-        rendered = render_image_halfblocks(img_path, max_width)
+
+        # Honour width="…" from <img> tags (convert pixels → columns)
+        tag_text = m.group(0)
+        width_attr = re.search(r'width=["\']?(\d+)', tag_text)
+        if width_attr:
+            img_width = max(10, int(width_attr.group(1)) // _PIXEL_TO_COL)
+        else:
+            img_width = max_width
+
+        rendered = render_image_halfblocks(img_path, img_width)
         if rendered:
             parts.append(Text())  # spacer
-            parts.append(rendered)
+            parts.append(Align.center(rendered))
             parts.append(Text())  # spacer
         else:
             alt = m.group(1) or src
-            parts.append(Text(f"  [image: {alt}]", style="dim italic"))
+            parts.append(Align.center(Text(f"[image: {alt}]", style="dim italic")))
 
         last_end = m.end()
 

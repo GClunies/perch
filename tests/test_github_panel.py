@@ -688,67 +688,6 @@ class TestPageNavigation:
                 assert panel.index == 0
 
 
-class TestCopyUrl:
-    """Tests for action_copy_url."""
-
-    @staticmethod
-    async def _activate_github_tab(pilot) -> GitHubPanel:
-        from textual.widgets import TabbedContent
-
-        await pilot.pause()
-        await pilot.pause()
-        pilot.app.query_one(TabbedContent).active = "tab-github"
-        await pilot.pause()
-        panel = pilot.app.query_one(GitHubPanel)
-        panel.focus()
-        await pilot.pause()
-        return panel
-
-    async def test_copy_url_copies_pr_url(self, worktree: Path) -> None:
-        from unittest.mock import MagicMock
-
-        pr = _make_pr_context(url="https://github.com/org/repo/pull/42")
-        p1, p2 = _patches(pr=pr)
-        with p1, p2:
-            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_github_tab(pilot)
-                # Navigate to the PR title item
-                pr_item = _find_item_with_text(panel, "#42")
-                assert pr_item is not None
-                panel.index = list(panel.children).index(pr_item)
-                await pilot.pause()
-
-                mock_copy = MagicMock()
-                mock_notify = MagicMock()
-                with (
-                    patch.object(pilot.app, "copy_to_clipboard", mock_copy),
-                    patch.object(pilot.app, "notify", mock_notify),
-                ):
-                    panel.action_copy_url()
-                mock_copy.assert_called_once_with("https://github.com/org/repo/pull/42")
-                mock_notify.assert_called_once()
-
-    async def test_copy_url_noop_on_header(self, worktree: Path) -> None:
-        from unittest.mock import MagicMock
-
-        pr = _make_pr_context()
-        p1, p2 = _patches(pr=pr)
-        with p1, p2:
-            async with PerchApp(worktree).run_test(size=(120, 40)) as pilot:
-                panel = await self._activate_github_tab(pilot)
-                # Navigate to a disabled section header
-                for i, child in enumerate(panel.children):
-                    if isinstance(child, ListItem) and child.disabled:
-                        panel.index = i
-                        break
-                await pilot.pause()
-
-                mock_copy = MagicMock()
-                with patch.object(pilot.app, "copy_to_clipboard", mock_copy):
-                    panel.action_copy_url()
-                mock_copy.assert_not_called()
-
-
 class TestOnListViewHighlightedPrBody:
     """Highlighting the PR title item posts a preview with the PR body."""
 

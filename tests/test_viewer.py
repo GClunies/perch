@@ -825,7 +825,7 @@ class TestRenderMarkdownWithImages:
         text = "![my image](missing.png)\n\nSome text"
         parts = render_markdown_with_images(text, tmp_path)
         # Should have a placeholder for the missing image
-        has_placeholder = any("image:" in str(getattr(p, "plain", "")) for p in parts)
+        has_placeholder = any("image:" in str(p) for p in parts)
         assert has_placeholder
 
 

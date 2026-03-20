@@ -6,21 +6,21 @@
 
 <p align="center"><em>A vantage point to observe agents in worktrees.</em></p>
 
-Built for (autonomous) agentic workflows, `perch` is a lightweight terminal context pane to quickly view:
-- Files (syntax highlighted)
+Built for agentic workflows, `perch` is a lightweight terminal UI to quickly view:
+- Files (syntax highlighted, markdown preview, image rendering)
 - Git (status, diffs, commits)
 - Pull Requests (reviews, comments, CI status)
 
 ## Features
 
-- **File browser** — Navigate the folfers and files in a worktree; select a file to view.
-- **Viewer** — Renders content based on your selection.
-- **Fuzzy file search** — `Ctrl+P` opens a fast fuzzy finder to jump to any file.
-- **Git status panel** — See staged, unstaged, and untracked changes at a glance.
-- **GitHub panel** — View PR descriptions, reviews, comments, and Actions status.
-- **Editor integration** — Quickly open a file in your `$EDITOR`.
-- **Command palette** — `?` for quick access to all commands.
-- **Draggable splitter** — Resize panes with `[` / `]` or by dragging with your mouse.
+- **File browser** — Navigate folders and files in a worktree with git status indicators.
+- **Viewer** — Syntax highlighting, unified/side-by-side diffs, markdown preview, and terminal image rendering.
+- **Fuzzy file search** — `Ctrl+P` opens a fast fuzzy finder.
+- **Git status panel** — Staged, unstaged, and untracked changes plus recent commits. Auto-refreshes every 5s.
+- **GitHub panel** — PR description, reviews, comments, and Actions CI status. Auto-refreshes every 30s.
+- **Editor integration** — `o` opens the current file in your editor.
+- **Command palette** — `?` for quick access to all commands and theme switching.
+- **Resizable panes** — Drag the splitter or use `-` / `=` to resize. `f` for full-screen focus mode.
 
 ## Requirements
 
@@ -31,86 +31,75 @@ Built for (autonomous) agentic workflows, `perch` is a lightweight terminal cont
 ## Getting Started
 
 ```bash
-# Clone the repo
+# Clone and install
 git clone <repo-url> && cd perch
-
-# Install dependencies and the perch package (editable)
 uv sync
 
-# Launch perch in the current directory
+# Launch in the current directory
 uv run perch
 
-# Or point it at a specific worktree
+# Or point at a specific worktree
 uv run perch /path/to/your/project
 
-# Use a specific editor
+# Use a specific editor (defaults to $EDITOR, then cursor)
 uv run perch --editor code
 ```
 
 ## Keyboard Shortcuts
 
-| Key              | Action                 |
-| ---------------- | ---------------------- |
-| `[` / `]`        | Previous / next sidebar tab |
-| `Tab`            | Toggle focus between viewer and sidebar |
-| `d`              | Toggle diff view       |
-| `s`              | Toggle diff layout (unified / side-by-side) |
-| `m`              | Toggle markdown preview (`.md` files) |
-| `n` / `p`        | Next / previous file in multi-file diff |
-| `h` / `j` / `k` / `l` | Vim-style navigation |
-| `Ctrl+P`         | Fuzzy file search      |
-| `?`              | Command palette        |
-| `e`              | Open file in `$EDITOR` |
-| `o` (GitHub tab) | Open item in browser   |
-| `r` (Git / GitHub tab) | Refresh data     |
-| `f`              | Focus mode (hide sidebar) |
-| `q`              | Quit                   |
+| Key | Action |
+| --- | ------ |
+| `[` / `]` | Previous / next sidebar tab |
+| `Tab` | Toggle focus between viewer and sidebar |
+| `j` / `k` | Navigate down / up (vim-style) |
+| `h` / `l` | Collapse / expand (file tree), scroll left / right (viewer) |
+| `d` | Toggle diff view |
+| `s` | Toggle diff layout (unified / side-by-side) |
+| `m` | Toggle markdown preview (`.md` files) |
+| `n` / `p` | Next / previous file in multi-file diff |
+| `Ctrl+P` | Fuzzy file search |
+| `o` | Open file in editor (file tree / viewer) or browser (GitHub tab) |
+| `r` | Refresh data (Git / GitHub tabs) |
+| `f` | Focus mode (hide sidebar) |
+| `-` / `=` | Shrink / grow focused pane |
+| `?` | Command palette |
+| `q` | Quit |
 
 ## Theming
 
-Perch supports all built-in [Textual themes](https://textual.textualize.io/guide/design/#themes). Change the theme at runtime via the command palette (`?`), or persist your choice by setting the `TEXTUAL_THEME` environment variable:
+Perch supports all built-in [Textual themes](https://textual.textualize.io/guide/design/#themes). Change the theme via the command palette (`?`), or set `TEXTUAL_THEME`:
 
 ```bash
-# In your shell profile (~/.zshrc, ~/.bashrc, etc.)
 export TEXTUAL_THEME="rose-pine-moon"
 ```
-
-Some popular themes: `textual-dark`, `textual-light`, `nord`, `gruvbox`, `dracula`, `tokyo-night`, `monokai`, `catppuccin-mocha`, `rose-pine`, `rose-pine-moon`.
 
 ## Development
 
 ```bash
-# Install dev dependencies
-uv sync --group dev
-
-# Run tests
-uv run pytest
-
-# Lint
-uv run ruff check src tests
-
-# Type check
-uv run ty check src
+uv sync --group dev    # Install dev dependencies
+uv run pytest          # Run tests
+uv run ruff check src tests  # Lint
+uv run ty check src    # Type check
 ```
 
 ## Project Layout
 
 ```
 src/perch/
-  app.py          # Main Textual application
-  app.tcss        # Stylesheet
-  cli.py          # CLI entry point (argparse)
-  commands.py     # Command palette provider
-  models.py       # Data classes (git status, PR context, CI checks)
+  app.py            # Main Textual application
+  app.tcss          # Stylesheet
+  cli.py            # CLI entry point
+  commands.py       # Command palette provider
+  models.py         # Data models (git status, PR context, CI checks)
   services/
-    editor.py     # External editor integration
-    git.py        # Git operations (status, log, branch)
-    github.py     # GitHub CLI wrapper (PR context, checks)
+    editor.py       # External editor integration
+    git.py          # Git operations (status, log, diff, branch)
+    github.py       # GitHub CLI wrapper (PR context, checks, CI logs)
   widgets/
-    file_tree.py  # Worktree file tree widget
-    viewer.py     # Unified viewer (files, diffs, markdown, logs)
-    file_search.py# Fuzzy file search modal
-    git_status.py # Git status panel
+    file_tree.py    # Directory tree with git status indicators
+    viewer.py       # Content viewer (files, diffs, markdown, images, logs)
+    file_search.py  # Fuzzy file search modal
+    git_status.py   # Git status panel (files + commits)
     github_panel.py # PR reviews, comments, GitHub Actions panel
-    splitter.py   # Draggable pane splitter
+    splitter.py     # Draggable pane splitter
 ```

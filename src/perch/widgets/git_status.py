@@ -71,7 +71,6 @@ class GitPanel(ListView):
 
     BINDINGS = [
         ("r", "refresh", "Refresh"),
-        Binding("c", "copy", "Copy Path"),
         Binding("f", "app.toggle_focus_mode", "Focus"),
         Binding("j", "cursor_down", "Down", show=False),
         Binding("k", "cursor_up", "Up", show=False),
@@ -228,38 +227,6 @@ class GitPanel(ListView):
         """Move selection down by a page."""
         if self.index is not None:
             self.index = min(len(self) - 1, self.index + self._page_size())
-
-    def action_copy(self) -> None:
-        """Copy the highlighted item's path or commit hash to clipboard."""
-        item = self.highlighted_child
-        if not isinstance(item, ListItem) or item.name is None:
-            return
-        if item.name.startswith("commit:"):
-            value = item.name.removeprefix("commit:")
-            self.app.copy_to_clipboard(value)
-            self.app.notify(f"Copied: {value}")
-        else:
-            abs_path = str(self._worktree_root / item.name)
-            self.app.copy_to_clipboard(abs_path)
-            self.app.notify(f"Copied: {abs_path}")
-
-    def _update_copy_binding(self) -> None:
-        """Update the copy binding description based on the highlighted item."""
-        item = self.highlighted_child
-        is_commit = (
-            isinstance(item, ListItem)
-            and item.name is not None
-            and item.name.startswith("commit:")
-        )
-        desc = "Copy Hash" if is_commit else "Copy Path"
-        self._bindings.bind("c", "copy", desc)
-        try:
-            self.screen.refresh_bindings()
-        except Exception:
-            pass
-
-    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
-        self._update_copy_binding()
 
     def action_refresh(self) -> None:
         self._do_refresh()
