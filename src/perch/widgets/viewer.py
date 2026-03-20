@@ -49,6 +49,7 @@ def render_image_halfblocks(path: Path, max_width: int = _IMAGE_MAX_WIDTH) -> Te
         h += 1
 
     pixels = img.load()
+    assert pixels is not None
     result = Text()
     for y in range(0, h, 2):
         if y > 0:
@@ -56,9 +57,11 @@ def render_image_halfblocks(path: Path, max_width: int = _IMAGE_MAX_WIDTH) -> Te
         for x in range(w):
             top = pixels[x, y]
             bot = pixels[x, y + 1]
+            r1, g1, b1 = int(top[0]), int(top[1]), int(top[2])  # type: ignore[index]
+            r2, g2, b2 = int(bot[0]), int(bot[1]), int(bot[2])  # type: ignore[index]
             result.append(
                 "▀",
-                style=f"rgb({top[0]},{top[1]},{top[2]}) on rgb({bot[0]},{bot[1]},{bot[2]})",
+                style=f"rgb({r1},{g1},{b1}) on rgb({r2},{g2},{b2})",
             )
     return result
 
@@ -133,28 +136,53 @@ def read_file_content(path: Path) -> tuple[str, bool]:
     return text, truncated
 
 
+def _extract_diff_filename(line: str) -> str:
+    """Extract a readable filename from a 'diff --git a/... b/...' line."""
+    # "diff --git a/path/to/file b/path/to/file" -> "path/to/file"
+    parts = line.split(" b/", 1)
+    if len(parts) == 2:
+        return parts[1]
+    return line
+
+
 def render_diff(diff_text: str, dark: bool = True) -> Text:
     """Render unified diff text with background-colored lines.
 
     Added lines get a green background, removed lines get a red background,
     hunk headers get a blue background, and context lines are unstyled.
+    File boundaries get a prominent separator with the filename.
     """
     if dark:
         add_style = "on #1a3a1a"
         del_style = "on #3a1a1a"
         hunk_style = "on #1a1a3a"
         meta_style = "bold"
+        separator_style = "bold cyan"
+        separator_rule_style = "dim cyan"
     else:
         add_style = "on #d4ffd4"
         del_style = "on #ffd4d4"
         hunk_style = "on #d4d4ff"
         meta_style = "bold"
+        separator_style = "bold blue"
+        separator_rule_style = "dim blue"
 
     result = Text()
+    file_index = 0
     for i, line in enumerate(diff_text.splitlines()):
         if i > 0:
             result.append("\n")
-        if line.startswith("+++") or line.startswith("---"):
+        if line.startswith("diff --git "):
+            filename = _extract_diff_filename(line)
+            if file_index > 0:
+                result.append("\n")
+            result.append("─" * 60, style=separator_rule_style)
+            result.append("\n")
+            result.append(f"  {filename}", style=separator_style)
+            result.append("\n")
+            result.append("─" * 60, style=separator_rule_style)
+            file_index += 1
+        elif line.startswith("+++") or line.startswith("---"):
             result.append(line, style=meta_style)
         elif line.startswith("+"):
             result.append(line, style=add_style)
@@ -321,6 +349,7 @@ class Viewer(VerticalScroll):
         self._diff_file_offsets: list[int] = []
         self._diff_file_index: int = 0
         self._markdown_preview: bool = False
+        self._current_commit: str | None = None
 
     # ------------------------------------------------------------------
     # Dynamic footer — check_action controls binding visibility
@@ -442,6 +471,7 @@ class Viewer(VerticalScroll):
     def load_file(self, path: Path) -> None:
         """Load and display a file with syntax highlighting."""
         self._current_path = path
+        self._current_commit = None
         self._diff_mode = False
         self._diff_layout = "unified"
         self._show_content_view()
@@ -502,7 +532,13 @@ class Viewer(VerticalScroll):
         if self.worktree_root is None:
             return
 
+        # Skip reload if already showing this commit (prevents scroll reset
+        # when the GitPanel auto-refresh re-selects the same commit).
+        if self._current_commit == commit_hash:
+            return
+
         self._current_path = None
+        self._current_commit = commit_hash
         self._diff_mode = True
         self._show_content_view()
         self._update_border_title(f"commit {commit_hash[:8]}")
@@ -519,11 +555,22 @@ class Viewer(VerticalScroll):
             self._diff_file_index = 0
             return
 
-        # Build file boundary offsets (line numbers where "diff --git" appears)
+        # Build file boundary offsets in the *rendered* output.
+        # render_diff replaces each "diff --git" line with 3 lines (rule,
+        # filename, rule) and adds a blank line between files, so we walk
+        # the source lines and track the rendered line count.
         self._diff_file_offsets = []
-        for i, line in enumerate(diff_text.splitlines()):
+        rendered_line = 0
+        file_index = 0
+        for line in diff_text.splitlines():
             if line.startswith("diff --git "):
-                self._diff_file_offsets.append(i)
+                if file_index > 0:
+                    rendered_line += 1  # blank line between files
+                self._diff_file_offsets.append(rendered_line)
+                rendered_line += 3  # rule + filename + rule
+                file_index += 1
+            else:
+                rendered_line += 1
         self._diff_file_index = 0
 
         # Build header with file count
@@ -551,10 +598,12 @@ class Viewer(VerticalScroll):
 
         from perch.services.git import get_diff
 
-        try:
-            diff_text = get_diff(self.worktree_root, rel_path, staged=staged)
-        except RuntimeError:
-            diff_text = ""
+        diff_text = ""
+        if self.worktree_root is not None:
+            try:
+                diff_text = get_diff(self.worktree_root, rel_path, staged=staged)
+            except RuntimeError:
+                pass
 
         if diff_text:
             styled = render_diff(diff_text, dark=self._is_dark_theme())
@@ -614,6 +663,8 @@ class Viewer(VerticalScroll):
         """Fetch a CI job log in the background and display it."""
         from perch.services.github import get_job_log
 
+        if self.worktree_root is None:
+            return
         log_text = get_job_log(url, self.worktree_root)
         self.app.call_from_thread(self.show_ci_log, log_text)
 
