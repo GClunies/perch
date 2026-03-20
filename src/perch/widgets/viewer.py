@@ -378,7 +378,7 @@ class Viewer(VerticalScroll):
         Binding("p", "prev_diff_file", "Prev File"),
         Binding("e", "app.open_editor", "Editor"),
         Binding("f", "app.toggle_focus_mode", "Focus"),
-        Binding("j", "scroll_down", "Down", show=False),
+        Binding("j", "scroll_down", "Scroll", key_display="hjkl/\u2190\u2193\u2191\u2192"),
         Binding("k", "scroll_up", "Up", show=False),
         Binding("h", "scroll_left", "Left", show=False),
         Binding("l", "scroll_right", "Right", show=False),
@@ -405,6 +405,22 @@ class Viewer(VerticalScroll):
         self._diff_file_index: int = 0
         self._markdown_preview: bool = False
         self._current_commit: str | None = None
+
+    # ------------------------------------------------------------------
+    # Scroll overrides — disable animation so held keys scroll smoothly
+    # ------------------------------------------------------------------
+
+    def action_scroll_up(self) -> None:
+        self.scroll_up(animate=False)
+
+    def action_scroll_down(self) -> None:
+        self.scroll_down(animate=False)
+
+    def action_scroll_left(self) -> None:
+        self.scroll_left(animate=False)
+
+    def action_scroll_right(self) -> None:
+        self.scroll_right(animate=False)
 
     # ------------------------------------------------------------------
     # Dynamic footer — check_action controls binding visibility

@@ -72,7 +72,7 @@ class GitPanel(ListView):
     BINDINGS = [
         ("r", "refresh", "Refresh"),
         Binding("f", "app.toggle_focus_mode", "Focus"),
-        Binding("j", "cursor_down", "Down", show=False),
+        Binding("j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("l", "select_cursor", "Select", show=False),
         Binding("pageup", "page_up", "Page Up", show=False),

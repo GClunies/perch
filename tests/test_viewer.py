@@ -279,6 +279,21 @@ class TestSyncedDiffView:
 
 
 # ---------------------------------------------------------------------------
+# Viewer scroll action overrides (animate=False)
+# ---------------------------------------------------------------------------
+class TestViewerScrollActions:
+    async def test_scroll_actions_do_not_raise(self, worktree: Path) -> None:
+        """Viewer scroll overrides should execute without error."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.action_scroll_up()
+            viewer.action_scroll_down()
+            viewer.action_scroll_left()
+            viewer.action_scroll_right()
+
+
+# ---------------------------------------------------------------------------
 # Viewer._get_syntax_theme / _is_dark_theme (lines 211-237)
 # ---------------------------------------------------------------------------
 class TestViewerHelpers:
