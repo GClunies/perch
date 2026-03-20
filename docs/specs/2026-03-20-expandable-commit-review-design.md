@@ -39,11 +39,13 @@ Displays: `▸ abc1234 fix login bug` (chevron + hash + message, existing stylin
 - `_refresh_file_status()` rebuilds only the file sections (unstaged/staged/untracked) without touching commit items. The "Recent Commits" header item is given `name="section-commits"` so it can be located by name (not label text). `_refresh_file_status()` finds this item's index and replaces only items before it; commit items and any expanded children below it are left intact.
 
 ### Commits Section
-- **No auto-refresh timer**
-- Manual refresh with `r` keybinding (already exists on GitPanel)
-- **Ref watcher**: on mount, resolve the current branch via `get_current_branch()`. Poll the mtime of `.git/refs/heads/<branch>` every 2-3 seconds. If the ref file does not exist (packed refs after `git gc`, or detached HEAD), fall back to polling both `.git/HEAD` and `.git/packed-refs` mtimes. A change in either triggers a commit refresh. When the branch changes mid-session (detected via `.git/HEAD` mtime change), re-resolve the branch and update the watched path.
+- **Ref watcher** (primary): on mount, resolve the current branch via `get_current_branch()`. Poll the mtime of `.git/refs/heads/<branch>` every 2-3 seconds. If the ref file does not exist (packed refs after `git gc`, or detached HEAD), fall back to polling both `.git/HEAD` and `.git/packed-refs` mtimes. A change in either triggers a commit refresh. When the branch changes mid-session (detected via `.git/HEAD` mtime change), re-resolve the branch and update the watched path.
 - When a ref change is detected, call `_refresh_commits()` which rebuilds commit items in place
 - `_refresh_commits()` preserves expanded state: after rebuilding, if `_expanded_commit` hash still exists in the new commit list, re-expand it (re-fetch `get_commit_files` and re-insert children). If the hash is gone, set `_expanded_commit = None`.
+
+### Manual Refresh (`r`)
+- The existing `r` keybinding on GitPanel becomes a force-refresh of the entire panel: both file sections and commits. This serves as an escape hatch if the ref watcher or auto-refresh miss something.
+- `r` means "refresh the current panel" — GitPanel refreshes files + commits, GitHubPanel refreshes PR data (unchanged).
 
 ## Commit History Pagination
 
@@ -170,6 +172,10 @@ Remove `CommitSelected` message and `on_list_view_selected` handling for commits
 - `toggle_commit(commit_hash)` — expands or collapses, manages accordion. On expand: calls `get_commit_files()`, inserts child items after the commit item. On collapse: removes child items.
 - `_expanded_commit: str | None` — tracks currently expanded commit hash
 - `_load_more_commits()` — pagination loader, appends next page of commits. Uses `@work(thread=True)` for the `get_log` call (consistent with all other git calls in the codebase). Guarded by `_loading_more: bool` flag — set `True` synchronously in the calling (main) thread before dispatching the worker, set `False` after items are inserted in the `call_from_thread` callback. This prevents the highlight event from re-triggering before the worker completes.
+
+## FileTree Refresh
+
+Add `r` keybinding to FileTree for consistency — "refresh the current panel" works on all three tabs. `r` triggers `reload()` on the underlying DirectoryTree to re-scan the filesystem. Preserves the current cursor position and expanded directories where possible.
 
 ## What Stays the Same
 
