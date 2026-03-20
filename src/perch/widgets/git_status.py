@@ -87,8 +87,8 @@ class GitPanel(ListView):
 
     def on_mount(self) -> None:
         self.append(_make_section_header("Loading git status..."))
-        self._do_refresh()
-        self.set_interval(5, self._do_refresh)
+        self._do_refresh()  # initial full refresh
+        self.set_interval(5, self._refresh_file_status_worker)  # auto-refresh files only
 
     @work(thread=True)
     def _do_refresh(self) -> None:
@@ -109,55 +109,86 @@ class GitPanel(ListView):
         text = Text("Not a git repository", style="bold red")
         self.append(ListItem(Label(text)))
 
-    def _update_display(self, status: GitStatusData, commits: list) -> None:
-        # Save current selection
-        saved_name = self._get_selected_name()
-
-        self.clear()
-
-        # Unstaged
-        self.append(_make_section_header("Unstaged Changes"))
+    def _build_file_items(self, status: GitStatusData) -> list[ListItem]:
+        """Build the file section ListItems (unstaged, staged, untracked)."""
+        items: list[ListItem] = []
+        items.append(_make_section_header("Unstaged Changes"))
         if status.unstaged:
             for f in status.unstaged:
-                self.append(_make_file_item(f, staged=False))
+                items.append(_make_file_item(f, staged=False))
         else:
             item = ListItem(Label(Text("  No unstaged changes", style="dim")))
             item.disabled = True
-            self.append(item)
-
-        # Staged
-        self.append(_make_section_header("Staged Changes"))
+            items.append(item)
+        items.append(_make_section_header("Staged Changes"))
         if status.staged:
             for f in status.staged:
-                self.append(_make_file_item(f, staged=True))
+                items.append(_make_file_item(f, staged=True))
         else:
             item = ListItem(Label(Text("  No staged changes", style="dim")))
             item.disabled = True
-            self.append(item)
-
-        # Untracked
-        self.append(_make_section_header("Untracked Files"))
+            items.append(item)
+        items.append(_make_section_header("Untracked Files"))
         if status.untracked:
             for f in status.untracked:
-                self.append(_make_file_item(f, staged=False))
+                items.append(_make_file_item(f, staged=False))
         else:
             item = ListItem(Label(Text("  No untracked files", style="dim")))
             item.disabled = True
-            self.append(item)
+            items.append(item)
+        return items
 
+    @work(thread=True)
+    def _refresh_file_status_worker(self) -> None:
+        """Background worker to refresh file sections only."""
+        from perch.services.git import get_status
+
+        try:
+            status = get_status(self._worktree_root)
+        except RuntimeError:
+            return
+        self.app.call_from_thread(self._update_file_sections, status)
+
+    def _update_file_sections(self, status: GitStatusData) -> None:
+        """Replace file sections (above section-commits header), keep commits intact."""
+        boundary = None
+        for i, node in enumerate(self._nodes):
+            if isinstance(node, ListItem) and node.name == "section-commits":
+                boundary = i
+                break
+        if boundary is None:
+            return  # Commits section not built yet
+
+        saved_name = self._get_selected_name()
+
+        # Collect and remove items before the boundary
+        items_to_remove = [self._nodes[i] for i in range(boundary)]
+        for item in items_to_remove:
+            item.remove()
+
+        # Build and insert new file sections
+        new_items = self._build_file_items(status)
+        for j, item in enumerate(new_items):
+            self.insert(j, [item])
+
+        self._restore_selection(saved_name)
+        self.post_message(self.SelectionRestored())
+
+    def _update_display(self, status: GitStatusData, commits: list) -> None:
+        saved_name = self._get_selected_name()
+        self.clear()
+        for item in self._build_file_items(status):
+            self.append(item)
         # Recent commits
         self.append(_make_section_header("Recent Commits", name="section-commits"))
         for c in commits:
             text = Text()
-            text.append("\u25b8 ")  # collapsed chevron
+            text.append("\u25b8 ")
             text.append(c.hash, style="cyan")
             text.append(f" {c.message}  ")
             text.append(c.author, style="dim")
             text.append(f"  {c.relative_time}", style="dim")
-            item = ListItem(Label(text), name=f"commit:{c.hash}")
-            self.append(item)
-
-        # Restore selection and notify the app so it can sync the viewer
+            self.append(ListItem(Label(text), name=f"commit:{c.hash}"))
         self._restore_selection(saved_name)
         self.post_message(self.SelectionRestored())
 

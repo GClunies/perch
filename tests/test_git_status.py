@@ -732,3 +732,29 @@ class TestCommitExpandCollapse:
             for node in panel._nodes:
                 if isinstance(node, ListItem) and node.name and node.name.startswith("commit-file:"):
                     assert node.name.startswith(f"commit-file:{commits[1]}:")
+
+
+class TestSplitRefresh:
+    async def test_file_status_refresh_preserves_commits(self, git_worktree: Path) -> None:
+        """_refresh_file_status_worker should not touch commit items."""
+        from perch.app import PerchApp
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            await pilot.pause()
+            commit_count_before = sum(
+                1 for node in panel._nodes
+                if isinstance(node, ListItem) and node.name
+                and node.name.startswith("commit:")
+            )
+            panel._refresh_file_status_worker()
+            await pilot.pause()
+            await pilot.pause()
+            commit_count_after = sum(
+                1 for node in panel._nodes
+                if isinstance(node, ListItem) and node.name
+                and node.name.startswith("commit:")
+            )
+            assert commit_count_after == commit_count_before
