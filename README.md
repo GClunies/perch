@@ -50,7 +50,7 @@ uv run perch --editor code
 | Key | Action |
 | --- | ------ |
 | `[` / `]` | Previous / next sidebar tab |
-| `Tab` | Toggle focus between viewer and sidebar |
+| `Tab` | Toggle focus between viewer and sidebar panes|
 | `j` / `k` | Navigate down / up (vim-style) |
 | `h` / `l` | Collapse / expand (file tree), scroll left / right (viewer) |
 | `d` | Toggle diff view |
@@ -85,21 +85,22 @@ uv run ty check src    # Type check
 ## Project Layout
 
 ```
-src/perch/
-  app.py            # Main Textual application
-  app.tcss          # Stylesheet
-  cli.py            # CLI entry point
-  commands.py       # Command palette provider
-  models.py         # Data models (git status, PR context, CI checks)
-  services/
-    editor.py       # External editor integration
-    git.py          # Git operations (status, log, diff, branch)
-    github.py       # GitHub CLI wrapper (PR context, checks, CI logs)
-  widgets/
-    file_tree.py    # Directory tree with git status indicators
-    viewer.py       # Content viewer (files, diffs, markdown, images, logs)
-    file_search.py  # Fuzzy file search modal
-    git_status.py   # Git status panel (files + commits)
-    github_panel.py # PR reviews, comments, GitHub Actions panel
-    splitter.py     # Draggable pane splitter
+src
+└── perch
+    ├── app.py              # Main Textual application
+    ├── app.tcss            # Stylesheet
+    ├── cli.py              # CLI entry point (argparse)
+    ├── commands.py         # Command palette provider
+    ├── models.py           # Data models (git status, PR context, CI checks)
+    ├── services
+    │   ├── editor.py       # Open files in $EDITOR
+    │   ├── git.py          # Git operations (status, log, diff, branch)
+    │   └── github.py       # GitHub CLI wrapper (PRs, reviews, checks)
+    └── widgets
+        ├── file_search.py  # Fuzzy file search modal
+        ├── file_tree.py    # Directory tree with git status indicators
+        ├── git_status.py   # Git status panel (files + commits)
+        ├── github_panel.py # PR reviews, comments, GitHub Actions panel
+        ├── splitter.py     # Draggable pane splitter
+        └── viewer.py       # Content viewer (files, diffs, markdown, images)
 ```
