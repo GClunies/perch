@@ -92,6 +92,7 @@ class GitPanel(ListView):
         self.append(_make_section_header("Loading git status..."))
         self._do_refresh()  # initial full refresh
         self.set_interval(5, self._refresh_file_status_worker)  # auto-refresh files only
+        self._start_ref_watcher()
 
     @work(thread=True)
     def _do_refresh(self) -> None:
@@ -429,3 +430,67 @@ class GitPanel(ListView):
         new_text.append(chevron)
         new_text.append(plain[2:])
         label.update(new_text)
+
+    def _start_ref_watcher(self) -> None:
+        """Start polling git refs for new commits."""
+        from perch.services.git import get_current_branch
+
+        try:
+            self._watched_branch = get_current_branch(self._worktree_root)
+        except RuntimeError:
+            return
+        self._last_ref_mtime: float | None = None
+        self._last_head_mtime: float | None = None
+        self._last_packed_mtime: float | None = None
+        self._update_ref_mtimes()
+        self.set_interval(2.5, self._check_refs)
+
+    def _get_git_dir(self) -> Path:
+        """Return the .git directory for the worktree."""
+        git_dir = self._worktree_root / ".git"
+        if git_dir.is_file():
+            content = git_dir.read_text().strip()
+            if content.startswith("gitdir: "):
+                return Path(content.removeprefix("gitdir: "))
+        return git_dir
+
+    def _update_ref_mtimes(self) -> None:
+        """Snapshot current mtimes for watched ref files."""
+        git_dir = self._get_git_dir()
+        ref_file = git_dir / "refs" / "heads" / self._watched_branch
+        if ref_file.exists():
+            self._last_ref_mtime = ref_file.stat().st_mtime
+        else:
+            self._last_ref_mtime = None
+            head_file = git_dir / "HEAD"
+            packed_file = git_dir / "packed-refs"
+            self._last_head_mtime = head_file.stat().st_mtime if head_file.exists() else None
+            self._last_packed_mtime = packed_file.stat().st_mtime if packed_file.exists() else None
+
+    def _check_refs(self) -> None:
+        """Poll ref mtimes and refresh commits if changed."""
+        from perch.services.git import get_current_branch
+
+        git_dir = self._get_git_dir()
+        ref_file = git_dir / "refs" / "heads" / self._watched_branch
+        changed = False
+        if ref_file.exists():
+            mtime = ref_file.stat().st_mtime
+            if mtime != self._last_ref_mtime:
+                changed = True
+        else:
+            head_file = git_dir / "HEAD"
+            packed_file = git_dir / "packed-refs"
+            head_mtime = head_file.stat().st_mtime if head_file.exists() else None
+            packed_mtime = packed_file.stat().st_mtime if packed_file.exists() else None
+            if head_mtime != self._last_head_mtime or packed_mtime != self._last_packed_mtime:
+                changed = True
+        if changed:
+            try:
+                new_branch = get_current_branch(self._worktree_root)
+                if new_branch != self._watched_branch:
+                    self._watched_branch = new_branch
+            except RuntimeError:
+                pass
+            self._update_ref_mtimes()
+            self._refresh_commits_section()

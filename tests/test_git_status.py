@@ -795,3 +795,31 @@ class TestCommitPagination:
                 if isinstance(node, ListItem) and node.name and node.name.startswith("commit:")
             )
             assert final_commits > initial_commits
+
+
+class TestRefWatcher:
+    async def test_new_commit_triggers_refresh(self, git_worktree: Path) -> None:
+        """Making a new commit should trigger a commits refresh via ref watcher."""
+        from perch.app import PerchApp
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            await pilot.pause()
+            initial_commits = sum(
+                1 for node in panel._nodes
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:")
+            )
+            # Make a new commit
+            (git_worktree / "newfile.txt").write_text("new\n")
+            subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+            subprocess.run(["git", "commit", "-m", "new commit"], cwd=git_worktree, check=True)
+            # Wait for ref watcher to detect
+            for _ in range(20):
+                await pilot.pause(delay=0.2)
+            final_commits = sum(
+                1 for node in panel._nodes
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:")
+            )
+            assert final_commits > initial_commits
