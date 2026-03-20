@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from perch.models import Commit, GitFile, GitStatusData
+from perch.models import Commit, CommitFile, GitFile, GitStatusData
 
 # Porcelain v1 status codes and their human-readable labels
 _STATUS_LABELS: dict[str, str] = {
@@ -180,6 +180,29 @@ def get_log(root: Path, n: int = 15, skip: int = 0) -> list[Commit]:
         # Empty repo (no commits yet) is not an error — just return []
         return []
     return parse_log(result.stdout)
+
+
+def get_commit_files(root: Path, commit_hash: str) -> list[CommitFile]:
+    """Return files changed in *commit_hash* with their status."""
+    result = _run_git(
+        ["diff-tree", "--no-commit-id", "-r", "--name-status", commit_hash],
+        cwd=root,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"git diff-tree failed: {result.stderr.strip()}")
+    files: list[CommitFile] = []
+    for line in result.stdout.strip().splitlines():
+        parts = line.split("\t")
+        if len(parts) < 2:
+            continue
+        raw_status = parts[0]
+        status_char = raw_status[0]
+        label = _STATUS_LABELS.get(status_char, raw_status)
+        if status_char in ("R", "C") and len(parts) >= 3:
+            files.append(CommitFile(path=parts[2], status=label, old_path=parts[1]))
+        else:
+            files.append(CommitFile(path=parts[1], status=label))
+    return files
 
 
 def parse_log(raw: str) -> list[Commit]:

@@ -353,6 +353,37 @@ class TestGetLogPagination:
         assert result == []
 
 
+class TestGetCommitFiles:
+    def test_returns_modified_files(self, git_worktree: Path) -> None:
+        from perch.services.git import get_commit_files
+        (git_worktree / "hello.py").write_text("modified content\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(["git", "commit", "-m", "modify hello"], cwd=git_worktree, check=True)
+        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        files = get_commit_files(git_worktree, head)
+        assert len(files) == 1
+        assert files[0].path == "hello.py"
+        assert files[0].status == "modified"
+        assert files[0].old_path is None
+
+    def test_added_file(self, git_worktree: Path) -> None:
+        from perch.services.git import get_commit_files
+        (git_worktree / "new.py").write_text("new file\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(["git", "commit", "-m", "add new"], cwd=git_worktree, check=True)
+        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        files = get_commit_files(git_worktree, head)
+        assert any(f.path == "new.py" and f.status == "added" for f in files)
+
+    def test_deleted_file(self, git_worktree: Path) -> None:
+        from perch.services.git import get_commit_files
+        subprocess.run(["git", "rm", "hello.py"], cwd=git_worktree, check=True)
+        subprocess.run(["git", "commit", "-m", "delete hello"], cwd=git_worktree, check=True)
+        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        files = get_commit_files(git_worktree, head)
+        assert any(f.path == "hello.py" and f.status == "deleted" for f in files)
+
+
 class TestCommitFileModel:
     def test_basic_fields(self) -> None:
         cf = CommitFile(path="src/app.py", status="modified", old_path=None)
