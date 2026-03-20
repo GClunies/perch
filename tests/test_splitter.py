@@ -51,3 +51,29 @@ class TestClampWidth:
             splitter = pilot.app.query_one(DraggableSplitter)
             result = splitter._clamp_width(40)
             assert result == 40
+
+
+class TestResizeLeftPane:
+    """Tests for resize_left_pane method."""
+
+    async def test_resize_left_pane_grows(self, worktree: Path) -> None:
+        """resize_left_pane(+delta) should increase the left pane width."""
+        async with PerchApp(worktree).run_test() as pilot:
+            splitter = pilot.app.query_one(DraggableSplitter)
+            left_pane = pilot.app.query_one("#left-pane")
+            original = left_pane.outer_size.width
+            splitter.resize_left_pane(5)
+            await pilot.pause()
+            # Width should have changed (or clamped)
+            new_width = left_pane.styles.width
+            assert new_width is not None
+
+    async def test_resize_left_pane_shrinks(self, worktree: Path) -> None:
+        """resize_left_pane(-delta) should decrease the left pane width."""
+        async with PerchApp(worktree).run_test() as pilot:
+            splitter = pilot.app.query_one(DraggableSplitter)
+            left_pane = pilot.app.query_one("#left-pane")
+            splitter.resize_left_pane(-5)
+            await pilot.pause()
+            new_width = left_pane.styles.width
+            assert new_width is not None

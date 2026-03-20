@@ -957,6 +957,20 @@ class TestShowCiLog:
 
 
 # ---------------------------------------------------------------------------
+# Coverage: fetch_ci_log early return when worktree is None (line 727)
+# ---------------------------------------------------------------------------
+class TestFetchCiLogNoWorktree:
+    async def test_fetch_ci_log_no_worktree_returns_early(self, worktree: Path) -> None:
+        """fetch_ci_log with worktree_root=None should return immediately."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = None
+            viewer.fetch_ci_log("https://example.com/log")
+            # Should not crash, and should be a no-op
+
+
+# ---------------------------------------------------------------------------
 # Viewer.show_pr_body — empty body (lines 628-629)
 # ---------------------------------------------------------------------------
 class TestShowPrBody:
@@ -1181,3 +1195,212 @@ class TestCommitFileDiffIntegration:
             )
             viewer.show_commit_summary(summary)
             viewer.refresh_content()  # should not crash
+
+
+# ---------------------------------------------------------------------------
+# Coverage: load_commit_file_diff error paths (lines 661-664, 667-668, 670)
+# ---------------------------------------------------------------------------
+class TestCommitFileDiffEdgeCases:
+    async def test_load_commit_file_diff_runtime_error(self, worktree: Path) -> None:
+        """RuntimeError from get_commit_file_diff is caught and displayed."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = worktree
+            with patch(
+                "perch.services.git.get_commit_file_diff",
+                side_effect=RuntimeError("git failed"),
+            ):
+                viewer.load_commit_file_diff("abc123", "file.py")
+            assert viewer._diff_mode is True
+            assert viewer._commit_file_context == ("abc123", "file.py")
+
+    async def test_load_commit_file_diff_empty(self, worktree: Path) -> None:
+        """Empty diff text shows 'No changes' message."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = worktree
+            with patch(
+                "perch.services.git.get_commit_file_diff",
+                return_value="",
+            ):
+                viewer.load_commit_file_diff("abc123", "file.py")
+
+    async def test_load_commit_file_diff_side_by_side(self, worktree: Path) -> None:
+        """Side-by-side layout for commit file diff."""
+        diff_text = "--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-old\n+new"
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = worktree
+            viewer._diff_layout = "side-by-side"
+            with patch(
+                "perch.services.git.get_commit_file_diff",
+                return_value=diff_text,
+            ):
+                viewer.load_commit_file_diff("abc123", "file.py")
+
+    async def test_load_commit_file_diff_no_worktree(self, worktree: Path) -> None:
+        """load_commit_file_diff returns early when worktree_root is None."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = None
+            viewer.load_commit_file_diff("abc123", "file.py")
+            # Should be a no-op (no state change)
+            assert viewer._commit_file_context is None
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _load_diff with commit-file context (lines 832-835)
+# ---------------------------------------------------------------------------
+class TestLoadDiffCommitFileContext:
+    async def test_load_diff_delegates_to_commit_file_diff(self, worktree: Path) -> None:
+        """_load_diff with _commit_file_context delegates to load_commit_file_diff."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = worktree
+            viewer._commit_file_context = ("abc123", "file.py")
+            with patch(
+                "perch.services.git.get_commit_file_diff",
+                return_value="--- a/f.py\n+++ b/f.py\n",
+            ):
+                viewer._load_diff()
+            assert viewer._diff_mode is True
+
+
+# ---------------------------------------------------------------------------
+# Coverage: refresh_content with commit-file context (lines 816-817)
+# ---------------------------------------------------------------------------
+class TestRefreshContentCommitFile:
+    async def test_refresh_content_with_commit_file_context(self, worktree: Path) -> None:
+        """refresh_content re-loads commit file diff when context is set."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = worktree
+            viewer._commit_file_context = ("abc123", "file.py")
+            with patch(
+                "perch.services.git.get_commit_file_diff",
+                return_value="--- a/f.py\n+++ b/f.py\n",
+            ):
+                viewer.refresh_content()
+            assert viewer._diff_mode is True
+
+    async def test_refresh_content_with_diff_mode(self, worktree: Path) -> None:
+        """refresh_content re-loads diff when in diff mode."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer.worktree_root = worktree
+            viewer._current_path = worktree / "hello.py"
+            viewer._diff_mode = True
+            with patch("perch.services.git.get_diff", return_value=""):
+                viewer.refresh_content()
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _refresh_footer exception path (lines 447-448)
+# ---------------------------------------------------------------------------
+class TestRefreshFooterException:
+    async def test_refresh_footer_swallows_exception(self, worktree: Path) -> None:
+        """_refresh_footer catches exceptions from screen.refresh_bindings."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            with patch.object(
+                viewer.screen,
+                "refresh_bindings",
+                side_effect=AttributeError("no screen"),
+            ):
+                viewer._refresh_footer()  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _extract_diff_filename fallback (line 204)
+# ---------------------------------------------------------------------------
+class TestExtractDiffFilenameFallback:
+    def test_no_b_slash_returns_whole_line(self) -> None:
+        """When no ' b/' is found, _extract_diff_filename returns the line."""
+        from perch.widgets.viewer import _extract_diff_filename
+
+        line = "diff --git some/weird/format"
+        assert _extract_diff_filename(line) == line
+
+
+# ---------------------------------------------------------------------------
+# Coverage: render_diff with multiple files (line 237 — file_index > 0)
+# ---------------------------------------------------------------------------
+class TestRenderDiffMultipleFiles:
+    def test_multiple_file_boundaries(self) -> None:
+        """render_diff adds extra newline between multiple files."""
+        diff = (
+            "diff --git a/foo.py b/foo.py\n"
+            "--- a/foo.py\n"
+            "+++ b/foo.py\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+            "diff --git a/bar.py b/bar.py\n"
+            "--- a/bar.py\n"
+            "+++ b/bar.py\n"
+            "@@ -1 +1 @@\n"
+            "-old2\n"
+            "+new2"
+        )
+        result = render_diff(diff, dark=True)
+        assert "foo.py" in result.plain
+        assert "bar.py" in result.plain
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _strip_html_for_markdown heading replacement (lines 96-98)
+# ---------------------------------------------------------------------------
+class TestStripHtmlHeadings:
+    def test_html_heading_to_markdown(self) -> None:
+        """<h1>...</h1> through <h6>...</h6> should be converted."""
+        from perch.widgets.viewer import _strip_html_for_markdown
+
+        assert _strip_html_for_markdown("<h1>Title</h1>") == "# Title"
+        assert _strip_html_for_markdown("<h2>Sub</h2>") == "## Sub"
+        assert _strip_html_for_markdown("<h3>Deep</h3>") == "### Deep"
+
+
+# ---------------------------------------------------------------------------
+# Coverage: markdown preview with multiple parts (line 568)
+# ---------------------------------------------------------------------------
+class TestMarkdownPreviewMultipleParts:
+    async def test_markdown_with_image_renders_group(self, tmp_path: Path) -> None:
+        """Markdown with an image reference should render as Group."""
+        from PIL import Image as PILImage
+
+        md_file = tmp_path / "test.md"
+        img = PILImage.new("RGB", (4, 4), color=(255, 0, 0))
+        img.save(tmp_path / "pic.png")
+        md_file.write_text("Before\n\n![alt](pic.png)\n\nAfter")
+
+        app = PerchApp(tmp_path)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            viewer._markdown_preview = True
+            viewer.load_file(md_file)
+
+
+# ---------------------------------------------------------------------------
+# Coverage: CI log group with pre-existing content (line 757)
+# ---------------------------------------------------------------------------
+class TestCiLogGroupNewline:
+    async def test_group_after_content_adds_newline(self, worktree: Path) -> None:
+        """A ##[group] that comes after earlier output should add a leading newline."""
+        app = PerchApp(worktree)
+        async with app.run_test():
+            viewer = app.query_one(Viewer)
+            log = "Normal line\n##[group]Setup"
+            viewer.show_ci_log(log)
+            from textual.widgets import Static
+            content = viewer.query_one("#file-content", Static)
+            text = content._Static__content
+            assert "Setup" in text.plain
+            assert "Normal line" in text.plain

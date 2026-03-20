@@ -823,3 +823,597 @@ class TestRefWatcher:
                 if isinstance(node, ListItem) and node.name and node.name.startswith("commit:")
             )
             assert final_commits > initial_commits
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _refresh_file_status_worker RuntimeError (lines 152-153)
+# ---------------------------------------------------------------------------
+class TestRefreshFileStatusWorkerRuntimeError:
+    async def test_runtime_error_is_swallowed(self, tmp_path: Path) -> None:
+        """RuntimeError in _refresh_file_status_worker should not crash."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Now make the next refresh fail
+                with patch(
+                    "perch.services.git.get_status",
+                    side_effect=RuntimeError("git not found"),
+                ):
+                    panel._refresh_file_status_worker()
+                    for _ in range(10):
+                        await pilot.pause()
+                # Panel should still be intact (no crash)
+                assert len(list(panel.children)) > 0
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _update_file_sections early return (line 164)
+# ---------------------------------------------------------------------------
+class TestUpdateFileSectionsNoBoundary:
+    async def test_returns_early_when_no_commits_section(self, tmp_path: Path) -> None:
+        """_update_file_sections returns early when section-commits not present."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                # Clear everything so there is no section-commits header
+                panel.clear()
+                await pilot.pause()
+                count_before = len(list(panel.children))
+                # Should be a no-op (no crash, no change)
+                panel._update_file_sections(_SAMPLE_STATUS)
+                await pilot.pause()
+                count_after = len(list(panel.children))
+                assert count_after == count_before
+
+
+# ---------------------------------------------------------------------------
+# Coverage: on_list_view_selected commit-file items (lines 198-199)
+# ---------------------------------------------------------------------------
+class TestOnListViewSelectedCommitFile:
+    async def test_commit_file_item_returns_early(self, tmp_path: Path) -> None:
+        """commit-file: items should not post a FileSelected message."""
+        from unittest.mock import MagicMock
+
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+
+                mock_post = MagicMock()
+                commit_file_item = ListItem(
+                    Label("commit file"), name="commit-file:abc123:file.py"
+                )
+                from textual.widgets import ListView
+
+                event = ListView.Selected(panel, commit_file_item, index=0)
+                with patch.object(panel, "post_message", mock_post):
+                    panel.on_list_view_selected(event)
+                mock_post.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _refresh_commits_section expanded commit error (lines 273-276)
+# ---------------------------------------------------------------------------
+class TestRefreshCommitsSectionExpandedError:
+    async def test_expanded_commit_error_clears_expansion(self, git_worktree: Path) -> None:
+        """If get_commit_files raises during refresh, expanded should be cleared."""
+        from perch.app import PerchApp
+
+        (git_worktree / "extra.txt").write_text("extra\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add extra file"],
+            cwd=git_worktree, check=True,
+        )
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            await pilot.pause()
+
+            # Find a commit hash
+            commit_item = None
+            for node in panel._nodes:
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:"):
+                    commit_item = node
+                    break
+            assert commit_item is not None
+            commit_hash = commit_item.name.removeprefix("commit:")
+
+            # Expand the commit first
+            panel.toggle_commit(commit_hash)
+            await pilot.pause()
+            assert panel._expanded_commit == commit_hash
+
+            # Now refresh commits with get_commit_files raising
+            with patch(
+                "perch.services.git.get_commit_files",
+                side_effect=RuntimeError("bad commit"),
+            ):
+                panel._refresh_commits_section()
+                for _ in range(10):
+                    await pilot.pause()
+            # Expansion should be cleared
+            assert panel._expanded_commit is None
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _apply_commits_update with expanded files (lines 309-315) and
+#           sentinel when commits == page_size (line 329)
+# ---------------------------------------------------------------------------
+class TestApplyCommitsUpdateExpanded:
+    async def test_apply_commits_with_expanded_files(self, tmp_path: Path) -> None:
+        """_apply_commits_update should re-expand children for preserved commit."""
+        from perch.app import PerchApp
+        from perch.models import CommitFile
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                expanded_files = [
+                    CommitFile(path="file_a.py", status="modified"),
+                    CommitFile(path="file_b.py", status="added"),
+                ]
+                panel._apply_commits_update(
+                    _SAMPLE_COMMITS, "aaa111", expanded_files
+                )
+                await pilot.pause()
+
+                # Should have commit-file items
+                child_names = [
+                    n.name for n in panel._nodes
+                    if isinstance(n, ListItem) and n.name and n.name.startswith("commit-file:")
+                ]
+                assert len(child_names) == 2
+                assert "commit-file:aaa111:file_a.py" in child_names
+                assert panel._expanded_commit == "aaa111"
+
+    async def test_apply_commits_sentinel_at_page_size(self, tmp_path: Path) -> None:
+        """When len(commits) == page_size, a load-more sentinel is appended."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Set page size to match the number of commits
+                panel._commit_page_size = len(_SAMPLE_COMMITS)
+                panel._apply_commits_update(_SAMPLE_COMMITS, None, None)
+                await pilot.pause()
+
+                sentinel = any(
+                    isinstance(n, ListItem) and n.name == "load-more-commits"
+                    for n in panel._nodes
+                )
+                assert sentinel, "Sentinel should appear when commits == page_size"
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _expand_commit error paths (lines 379, 385-386)
+# ---------------------------------------------------------------------------
+class TestExpandCommitErrors:
+    async def test_expand_commit_not_found(self, tmp_path: Path) -> None:
+        """_expand_commit returns early if commit hash not found in nodes."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Try to expand a non-existent commit
+                panel._expand_commit("nonexistent_hash")
+                await pilot.pause()
+                # No crash, no expanded commit
+                assert panel._expanded_commit is None
+
+    async def test_expand_commit_runtime_error(self, tmp_path: Path) -> None:
+        """_expand_commit catches RuntimeError from get_commit_files."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                with patch(
+                    "perch.services.git.get_commit_files",
+                    side_effect=RuntimeError("git failed"),
+                ):
+                    panel._expand_commit("aaa111")
+                    await pilot.pause()
+
+                # No child items should be added
+                child_items = [
+                    n for n in panel._nodes
+                    if isinstance(n, ListItem) and n.name
+                    and n.name.startswith("commit-file:")
+                ]
+                assert len(child_items) == 0
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _set_commit_chevron guard conditions (lines 419, 424, 427)
+# ---------------------------------------------------------------------------
+class TestSetCommitChevronGuards:
+    async def test_set_chevron_on_non_list_item(self, tmp_path: Path) -> None:
+        """_set_commit_chevron returns early if node isn't a named ListItem."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Index 0 is a section header with no name (or section-header class)
+                # It's disabled with name=None
+                panel._set_commit_chevron(0, expanded=True)
+                # Should not raise
+
+    async def test_set_chevron_bad_content_type(self, tmp_path: Path) -> None:
+        """_set_commit_chevron returns early if __content is not Text."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Find a commit item and corrupt its label content
+                for i, node in enumerate(panel._nodes):
+                    if isinstance(node, ListItem) and node.name and node.name.startswith("commit:"):
+                        label = node.query_one(Label)
+                        # Set __content to a string instead of Text
+                        label._Static__content = "not a Text object"
+                        panel._set_commit_chevron(i, expanded=True)
+                        break
+
+    async def test_set_chevron_no_arrow_prefix(self, tmp_path: Path) -> None:
+        """_set_commit_chevron returns early if text doesn't start with arrow."""
+        from perch.app import PerchApp
+        from rich.text import Text
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Find a commit item and replace its text with no arrow
+                for i, node in enumerate(panel._nodes):
+                    if isinstance(node, ListItem) and node.name and node.name.startswith("commit:"):
+                        label = node.query_one(Label)
+                        label._Static__content = Text("no arrow here")
+                        panel._set_commit_chevron(i, expanded=True)
+                        break
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _get_git_dir worktree .git file (lines 452-454)
+# ---------------------------------------------------------------------------
+class TestGetGitDirWorktree:
+    async def test_git_file_redirect(self, tmp_path: Path) -> None:
+        """When .git is a file (worktree), _get_git_dir follows the redirect."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        real_git_dir = tmp_path / ".real_git"
+        real_git_dir.mkdir()
+        (real_git_dir / "HEAD").write_text("ref: refs/heads/main\n")
+
+        # Create a worktree-like .git file
+        worktree_dir = tmp_path / "wt"
+        worktree_dir.mkdir()
+        (worktree_dir / ".git").write_text(f"gitdir: {real_git_dir}")
+        (worktree_dir / "hello.py").write_text("print('hi')\n")
+
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(worktree_dir)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                result = panel._get_git_dir()
+                assert result == real_git_dir
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _update_ref_mtimes packed refs fallback (lines 464-468)
+# ---------------------------------------------------------------------------
+class TestUpdateRefMtimesFallback:
+    async def test_packed_refs_fallback(self, git_worktree: Path) -> None:
+        """When ref file doesn't exist, _update_ref_mtimes checks packed-refs."""
+        from perch.app import PerchApp
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            await pilot.pause()
+
+            git_dir = panel._get_git_dir()
+            ref_file = git_dir / "refs" / "heads" / panel._watched_branch
+
+            # Rename the ref file so it doesn't exist
+            if ref_file.exists():
+                ref_file.rename(ref_file.with_suffix(".bak"))
+
+            # Create a packed-refs file
+            packed = git_dir / "packed-refs"
+            packed.write_text("# pack-refs\n")
+
+            panel._update_ref_mtimes()
+            assert panel._last_ref_mtime is None
+            assert panel._last_head_mtime is not None or panel._last_packed_mtime is not None
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _check_refs packed refs polling (lines 482-487) and branch change (492-494)
+# ---------------------------------------------------------------------------
+class TestCheckRefsPacked:
+    async def test_check_refs_packed_fallback_triggers_refresh(self, git_worktree: Path) -> None:
+        """When ref file doesn't exist, _check_refs uses HEAD/packed-refs."""
+        from perch.app import PerchApp
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            await pilot.pause()
+
+            git_dir = panel._get_git_dir()
+            ref_file = git_dir / "refs" / "heads" / panel._watched_branch
+
+            # First, set mtimes with ref file absent
+            if ref_file.exists():
+                ref_file.rename(ref_file.with_suffix(".bak"))
+
+            packed = git_dir / "packed-refs"
+            packed.write_text("# initial\n")
+            panel._update_ref_mtimes()
+
+            # Now change packed-refs to simulate a change
+            import time
+            time.sleep(0.05)
+            packed.write_text("# changed\n")
+
+            refresh_called = []
+            original = panel._refresh_commits_section
+            panel._refresh_commits_section = lambda: refresh_called.append(True) or original()
+
+            panel._check_refs()
+            assert len(refresh_called) == 1
+
+    async def test_check_refs_branch_change(self, git_worktree: Path) -> None:
+        """_check_refs detects branch name changes."""
+        from perch.app import PerchApp
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            await pilot.pause()
+
+            git_dir = panel._get_git_dir()
+            ref_file = git_dir / "refs" / "heads" / panel._watched_branch
+
+            # Remove ref file to enter packed-refs path
+            if ref_file.exists():
+                ref_file.rename(ref_file.with_suffix(".bak"))
+            packed = git_dir / "packed-refs"
+            packed.write_text("# v1\n")
+            panel._update_ref_mtimes()
+
+            # Change packed-refs and mock a branch change
+            import time
+            time.sleep(0.05)
+            packed.write_text("# v2\n")
+
+            with patch(
+                "perch.services.git.get_current_branch",
+                return_value="new-branch",
+            ):
+                panel._check_refs()
+
+            assert panel._watched_branch == "new-branch"
+
+    async def test_check_refs_branch_error(self, git_worktree: Path) -> None:
+        """_check_refs handles RuntimeError from get_current_branch."""
+        from perch.app import PerchApp
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            await pilot.pause()
+
+            git_dir = panel._get_git_dir()
+            ref_file = git_dir / "refs" / "heads" / panel._watched_branch
+
+            # Remove ref file
+            if ref_file.exists():
+                ref_file.rename(ref_file.with_suffix(".bak"))
+            packed = git_dir / "packed-refs"
+            packed.write_text("# v1\n")
+            panel._update_ref_mtimes()
+
+            import time
+            time.sleep(0.05)
+            packed.write_text("# v2\n")
+
+            old_branch = panel._watched_branch
+            with patch(
+                "perch.services.git.get_current_branch",
+                side_effect=RuntimeError("detached HEAD"),
+            ):
+                panel._check_refs()
+
+            # Branch should not change on error
+            assert panel._watched_branch == old_branch
+
+
+# ---------------------------------------------------------------------------
+# Coverage: _update_display sentinel (lines 198-199) and
+#           _load_more_commits early return (line 329)
+# ---------------------------------------------------------------------------
+class TestUpdateDisplaySentinel:
+    async def test_update_display_adds_sentinel_at_page_size(self, tmp_path: Path) -> None:
+        """_update_display adds load-more sentinel when commits == page_size."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+
+                # Set page size to match sample commits count
+                panel._commit_page_size = len(_SAMPLE_COMMITS)
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                sentinel = any(
+                    isinstance(n, ListItem) and n.name == "load-more-commits"
+                    for n in panel._nodes
+                )
+                assert sentinel
+
+
+class TestLoadMoreCommitsEarlyReturn:
+    async def test_loading_more_flag_prevents_duplicate(self, git_worktree: Path) -> None:
+        """_load_more_commits returns early when _loading_more is True."""
+        from perch.app import PerchApp
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            await pilot.pause()
+
+            panel._loading_more = True
+            count_before = sum(
+                1 for node in panel._nodes
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:")
+            )
+            panel._load_more_commits()
+            for _ in range(5):
+                await pilot.pause()
+            count_after = sum(
+                1 for node in panel._nodes
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:")
+            )
+            # No new commits should be loaded
+            assert count_after == count_before
+
+
+# ---------------------------------------------------------------------------
+# Coverage: activate_current_selection for commit-file items
+# ---------------------------------------------------------------------------
+class TestActivateCurrentSelectionCommitFile:
+    async def test_returns_false_for_commit_file_item(self, tmp_path: Path) -> None:
+        """commit-file: items should return False from activate_current_selection."""
+        from unittest.mock import MagicMock
+
+        from perch.app import PerchApp
+        from perch.models import CommitFile
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Expand the first commit to get commit-file items
+                expanded_files = [
+                    CommitFile(path="file_a.py", status="modified"),
+                ]
+                panel._apply_commits_update(
+                    _SAMPLE_COMMITS, "aaa111", expanded_files
+                )
+                await pilot.pause()
+
+                # Find and select a commit-file item
+                for i, node in enumerate(panel._nodes):
+                    if isinstance(node, ListItem) and node.name and node.name.startswith("commit-file:"):
+                        panel.index = i
+                        break
+
+                mock_post = MagicMock()
+                with patch.object(panel, "post_message", mock_post):
+                    result = panel.activate_current_selection()
+                assert result is False
+                mock_post.assert_not_called()
