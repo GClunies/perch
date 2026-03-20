@@ -2,7 +2,7 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
-from perch.models import Commit, GitFile, GitStatusData
+from perch.models import Commit, CommitFile, CommitSummary, GitFile, GitStatusData
 from perch.services.git import (
     get_commit_diff,
     get_current_branch,
@@ -332,3 +332,34 @@ class TestGetLog:
         )
         result = get_log(Path("/tmp"))
         assert result == []
+
+
+class TestCommitFileModel:
+    def test_basic_fields(self) -> None:
+        cf = CommitFile(path="src/app.py", status="modified", old_path=None)
+        assert cf.path == "src/app.py"
+        assert cf.status == "modified"
+        assert cf.old_path is None
+
+    def test_renamed_file(self) -> None:
+        cf = CommitFile(path="new.py", status="renamed", old_path="old.py")
+        assert cf.old_path == "old.py"
+
+    def test_old_path_defaults_none(self) -> None:
+        cf = CommitFile(path="file.py", status="added")
+        assert cf.old_path is None
+
+
+class TestCommitSummaryModel:
+    def test_basic_fields(self) -> None:
+        cs = CommitSummary(
+            hash="abc1234",
+            subject="fix login",
+            body="Detailed description",
+            author="Alice",
+            date="2026-03-20T10:00:00+00:00",
+            stats=" 2 files changed, 10 insertions(+), 3 deletions(-)",
+        )
+        assert cs.hash == "abc1234"
+        assert cs.subject == "fix login"
+        assert cs.body == "Detailed description"

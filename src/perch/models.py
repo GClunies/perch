@@ -26,6 +26,23 @@ class Commit:
 
 
 @dataclass
+class CommitFile:
+    path: str
+    status: str
+    old_path: str | None = None
+
+
+@dataclass
+class CommitSummary:
+    hash: str
+    subject: str
+    body: str
+    author: str
+    date: str
+    stats: str
+
+
+@dataclass
 class PRReview:
     author: str
     state: str
