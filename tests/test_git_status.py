@@ -758,3 +758,40 @@ class TestSplitRefresh:
                 and node.name.startswith("commit:")
             )
             assert commit_count_after == commit_count_before
+
+
+class TestCommitPagination:
+    async def test_load_more_commits(self, git_worktree: Path) -> None:
+        """_load_more_commits should append additional commit items."""
+        from perch.app import PerchApp
+
+        for i in range(3):
+            (git_worktree / f"page{i}.txt").write_text(f"{i}\n")
+            subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+            subprocess.run(["git", "commit", "-m", f"page commit {i}"], cwd=git_worktree, check=True)
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            panel = app.query_one(GitPanel)
+            panel._commit_page_size = 2
+            panel._refresh_commits_section()
+            await pilot.pause()
+            await pilot.pause()
+            initial_commits = sum(
+                1 for node in panel._nodes
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:")
+            )
+            assert initial_commits == 2
+            sentinel = any(
+                isinstance(node, ListItem) and node.name == "load-more-commits"
+                for node in panel._nodes
+            )
+            assert sentinel, "Sentinel should be present when more commits exist"
+            panel._load_more_commits()
+            await pilot.pause()
+            await pilot.pause()
+            final_commits = sum(
+                1 for node in panel._nodes
+                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:")
+            )
+            assert final_commits > initial_commits

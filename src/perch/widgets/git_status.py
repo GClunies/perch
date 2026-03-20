@@ -84,6 +84,9 @@ class GitPanel(ListView):
         self._worktree_root = worktree_root
         self._is_git_repo = True
         self._expanded_commit: str | None = None
+        self._commit_page_size: int = 50
+        self._commits_loaded: int = 0
+        self._loading_more: bool = False
 
     def on_mount(self) -> None:
         self.append(_make_section_header("Loading git status..."))
@@ -96,7 +99,7 @@ class GitPanel(ListView):
 
         try:
             status = get_status(self._worktree_root)
-            commits = get_log(self._worktree_root)
+            commits = get_log(self._worktree_root, n=self._commit_page_size)
         except RuntimeError:
             self.app.call_from_thread(self._show_not_git_repo)
             return
@@ -189,6 +192,10 @@ class GitPanel(ListView):
             text.append(c.author, style="dim")
             text.append(f"  {c.relative_time}", style="dim")
             self.append(ListItem(Label(text), name=f"commit:{c.hash}"))
+        self._commits_loaded = len(commits)
+        if len(commits) == self._commit_page_size:
+            sentinel_text = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
+            self.append(ListItem(Label(sentinel_text), name="load-more-commits"))
         self._restore_selection(saved_name)
         self.post_message(self.SelectionRestored())
 
@@ -252,6 +259,100 @@ class GitPanel(ListView):
 
     def action_refresh(self) -> None:
         self._do_refresh()
+
+    @work(thread=True)
+    def _refresh_commits_section(self) -> None:
+        """Rebuild the commits section in a background thread."""
+        from perch.services.git import get_commit_files, get_log
+
+        commits = get_log(self._worktree_root, n=self._commit_page_size)
+        expanded = self._expanded_commit
+        expanded_files = None
+        if expanded and any(c.hash == expanded for c in commits):
+            try:
+                expanded_files = get_commit_files(self._worktree_root, expanded)
+            except RuntimeError:
+                expanded = None
+        else:
+            expanded = None
+        self.app.call_from_thread(
+            self._apply_commits_update, commits, expanded, expanded_files
+        )
+
+    def _apply_commits_update(
+        self, commits: list, expanded: str | None, expanded_files: list | None
+    ) -> None:
+        """Apply commit section rebuild on the main thread."""
+        to_remove = [
+            node for node in self._nodes
+            if isinstance(node, ListItem) and node.name and (
+                node.name.startswith("commit:") or
+                node.name.startswith("commit-file:") or
+                node.name == "load-more-commits"
+            )
+        ]
+        for node in to_remove:
+            node.remove()
+        self._expanded_commit = expanded
+        self._commits_loaded = len(commits)
+        for c in commits:
+            chevron = "\u25be " if c.hash == expanded else "\u25b8 "
+            text = Text()
+            text.append(chevron)
+            text.append(c.hash, style="cyan")
+            text.append(f" {c.message}  ")
+            text.append(c.author, style="dim")
+            text.append(f"  {c.relative_time}", style="dim")
+            self.append(ListItem(Label(text), name=f"commit:{c.hash}"))
+            if c.hash == expanded and expanded_files:
+                for ef in expanded_files:
+                    child_text = Text()
+                    child_text.append("  ")
+                    style = _STATUS_STYLES.get(ef.status, "")
+                    child_text.append(f"{ef.status:<10}", style=style)
+                    child_text.append(f" {ef.path}")
+                    self.append(ListItem(
+                        Label(child_text),
+                        name=f"commit-file:{c.hash}:{ef.path}",
+                    ))
+        if len(commits) == self._commit_page_size:
+            sentinel_text = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
+            self.append(ListItem(Label(sentinel_text), name="load-more-commits"))
+        if not expanded:
+            self._expanded_commit = None
+
+    @work(thread=True)
+    def _load_more_commits(self) -> None:
+        """Load the next page of commits in a background thread."""
+        if self._loading_more:
+            return
+        self._loading_more = True
+        from perch.services.git import get_log
+
+        commits = get_log(
+            self._worktree_root, n=self._commit_page_size, skip=self._commits_loaded
+        )
+        self.app.call_from_thread(self._apply_more_commits, commits)
+
+    def _apply_more_commits(self, commits: list) -> None:
+        """Apply loaded commits on the main thread."""
+        for node in self._nodes:
+            if isinstance(node, ListItem) and node.name == "load-more-commits":
+                node.remove()
+                break
+        self._commits_loaded += len(commits)
+        for c in commits:
+            text = Text()
+            text.append("\u25b8 ")
+            text.append(c.hash, style="cyan")
+            text.append(f" {c.message}  ")
+            text.append(c.author, style="dim")
+            text.append(f"  {c.relative_time}", style="dim")
+            self.append(ListItem(Label(text), name=f"commit:{c.hash}"))
+        if len(commits) == self._commit_page_size:
+            sentinel_text = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
+            self.append(ListItem(Label(sentinel_text), name="load-more-commits"))
+        self._loading_more = False
 
     def toggle_commit(self, commit_hash: str) -> None:
         """Expand or collapse a commit's file list (accordion pattern)."""
