@@ -39,6 +39,7 @@ class FileTree(DirectoryTree):
     BINDINGS = [
         Binding("ctrl+p", "app.file_search", "Search"),
         Binding("o", "app.open_editor", "Open"),
+        Binding("c", "copy_path", "Copy Path"),
         Binding("f", "app.toggle_focus_mode", "Focus"),
         Binding("right", "expand_node", "Expand", show=False),
         Binding("left", "collapse_node", "Collapse", show=False),
@@ -49,6 +50,18 @@ class FileTree(DirectoryTree):
         Binding("pageup", "page_up", "Page Up", show=False),
         Binding("pagedown", "page_down", "Page Down", show=False),
     ]
+
+    def action_copy_path(self) -> None:
+        """Copy the highlighted node's absolute path to clipboard."""
+        node = self.cursor_node
+        if node is None or node.data is None:
+            return
+        path = node.data.path if hasattr(node.data, "path") else node.data
+        if not isinstance(path, Path):
+            return
+        value = str(path)
+        self.app.copy_to_clipboard(value)
+        self.app.notify(f"Copied: {value}")
 
     def action_expand_node(self) -> None:
         """Expand the currently highlighted folder node."""
