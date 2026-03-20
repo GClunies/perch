@@ -37,6 +37,7 @@ class FileTree(DirectoryTree):
     ICON_NODE_EXPANDED = "\U000f0770 "
 
     BINDINGS = [
+        ("r", "refresh", "Refresh"),
         Binding("ctrl+p", "app.file_search", "Search"),
         Binding("o", "app.open_editor", "Open"),
         Binding("f", "app.toggle_focus_mode", "Focus"),
@@ -86,6 +87,10 @@ class FileTree(DirectoryTree):
     def action_page_down(self) -> None:
         """Move cursor down by a page."""
         self.cursor_line = min(self.last_line, self.cursor_line + self._page_size())
+
+    def action_refresh(self) -> None:
+        """Re-scan the filesystem."""
+        self.reload()
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

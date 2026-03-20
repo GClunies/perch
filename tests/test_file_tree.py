@@ -668,3 +668,36 @@ class TestRenderLabel:
 
                 # Should return label without crash
                 assert label.plain  # label exists and is non-empty
+
+
+class TestRefreshBinding:
+    async def test_r_keybinding_exists(self, tmp_path: Path) -> None:
+        """FileTree should have an 'r' refresh binding."""
+        binding_keys = [
+            b.key if hasattr(b, "key") else b[0] for b in FileTree.BINDINGS
+        ]
+        assert "r" in binding_keys
+
+    async def test_refresh_action_does_not_crash(self, tmp_path: Path) -> None:
+        """action_refresh should execute without error."""
+        from unittest.mock import patch
+
+        from perch.app import PerchApp
+        from perch.models import GitStatusData
+
+        _init_git_repo_with_commit(tmp_path)
+        (tmp_path / "hello.py").write_text("x = 1\n")
+
+        with (
+            patch("perch.services.git.get_status", return_value=GitStatusData()),
+            patch("perch.services.git.get_log", return_value=[]),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+            patch("perch.widgets.file_tree.FileTree._watch_filesystem"),
+        ):
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                tree = pilot.app.query_one(FileTree)
+                await pilot.pause()
+                tree.action_refresh()
+                await pilot.pause()
