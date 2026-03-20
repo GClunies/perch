@@ -62,7 +62,7 @@ uv run perch --editor code
 | `r` | Refresh data (Git / GitHub tabs) |
 | `f` | Focus mode (hide sidebar) |
 | `-` / `=` | Shrink / grow focused pane |
-| `?` | Command palette |
+| `?` | Command palette (lists commands and hotkeys)|
 | `q` | Quit |
 
 ## Theming
