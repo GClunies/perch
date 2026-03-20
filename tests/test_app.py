@@ -314,32 +314,6 @@ class TestGitPanelFileSelected:
             assert viewer._current_path == worktree / deleted_name
 
 
-class TestGitPanelCommitSelected:
-    """Tests for on_git_panel_commit_selected() handler."""
-
-    async def test_commit_selected_loads_commit_diff(self, git_worktree: Path) -> None:
-        """Selecting a commit should load its diff in the viewer."""
-        # Get the commit hash
-        result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=git_worktree,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        commit_hash = result.stdout.strip()
-
-        app = PerchApp(git_worktree)
-        async with app.run_test(size=(120, 40)) as pilot:
-            await pilot.pause()
-            viewer = pilot.app.query_one(Viewer)
-            event = GitPanel.CommitSelected(commit_hash=commit_hash)
-            pilot.app.on_git_panel_commit_selected(event)
-            await pilot.pause()
-            assert viewer._diff_mode is True
-            assert viewer.worktree_root == git_worktree
-
-
 class TestToggleDiff:
     """Tests for action_toggle_diff() and action_toggle_diff_layout()."""
 
@@ -359,28 +333,6 @@ class TestToggleDiff:
             viewer = pilot.app.query_one(Viewer)
             with patch.object(viewer, "action_toggle_diff_layout") as mock:
                 pilot.app.action_toggle_diff_layout()
-                mock.assert_called_once()
-
-
-class TestDiffFileNavigation:
-    """Tests for action_next_diff_file() and action_prev_diff_file()."""
-
-    async def test_next_diff_file_delegates_to_viewer(self, worktree: Path) -> None:
-        """action_next_diff_file should call the viewer's action."""
-        app = PerchApp(worktree)
-        async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(Viewer)
-            with patch.object(viewer, "action_next_diff_file") as mock:
-                pilot.app.action_next_diff_file()
-                mock.assert_called_once()
-
-    async def test_prev_diff_file_delegates_to_viewer(self, worktree: Path) -> None:
-        """action_prev_diff_file should call the viewer's action."""
-        app = PerchApp(worktree)
-        async with app.run_test() as pilot:
-            viewer = pilot.app.query_one(Viewer)
-            with patch.object(viewer, "action_prev_diff_file") as mock:
-                pilot.app.action_prev_diff_file()
                 mock.assert_called_once()
 
 
@@ -795,45 +747,7 @@ class TestSelectionRestoredCleanTree:
 
 
 class TestOnListViewHighlighted:
-    """Tests for on_list_view_highlighted handling commit and deleted-file items."""
-
-    async def test_highlighted_commit_loads_diff(self, git_worktree: Path) -> None:
-        """Highlighting a commit item on the git tab should call load_commit_diff."""
-        import subprocess as _sp
-
-        result = _sp.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=git_worktree,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-        commit_hash = result.stdout.strip()
-
-        from perch.models import Commit, GitStatusData
-
-        status = GitStatusData()
-        commits = [
-            Commit(hash=commit_hash, message="init", author="Test", relative_time="now")
-        ]
-        with (
-            patch("perch.services.git.get_status", return_value=status),
-            patch("perch.services.git.get_log", return_value=commits),
-            patch("perch.services.github.get_pr_context", return_value=None),
-            patch("perch.services.github.get_checks", return_value=[]),
-        ):
-            app = PerchApp(git_worktree)
-            async with app.run_test(size=(120, 40)) as pilot:
-                pilot.app.action_next_tab()  # files -> git
-                await pilot.pause()
-
-                viewer = pilot.app.query_one(Viewer)
-                with patch.object(viewer, "load_commit_diff") as mock:
-                    item = ListItem(name=f"commit:{commit_hash}")
-                    event = ListView.Highlighted(pilot.app.query_one(GitPanel), item)
-                    pilot.app.on_list_view_highlighted(event)
-                    mock.assert_called_once_with(commit_hash)
-                    assert viewer.worktree_root == git_worktree
+    """Tests for on_list_view_highlighted handling deleted-file items."""
 
     async def test_highlighted_deleted_file_shows_diff(
         self, git_worktree: Path

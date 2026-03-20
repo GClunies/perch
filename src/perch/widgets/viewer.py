@@ -378,8 +378,6 @@ class Viewer(VerticalScroll):
         Binding("d", "toggle_diff", "Diff"),
         Binding("s", "toggle_diff_layout", "Layout"),
         Binding("m", "toggle_markdown_preview", "Markdown"),
-        Binding("n", "next_diff_file", "Next File"),
-        Binding("p", "prev_diff_file", "Prev File"),
         Binding("e", "app.open_editor", "Editor"),
         Binding("f", "app.toggle_focus_mode", "Focus"),
         Binding("j", "scroll_down", "Scroll", key_display="hjkl/\u2190\u2193\u2191\u2192"),
@@ -405,10 +403,7 @@ class Viewer(VerticalScroll):
         self.worktree_root: Path | None = worktree_root
         self._diff_mode: bool = False
         self._diff_layout: str = "unified"
-        self._diff_file_offsets: list[int] = []
-        self._diff_file_index: int = 0
         self._markdown_preview: bool = False
-        self._current_commit: str | None = None
         self._commit_file_context: tuple[str, str] | None = None  # (hash, path)
         self._current_summary: CommitSummary | None = None
 
@@ -443,8 +438,6 @@ class Viewer(VerticalScroll):
                 and self._is_markdown(self._current_path)
                 and not self._diff_mode
             )
-        if action in ("next_diff_file", "prev_diff_file"):
-            return bool(self._diff_file_offsets)
         return True
 
     def _refresh_footer(self) -> None:
@@ -496,7 +489,6 @@ class Viewer(VerticalScroll):
 
     def _show_content_view(self) -> None:
         """Show the main content area and hide the diff container."""
-        self._current_commit = None
         self._content.display = True
         try:
             self.query_one("#diff-container").display = False
@@ -597,67 +589,6 @@ class Viewer(VerticalScroll):
         else:
             self._content.update(syntax)
 
-        self.scroll_home(animate=False)
-        self._refresh_footer()
-
-    def load_commit_diff(self, commit_hash: str) -> None:
-        """Load and display the full diff for a commit with file jump support."""
-        from perch.services.git import get_commit_diff
-
-        if self.worktree_root is None:
-            return
-
-        # Skip reload if already showing this commit (prevents scroll reset
-        # when the GitPanel auto-refresh re-selects the same commit).
-        if self._current_commit == commit_hash:
-            return
-
-        self._current_path = None
-        self._diff_mode = True
-        self._show_content_view()
-        self._current_commit = commit_hash
-        self._update_border_title(f"commit {commit_hash[:8]}")
-
-        try:
-            diff_text = get_commit_diff(self.worktree_root, commit_hash)
-        except RuntimeError as e:
-            self._content.update(f"Error getting commit diff: {e}")
-            return
-
-        if not diff_text:
-            self._content.update(Text("Empty commit", style="dim italic"))
-            self._diff_file_offsets = []
-            self._diff_file_index = 0
-            return
-
-        # Build file boundary offsets in the *rendered* output.
-        # render_diff replaces each "diff --git" line with 3 lines (rule,
-        # filename, rule) and adds a blank line between files, so we walk
-        # the source lines and track the rendered line count.
-        self._diff_file_offsets = []
-        rendered_line = 0
-        file_index = 0
-        for line in diff_text.splitlines():
-            if line.startswith("diff --git "):
-                if file_index > 0:
-                    rendered_line += 1  # blank line between files
-                self._diff_file_offsets.append(rendered_line)
-                rendered_line += 3  # rule + filename + rule
-                file_index += 1
-            else:
-                rendered_line += 1
-        self._diff_file_index = 0
-
-        # Build header with file count
-        n_files = len(self._diff_file_offsets)
-        header = Text(f"Commit {commit_hash}")
-        header.stylize("bold cyan")
-        header.append(f"  ({n_files} file{'s' if n_files != 1 else ''})")
-        header.append("  [n] next file  [p] prev file", style="dim")
-        header.append("\n\n")
-
-        styled = render_diff(diff_text, dark=self._is_dark_theme())
-        self._content.update(Group(header, styled))
         self.scroll_home(animate=False)
         self._refresh_footer()
 
@@ -966,26 +897,3 @@ class Viewer(VerticalScroll):
         )
         self._load_diff()
 
-    def action_next_diff_file(self) -> None:
-        """Jump to the next file boundary in a multi-file diff."""
-        if not self._diff_file_offsets:
-            return
-        if self._diff_file_index < len(self._diff_file_offsets) - 1:
-            self._diff_file_index += 1
-        self._scroll_to_diff_file()
-
-    def action_prev_diff_file(self) -> None:
-        """Jump to the previous file boundary in a multi-file diff."""
-        if not self._diff_file_offsets:
-            return
-        if self._diff_file_index > 0:
-            self._diff_file_index -= 1
-        self._scroll_to_diff_file()
-
-    def _scroll_to_diff_file(self) -> None:
-        """Scroll to the current file boundary offset."""
-        if not self._diff_file_offsets:
-            return
-        line = self._diff_file_offsets[self._diff_file_index]
-        # +2 to account for the header lines in load_commit_diff
-        self.scroll_to(y=line + 2, animate=False)
