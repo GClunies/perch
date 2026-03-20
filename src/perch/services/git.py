@@ -167,10 +167,13 @@ _LOG_SEP = "\x1f"  # unit separator — unlikely in commit data
 _LOG_FORMAT = f"%h{_LOG_SEP}%s{_LOG_SEP}%an{_LOG_SEP}%cr"
 
 
-def get_log(root: Path, n: int = 15) -> list[Commit]:
+def get_log(root: Path, n: int = 15, skip: int = 0) -> list[Commit]:
     """Return the last *n* commits for the repo at *root*."""
+    args = ["log", f"--format={_LOG_FORMAT}", f"-{n}"]
+    if skip > 0:
+        args.append(f"--skip={skip}")
     result = _run_git(
-        ["log", f"--format={_LOG_FORMAT}", f"-{n}"],
+        args,
         cwd=root,
     )
     if result.returncode != 0:

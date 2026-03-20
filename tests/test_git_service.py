@@ -334,6 +334,25 @@ class TestGetLog:
         assert result == []
 
 
+class TestGetLogPagination:
+    def test_skip_parameter(self, git_worktree: Path) -> None:
+        from perch.services.git import get_log
+        for i in range(3):
+            (git_worktree / f"file{i}.txt").write_text(f"content {i}")
+            subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+            subprocess.run(["git", "commit", "-m", f"commit {i}"], cwd=git_worktree, check=True)
+        all_commits = get_log(git_worktree, n=10)
+        skipped = get_log(git_worktree, n=10, skip=1)
+        assert len(all_commits) == 4  # 3 new + 1 initial
+        assert len(skipped) == 3
+        assert skipped[0].hash == all_commits[1].hash
+
+    def test_skip_past_end(self, git_worktree: Path) -> None:
+        from perch.services.git import get_log
+        result = get_log(git_worktree, n=10, skip=999)
+        assert result == []
+
+
 class TestCommitFileModel:
     def test_basic_fields(self) -> None:
         cf = CommitFile(path="src/app.py", status="modified", old_path=None)
