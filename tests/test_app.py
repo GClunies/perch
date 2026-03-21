@@ -856,7 +856,6 @@ class TestCommitTreeAppEvents:
     async def test_commit_toggled_expands(self, git_worktree: Path) -> None:
         """CommitToggled message should expand the commit."""
         (git_worktree / "hello.py").write_text("changed\n")
-        import subprocess
 
         subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
         subprocess.run(
@@ -956,7 +955,7 @@ class TestShowCurrentGitItem:
                     n for n in panel._commit_tree.root.children
                     if n.data and n.data.startswith("commit:")
                 )
-                file_child = commit_node.add_leaf(
+                commit_node.add_leaf(
                     "file.py", data="commit-file:aaa111:file.py"
                 )
                 commit_node.expand()
@@ -1217,7 +1216,7 @@ class TestFocusActiveTabCachedPath:
             # Switch back to files tab
             with (
                 patch.object(viewer, "load_file") as mock_load,
-                patch.object(pilot.app, "_sync_tree_to_path") as mock_sync,
+                patch.object(pilot.app, "_sync_tree_to_path"),
             ):
                 pilot.app.action_prev_tab()  # git -> files
                 await pilot.pause()
@@ -1227,7 +1226,7 @@ class TestFocusActiveTabCachedPath:
         """Switching back to files tab should restore a cached folder path."""
         app = PerchApp(worktree)
         async with app.run_test(size=(120, 40)) as pilot:
-            viewer = pilot.app.query_one(Viewer)
+            pilot.app.query_one(Viewer)
             # Set a cached folder path
             pilot.app._files_tab_last_path = worktree / "sub"
             pilot.app.action_next_tab()
@@ -1277,7 +1276,7 @@ class TestLoadCommitSummary:
         app = PerchApp(git_worktree)
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
-            viewer = pilot.app.query_one(Viewer)
+            pilot.app.query_one(Viewer)
             with patch(
                 "perch.services.git.get_commit_summary",
                 return_value=summary,

@@ -4,7 +4,6 @@ import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from textual.widgets import Label, ListItem, ListView
 
 from perch.models import Commit, CommitFile, GitFile, GitStatusData

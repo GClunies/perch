@@ -61,7 +61,6 @@ class TestResizeLeftPane:
         async with PerchApp(worktree).run_test() as pilot:
             splitter = pilot.app.query_one(DraggableSplitter)
             left_pane = pilot.app.query_one("#left-pane")
-            original = left_pane.outer_size.width
             splitter.resize_left_pane(5)
             await pilot.pause()
             # Width should have changed (or clamped)
