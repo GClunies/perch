@@ -523,8 +523,6 @@ class TestViewerToggleDiff:
                 assert viewer._diff_layout == "unified"
 
 
-
-
 # ---------------------------------------------------------------------------
 # Viewer._show_content_view / _show_side_by_side_view — lines 244-269
 # ---------------------------------------------------------------------------
@@ -732,7 +730,6 @@ class TestCheckActions:
             assert viewer.check_action("toggle_markdown_preview", ()) is True
             viewer._diff_mode = True
             assert viewer.check_action("toggle_markdown_preview", ()) is False
-
 
 
 class TestMarkdownPreview:
@@ -1064,8 +1061,6 @@ class TestShowEmptyDirectory:
             assert "No files in this directory" in text.plain
 
 
-
-
 # ---------------------------------------------------------------------------
 # Viewer._path_label — fallback when path not relative to worktree (lines 463-465)
 # ---------------------------------------------------------------------------
@@ -1256,7 +1251,9 @@ class TestCommitFileDiffEdgeCases:
 # Coverage: _load_diff with commit-file context (lines 832-835)
 # ---------------------------------------------------------------------------
 class TestLoadDiffCommitFileContext:
-    async def test_load_diff_delegates_to_commit_file_diff(self, worktree: Path) -> None:
+    async def test_load_diff_delegates_to_commit_file_diff(
+        self, worktree: Path
+    ) -> None:
         """_load_diff with _commit_file_context delegates to load_commit_file_diff."""
         app = PerchApp(worktree)
         async with app.run_test():
@@ -1275,7 +1272,9 @@ class TestLoadDiffCommitFileContext:
 # Coverage: refresh_content with commit-file context (lines 816-817)
 # ---------------------------------------------------------------------------
 class TestRefreshContentCommitFile:
-    async def test_refresh_content_with_commit_file_context(self, worktree: Path) -> None:
+    async def test_refresh_content_with_commit_file_context(
+        self, worktree: Path
+    ) -> None:
         """refresh_content re-loads commit file diff when context is set."""
         app = PerchApp(worktree)
         async with app.run_test():
@@ -1400,6 +1399,7 @@ class TestCiLogGroupNewline:
             log = "Normal line\n##[group]Setup"
             viewer.show_ci_log(log)
             from textual.widgets import Static
+
             content = viewer.query_one("#file-content", Static)
             text = content._Static__content
             assert "Setup" in text.plain

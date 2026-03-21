@@ -258,9 +258,7 @@ class TestCommitTreeBehavior:
         """Expanding a commit node should add file children."""
         (git_worktree / "hello.py").write_text("modified\n")
         subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "modify"], cwd=git_worktree, check=True
-        )
+        subprocess.run(["git", "commit", "-m", "modify"], cwd=git_worktree, check=True)
 
         from perch.app import PerchApp
 
@@ -289,9 +287,7 @@ class TestCommitTreeBehavior:
         """Toggling an expanded commit should collapse it."""
         (git_worktree / "hello.py").write_text("modified\n")
         subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "modify"], cwd=git_worktree, check=True
-        )
+        subprocess.run(["git", "commit", "-m", "modify"], cwd=git_worktree, check=True)
 
         from perch.app import PerchApp
 
@@ -318,14 +314,10 @@ class TestCommitTreeBehavior:
         """Expanding one commit should collapse the previously expanded one."""
         (git_worktree / "f1.txt").write_text("1\n")
         subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "c1"], cwd=git_worktree, check=True
-        )
+        subprocess.run(["git", "commit", "-m", "c1"], cwd=git_worktree, check=True)
         (git_worktree / "f2.txt").write_text("2\n")
         subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-        subprocess.run(
-            ["git", "commit", "-m", "c2"], cwd=git_worktree, check=True
-        )
+        subprocess.run(["git", "commit", "-m", "c2"], cwd=git_worktree, check=True)
 
         from perch.app import PerchApp
 
@@ -845,17 +837,13 @@ class TestRefreshCommitsSectionExpanded:
                     CommitFile(path="file_a.py", status="modified"),
                     CommitFile(path="file_b.py", status="added"),
                 ]
-                panel._apply_commits_update(
-                    _SAMPLE_COMMITS, "aaa111", expanded_files
-                )
+                panel._apply_commits_update(_SAMPLE_COMMITS, "aaa111", expanded_files)
                 await pilot.pause()
 
                 # Find the expanded node
                 root = panel._commit_tree.root
                 expanded_node = next(
-                    n
-                    for n in root.children
-                    if n.data == "commit:aaa111"
+                    n for n in root.children if n.data == "commit:aaa111"
                 )
                 child_data = [c.data for c in expanded_node.children]
                 assert len(child_data) == 2
@@ -881,9 +869,7 @@ class TestRefreshCommitsSectionExpanded:
                 await pilot.pause()
 
                 root = panel._commit_tree.root
-                sentinel = any(
-                    n.data == "load-more-commits" for n in root.children
-                )
+                sentinel = any(n.data == "load-more-commits" for n in root.children)
                 assert sentinel, "Sentinel should appear when commits == page_size"
 
 
@@ -1050,8 +1036,8 @@ class TestCheckRefsPacked:
 
             refresh_called = []
             original = panel._refresh_commits_section
-            panel._refresh_commits_section = (
-                lambda: refresh_called.append(True) or original()
+            panel._refresh_commits_section = lambda: (
+                refresh_called.append(True) or original()
             )
 
             panel._check_refs()
@@ -1146,9 +1132,7 @@ class TestUpdateDisplaySentinel:
                 await pilot.pause()
 
                 root = panel._commit_tree.root
-                sentinel = any(
-                    n.data == "load-more-commits" for n in root.children
-                )
+                sentinel = any(n.data == "load-more-commits" for n in root.children)
                 assert sentinel
 
 
@@ -1186,7 +1170,9 @@ class TestNavigationActions:
                 await pilot.pause()
                 assert panel._commit_tree.has_focus
 
-    async def test_cursor_down_in_middle_stays_in_file_list(self, tmp_path: Path) -> None:
+    async def test_cursor_down_in_middle_stays_in_file_list(
+        self, tmp_path: Path
+    ) -> None:
         """In the middle of the file list, j should just move down."""
         from perch.app import PerchApp
 
@@ -1467,7 +1453,8 @@ class TestTreeEventHandling:
 
                 # Find a commit node
                 commit_node = next(
-                    n for n in panel._commit_tree.root.children
+                    n
+                    for n in panel._commit_tree.root.children
                     if n.data and n.data.startswith("commit:")
                 )
                 mock_post = MagicMock()
@@ -1481,7 +1468,9 @@ class TestTreeEventHandling:
                 assert isinstance(msg, GitPanel.CommitHighlighted)
                 assert msg.commit_hash == "aaa111"
 
-    async def test_commit_file_node_highlighted_posts_message(self, tmp_path: Path) -> None:
+    async def test_commit_file_node_highlighted_posts_message(
+        self, tmp_path: Path
+    ) -> None:
         """Highlighting a commit-file node should post CommitFileHighlighted."""
         from perch.app import PerchApp
 
@@ -1498,7 +1487,8 @@ class TestTreeEventHandling:
 
                 # Add a commit-file child to a commit node
                 commit_node = next(
-                    n for n in panel._commit_tree.root.children
+                    n
+                    for n in panel._commit_tree.root.children
                     if n.data and n.data.startswith("commit:")
                 )
                 file_child = commit_node.add_leaf(
@@ -1516,7 +1506,9 @@ class TestTreeEventHandling:
                 assert msg.commit_hash == "aaa111"
                 assert msg.path == "file.py"
 
-    async def test_load_more_sentinel_highlighted_triggers_load(self, tmp_path: Path) -> None:
+    async def test_load_more_sentinel_highlighted_triggers_load(
+        self, tmp_path: Path
+    ) -> None:
         """Highlighting the sentinel node should trigger _load_more_commits."""
         from perch.app import PerchApp
 
@@ -1533,7 +1525,8 @@ class TestTreeEventHandling:
                 await pilot.pause()
 
                 sentinel = next(
-                    n for n in panel._commit_tree.root.children
+                    n
+                    for n in panel._commit_tree.root.children
                     if n.data == "load-more-commits"
                 )
                 fake_event = MagicMock()
@@ -1558,7 +1551,8 @@ class TestTreeEventHandling:
                 await pilot.pause()
 
                 commit_node = next(
-                    n for n in panel._commit_tree.root.children
+                    n
+                    for n in panel._commit_tree.root.children
                     if n.data and n.data.startswith("commit:")
                 )
                 mock_post = MagicMock()
@@ -1669,14 +1663,17 @@ class TestUpdateFileSections:
 
                 # Update with different status
                 new_status = GitStatusData(
-                    unstaged=[GitFile(path="changed.py", status="modified", staged=False)],
+                    unstaged=[
+                        GitFile(path="changed.py", status="modified", staged=False)
+                    ],
                 )
                 panel._update_file_sections(new_status)
                 await pilot.pause()
 
                 # Check that the new file appears
                 names = [
-                    n.name for n in panel._file_list._nodes
+                    n.name
+                    for n in panel._file_list._nodes
                     if isinstance(n, ListItem) and n.name
                 ]
                 assert "changed.py" in names

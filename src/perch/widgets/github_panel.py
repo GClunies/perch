@@ -83,7 +83,9 @@ class GitHubPanel(ListView):
         ("o", "open_in_browser", "Open"),
         ("r", "refresh", "Refresh"),
         Binding("f", "app.toggle_focus_mode", "Focus"),
-        Binding("j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+        Binding(
+            "j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"
+        ),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("pageup", "page_up", "", show=False),
         Binding("pagedown", "page_down", "", show=False),

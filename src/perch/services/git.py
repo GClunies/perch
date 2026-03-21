@@ -256,6 +256,10 @@ def get_commit_summary(root: Path, commit_hash: str) -> CommitSummary:
     )
     stats = stat_result.stdout.strip() if stat_result.returncode == 0 else ""
     return CommitSummary(
-        hash=parts[0], subject=parts[1], author=parts[2],
-        date=parts[3], body=body, stats=stats,
+        hash=parts[0],
+        subject=parts[1],
+        author=parts[2],
+        date=parts[3],
+        body=body,
+        stats=stats,
     )

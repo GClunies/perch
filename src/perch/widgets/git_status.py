@@ -104,7 +104,9 @@ class GitPanel(Vertical):
     BINDINGS = [
         ("r", "refresh", "Refresh"),
         Binding("f", "app.toggle_focus_mode", "Focus"),
-        Binding("j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+        Binding(
+            "j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"
+        ),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("l", "select_cursor", "Select", show=False),
         Binding("pageup", "page_up", "Page Up", show=False),
@@ -136,7 +138,7 @@ class GitPanel(Vertical):
         yield self._commit_tree
 
     @property
-    def has_focus(self) -> bool:  # type: ignore[override]
+    def has_focus(self) -> bool:
         """Return True if either child widget has focus."""
         return self._file_list.has_focus or self._commit_tree.has_focus
 
@@ -364,9 +366,7 @@ class GitPanel(Vertical):
             self._commit_tree.root.add(label, data=f"commit:{c.hash}")
         if len(commits) == self._commit_page_size:
             sentinel_label = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
-            self._commit_tree.root.add_leaf(
-                sentinel_label, data="load-more-commits"
-            )
+            self._commit_tree.root.add_leaf(sentinel_label, data="load-more-commits")
         self._expanded_commit = None
 
     def _get_selected_name(self) -> str | None:
@@ -463,9 +463,7 @@ class GitPanel(Vertical):
                 node.expand()
         if len(commits) == self._commit_page_size:
             sentinel_label = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
-            self._commit_tree.root.add_leaf(
-                sentinel_label, data="load-more-commits"
-            )
+            self._commit_tree.root.add_leaf(sentinel_label, data="load-more-commits")
         if not expanded:
             self._expanded_commit = None
 
@@ -503,9 +501,7 @@ class GitPanel(Vertical):
             self._commit_tree.root.add(label, data=f"commit:{c.hash}")
         if len(commits) == self._commit_page_size:
             sentinel_label = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
-            self._commit_tree.root.add_leaf(
-                sentinel_label, data="load-more-commits"
-            )
+            self._commit_tree.root.add_leaf(sentinel_label, data="load-more-commits")
         self._loading_more = False
 
     # ------------------------------------------------------------------
@@ -548,9 +544,7 @@ class GitPanel(Vertical):
                 child_label = Text()
                 child_label.append(f"{f.status:<10}", style=style)
                 child_label.append(f" {f.path}")
-                target.add_leaf(
-                    child_label, data=f"commit-file:{commit_hash}:{f.path}"
-                )
+                target.add_leaf(child_label, data=f"commit-file:{commit_hash}:{f.path}")
             target.expand()
             self._expanded_commit = commit_hash
 
@@ -613,9 +607,7 @@ class GitPanel(Vertical):
             head_file = git_dir / "HEAD"
             packed_file = git_dir / "packed-refs"
             head_mtime = head_file.stat().st_mtime if head_file.exists() else None
-            packed_mtime = (
-                packed_file.stat().st_mtime if packed_file.exists() else None
-            )
+            packed_mtime = packed_file.stat().st_mtime if packed_file.exists() else None
             if (
                 head_mtime != self._last_head_mtime
                 or packed_mtime != self._last_packed_mtime

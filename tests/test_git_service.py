@@ -337,10 +337,13 @@ class TestGetLog:
 class TestGetLogPagination:
     def test_skip_parameter(self, git_worktree: Path) -> None:
         from perch.services.git import get_log
+
         for i in range(3):
             (git_worktree / f"file{i}.txt").write_text(f"content {i}")
             subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-            subprocess.run(["git", "commit", "-m", f"commit {i}"], cwd=git_worktree, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", f"commit {i}"], cwd=git_worktree, check=True
+            )
         all_commits = get_log(git_worktree, n=10)
         skipped = get_log(git_worktree, n=10, skip=1)
         assert len(all_commits) == 4  # 3 new + 1 initial
@@ -349,6 +352,7 @@ class TestGetLogPagination:
 
     def test_skip_past_end(self, git_worktree: Path) -> None:
         from perch.services.git import get_log
+
         result = get_log(git_worktree, n=10, skip=999)
         assert result == []
 
@@ -356,10 +360,19 @@ class TestGetLogPagination:
 class TestGetCommitFiles:
     def test_returns_modified_files(self, git_worktree: Path) -> None:
         from perch.services.git import get_commit_files
+
         (git_worktree / "hello.py").write_text("modified content\n")
         subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-        subprocess.run(["git", "commit", "-m", "modify hello"], cwd=git_worktree, check=True)
-        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        subprocess.run(
+            ["git", "commit", "-m", "modify hello"], cwd=git_worktree, check=True
+        )
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
         files = get_commit_files(git_worktree, head)
         assert len(files) == 1
         assert files[0].path == "hello.py"
@@ -368,18 +381,34 @@ class TestGetCommitFiles:
 
     def test_added_file(self, git_worktree: Path) -> None:
         from perch.services.git import get_commit_files
+
         (git_worktree / "new.py").write_text("new file\n")
         subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
         subprocess.run(["git", "commit", "-m", "add new"], cwd=git_worktree, check=True)
-        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
         files = get_commit_files(git_worktree, head)
         assert any(f.path == "new.py" and f.status == "added" for f in files)
 
     def test_deleted_file(self, git_worktree: Path) -> None:
         from perch.services.git import get_commit_files
+
         subprocess.run(["git", "rm", "hello.py"], cwd=git_worktree, check=True)
-        subprocess.run(["git", "commit", "-m", "delete hello"], cwd=git_worktree, check=True)
-        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        subprocess.run(
+            ["git", "commit", "-m", "delete hello"], cwd=git_worktree, check=True
+        )
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
         files = get_commit_files(git_worktree, head)
         assert any(f.path == "hello.py" and f.status == "deleted" for f in files)
 
@@ -387,20 +416,38 @@ class TestGetCommitFiles:
 class TestGetCommitFileDiff:
     def test_returns_diff_for_file(self, git_worktree: Path) -> None:
         from perch.services.git import get_commit_file_diff
+
         (git_worktree / "hello.py").write_text("modified\n")
         subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-        subprocess.run(["git", "commit", "-m", "modify hello"], cwd=git_worktree, check=True)
-        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        subprocess.run(
+            ["git", "commit", "-m", "modify hello"], cwd=git_worktree, check=True
+        )
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
         diff = get_commit_file_diff(git_worktree, head, "hello.py")
         assert "diff --git" in diff
         assert "hello.py" in diff
 
     def test_no_commit_metadata_in_output(self, git_worktree: Path) -> None:
         from perch.services.git import get_commit_file_diff
+
         (git_worktree / "hello.py").write_text("changed\n")
         subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-        subprocess.run(["git", "commit", "-m", "test commit message"], cwd=git_worktree, check=True)
-        head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        subprocess.run(
+            ["git", "commit", "-m", "test commit message"], cwd=git_worktree, check=True
+        )
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
         diff = get_commit_file_diff(git_worktree, head, "hello.py")
         assert "test commit message" not in diff
 
@@ -408,7 +455,14 @@ class TestGetCommitFileDiff:
 class TestGetCommitSummary:
     def test_returns_summary(self, git_worktree: Path) -> None:
         from perch.services.git import get_commit_summary
-        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
         summary = get_commit_summary(git_worktree, head)
         assert summary.hash == head
         assert summary.author == "test"
@@ -417,19 +471,39 @@ class TestGetCommitSummary:
 
     def test_stats_contain_file_info(self, git_worktree: Path) -> None:
         from perch.services.git import get_commit_summary
+
         (git_worktree / "stats_test.py").write_text("content\n")
         subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-        subprocess.run(["git", "commit", "-m", "add stats_test"], cwd=git_worktree, check=True)
-        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        subprocess.run(
+            ["git", "commit", "-m", "add stats_test"], cwd=git_worktree, check=True
+        )
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
         summary = get_commit_summary(git_worktree, head)
         assert "stats_test.py" in summary.stats
 
     def test_body_with_unit_separator(self, git_worktree: Path) -> None:
         from perch.services.git import get_commit_summary
+
         (git_worktree / "sep.txt").write_text("x\n")
         subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-        subprocess.run(["git", "commit", "-m", "subject\n\nbody with \x1f separator"], cwd=git_worktree, check=True)
-        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=git_worktree, capture_output=True, text=True, check=True).stdout.strip()
+        subprocess.run(
+            ["git", "commit", "-m", "subject\n\nbody with \x1f separator"],
+            cwd=git_worktree,
+            check=True,
+        )
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
         summary = get_commit_summary(git_worktree, head)
         assert "\x1f" in summary.body
 

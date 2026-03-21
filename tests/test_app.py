@@ -952,12 +952,11 @@ class TestShowCurrentGitItem:
 
                 # Add a commit-file child and focus tree on it
                 commit_node = next(
-                    n for n in panel._commit_tree.root.children
+                    n
+                    for n in panel._commit_tree.root.children
                     if n.data and n.data.startswith("commit:")
                 )
-                commit_node.add_leaf(
-                    "file.py", data="commit-file:aaa111:file.py"
-                )
+                commit_node.add_leaf("file.py", data="commit-file:aaa111:file.py")
                 commit_node.expand()
                 panel._commit_tree.focus()
                 await pilot.pause()

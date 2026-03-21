@@ -380,7 +380,9 @@ class Viewer(VerticalScroll):
         Binding("m", "toggle_markdown_preview", "Markdown"),
         Binding("e", "app.open_editor", "Editor"),
         Binding("f", "app.toggle_focus_mode", "Focus"),
-        Binding("j", "scroll_down", "Scroll", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+        Binding(
+            "j", "scroll_down", "Scroll", key_display="hjkl/\u2190\u2193\u2191\u2192"
+        ),
         Binding("k", "scroll_up", "Up", show=False),
         Binding("h", "scroll_left", "Left", show=False),
         Binding("l", "scroll_right", "Right", show=False),
@@ -429,7 +431,9 @@ class Viewer(VerticalScroll):
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         if action == "toggle_diff":
-            return self._current_path is not None or self._commit_file_context is not None
+            return (
+                self._current_path is not None or self._commit_file_context is not None
+            )
         if action == "toggle_diff_layout":
             return self._diff_mode
         if action == "toggle_markdown_preview":
@@ -875,7 +879,7 @@ class Viewer(VerticalScroll):
         elif self._commit_file_context is not None:
             if self._current_summary is not None:
                 self.show_commit_summary(self._current_summary)
-        else:
+        elif self._current_path is not None:
             self.load_file(self._current_path)
         self._refresh_footer()
 
@@ -896,4 +900,3 @@ class Viewer(VerticalScroll):
             "side-by-side" if self._diff_layout == "unified" else "unified"
         )
         self._load_diff()
-

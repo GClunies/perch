@@ -164,13 +164,17 @@ class PerchApp(App):
         else:
             viewer.show_deleted_file_diff(file_path, event.path, staged=event.staged)
 
-    def on_git_panel_commit_highlighted(self, event: GitPanel.CommitHighlighted) -> None:
+    def on_git_panel_commit_highlighted(
+        self, event: GitPanel.CommitHighlighted
+    ) -> None:
         """Load commit summary when a commit is highlighted in the tree."""
         viewer = self.query_one(Viewer)
         viewer.worktree_root = self.worktree_path
         self._load_commit_summary(event.commit_hash)
 
-    def on_git_panel_commit_file_highlighted(self, event: GitPanel.CommitFileHighlighted) -> None:
+    def on_git_panel_commit_file_highlighted(
+        self, event: GitPanel.CommitFileHighlighted
+    ) -> None:
         """Load file diff when a commit-file is highlighted in the tree."""
         viewer = self.query_one(Viewer)
         viewer.worktree_root = self.worktree_path

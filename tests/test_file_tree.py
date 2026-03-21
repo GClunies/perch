@@ -673,9 +673,7 @@ class TestRenderLabel:
 class TestRefreshBinding:
     async def test_r_keybinding_exists(self, tmp_path: Path) -> None:
         """FileTree should have an 'r' refresh binding."""
-        binding_keys = [
-            b.key if hasattr(b, "key") else b[0] for b in FileTree.BINDINGS
-        ]
+        binding_keys = [b.key if hasattr(b, "key") else b[0] for b in FileTree.BINDINGS]
         assert "r" in binding_keys
 
     async def test_refresh_action_does_not_crash(self, tmp_path: Path) -> None:

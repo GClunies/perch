@@ -45,7 +45,9 @@ class FileTree(DirectoryTree):
         Binding("left", "collapse_node", "Collapse", show=False),
         Binding("l", "expand_node", "Expand", show=False),
         Binding("h", "collapse_node", "Collapse", show=False),
-        Binding("j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+        Binding(
+            "j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"
+        ),
         Binding("k", "cursor_up", "Up", show=False),
         Binding("pageup", "page_up", "Page Up", show=False),
         Binding("pagedown", "page_down", "Page Down", show=False),
