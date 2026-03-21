@@ -34,8 +34,6 @@ class PerchApp(App):
         Binding("d", "toggle_diff", "Toggle Diff", show=False),
         Binding("s", "toggle_diff_layout", "Diff Layout", show=False),
         Binding("m", "toggle_markdown_preview", "Markdown Preview", show=False),
-        Binding("n", "next_diff_file", "Next File", show=False),
-        Binding("p", "prev_diff_file", "Prev File", show=False),
         Binding("o", "open_editor", "Open", show=False),
         Binding("minus", "shrink_pane", "Shrink", show=False, key_display="-"),
         Binding("equals_sign", "grow_pane", "Grow", show=False, key_display="="),
@@ -166,6 +164,23 @@ class PerchApp(App):
         else:
             viewer.show_deleted_file_diff(file_path, event.path, staged=event.staged)
 
+    def on_git_panel_commit_highlighted(self, event: GitPanel.CommitHighlighted) -> None:
+        """Load commit summary when a commit is highlighted in the tree."""
+        viewer = self.query_one(Viewer)
+        viewer.worktree_root = self.worktree_path
+        self._load_commit_summary(event.commit_hash)
+
+    def on_git_panel_commit_file_highlighted(self, event: GitPanel.CommitFileHighlighted) -> None:
+        """Load file diff when a commit-file is highlighted in the tree."""
+        viewer = self.query_one(Viewer)
+        viewer.worktree_root = self.worktree_path
+        viewer.load_commit_file_diff(event.commit_hash, event.path)
+
+    def on_git_panel_commit_toggled(self, event: GitPanel.CommitToggled) -> None:
+        """Expand or collapse a commit in the tree."""
+        panel = self.query_one(GitPanel)
+        panel.toggle_commit(event.commit_hash)
+
     def on_tree_node_highlighted(self, event) -> None:
         """Update the viewer when a tree node is highlighted (cursor moves)."""
         node = event.node
@@ -218,25 +233,15 @@ class PerchApp(App):
         self.call_from_thread(self.query_one(Viewer).show_commit_summary, summary)
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
-        """Handle selection (Enter/l) in the sidebar."""
+        """Focus the viewer when a file is selected."""
         try:
             if self.query_one(TabbedContent).active == "tab-git":
-                item = event.item
-                if isinstance(item, ListItem) and item.name:
-                    if item.name.startswith("commit:"):
-                        commit_hash = item.name.removeprefix("commit:")
-                        panel = self.query_one(GitPanel)
-                        panel.toggle_commit(commit_hash)
-                        return
-                    elif item.name.startswith("commit-file:"):
-                        self.query_one(Viewer).focus()
-                        return
                 self.query_one(Viewer).focus()
         except Exception:
             pass
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
-        """Preview the highlighted item in the viewer when navigating with j/k."""
+        """Preview files when navigating the git file list."""
         try:
             if self.query_one(TabbedContent).active != "tab-git":
                 return
@@ -246,24 +251,12 @@ class PerchApp(App):
         if not isinstance(item, ListItem) or item.name is None:
             return
         viewer = self.query_one(Viewer)
-        if item.name.startswith("commit:"):
-            commit_hash = item.name.removeprefix("commit:")
-            viewer.worktree_root = self.worktree_path
-            self._load_commit_summary(commit_hash)
-        elif item.name.startswith("commit-file:"):
-            parts = item.name.removeprefix("commit-file:").split(":", 1)
-            if len(parts) == 2:
-                viewer.worktree_root = self.worktree_path
-                viewer.load_commit_file_diff(parts[0], parts[1])
-        elif item.name == "load-more-commits":
-            self.query_one(GitPanel)._load_more_commits()
+        file_path = self.worktree_path / item.name
+        staged = getattr(item, "_staged", False)
+        if file_path.is_file():
+            viewer.load_file(file_path)
         else:
-            file_path = self.worktree_path / item.name
-            staged = getattr(item, "_staged", False)
-            if file_path.is_file():
-                viewer.load_file(file_path)
-            else:
-                viewer.show_deleted_file_diff(file_path, item.name, staged=staged)
+            viewer.show_deleted_file_diff(file_path, item.name, staged=staged)
 
     def on_git_panel_selection_restored(
         self, event: GitPanel.SelectionRestored
@@ -334,12 +327,7 @@ class PerchApp(App):
                 self._show_current_tree_node(tree, viewer)
         elif active == "tab-git":
             panel = self.query_one(GitPanel)
-            panel.focus()
-            # Reset and re-select so the highlight CSS is applied even
-            # when items were selected while the panel was hidden.
-            saved = panel._get_selected_name()
-            panel.index = None
-            panel._restore_selection(saved)
+            panel._file_list.focus()
             self._show_current_git_item(panel, viewer)
         elif active == "tab-github":
             github = self.query_one(GitHubPanel)
@@ -371,26 +359,25 @@ class PerchApp(App):
 
     def _show_current_git_item(self, panel: GitPanel, viewer: Viewer) -> None:
         """Load the git panel's currently highlighted item into the viewer."""
-        item = panel.highlighted_child
-        if not isinstance(item, ListItem) or item.name is None:
+        name = panel.highlighted_item_name()
+        if name is None:
             viewer.show_clean_tree()
-            return
-        if item.name.startswith("commit:"):
-            commit_hash = item.name.removeprefix("commit:")
+        elif name.startswith("commit:"):
+            commit_hash = name.removeprefix("commit:")
             viewer.worktree_root = self.worktree_path
             self._load_commit_summary(commit_hash)
-        elif item.name.startswith("commit-file:"):
-            parts = item.name.removeprefix("commit-file:").split(":", 1)
+        elif name.startswith("commit-file:"):
+            parts = name.removeprefix("commit-file:").split(":", 1)
             if len(parts) == 2:
                 viewer.worktree_root = self.worktree_path
                 viewer.load_commit_file_diff(parts[0], parts[1])
         else:
-            file_path = self.worktree_path / item.name
-            staged = getattr(item, "_staged", False)
+            file_path = self.worktree_path / name
+            staged = False
             if file_path.is_file():
                 viewer.load_file(file_path)
             else:
-                viewer.show_deleted_file_diff(file_path, item.name, staged=staged)
+                viewer.show_deleted_file_diff(file_path, name, staged=staged)
 
     def _show_current_github_item(self, github: GitHubPanel, viewer: Viewer) -> None:
         """Load the GitHub panel's currently highlighted item into the viewer."""
@@ -443,14 +430,6 @@ class PerchApp(App):
     def action_toggle_diff_layout(self) -> None:
         """Toggle diff layout in the viewer (command palette entry)."""
         self.query_one(Viewer).action_toggle_diff_layout()
-
-    def action_next_diff_file(self) -> None:
-        """Jump to the next file in a multi-file diff."""
-        self.query_one(Viewer).action_next_diff_file()
-
-    def action_prev_diff_file(self) -> None:
-        """Jump to the previous file in a multi-file diff."""
-        self.query_one(Viewer).action_prev_diff_file()
 
     # ------------------------------------------------------------------
     # Focus mode & pane resizing

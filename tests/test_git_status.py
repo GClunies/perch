@@ -1151,3 +1151,562 @@ class TestUpdateDisplaySentinel:
                     n.data == "load-more-commits" for n in root.children
                 )
                 assert sentinel
+
+
+# ---------------------------------------------------------------------------
+# Navigation: j/k/pageup/pagedown cross-widget boundary handling
+# ---------------------------------------------------------------------------
+
+
+class TestNavigationActions:
+    """Tests for action_cursor_down/up/select/page_up/page_down."""
+
+    async def test_cursor_down_transfers_focus_to_tree(self, tmp_path: Path) -> None:
+        """At the bottom of the file list, j should transfer focus to the tree."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Focus file list and move to the last item
+                panel._file_list.focus()
+                await pilot.pause()
+                panel._file_list.index = len(panel._file_list) - 1
+                await pilot.pause()
+
+                # action_cursor_down should transfer focus to commit tree
+                panel.action_cursor_down()
+                await pilot.pause()
+                assert panel._commit_tree.has_focus
+
+    async def test_cursor_down_in_middle_stays_in_file_list(self, tmp_path: Path) -> None:
+        """In the middle of the file list, j should just move down."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._file_list.focus()
+                await pilot.pause()
+                # Set index to first enabled item (not at boundary)
+                panel._file_list.index = 1
+                await pilot.pause()
+
+                panel.action_cursor_down()
+                await pilot.pause()
+                assert panel._file_list.has_focus
+
+    async def test_cursor_down_in_tree(self, tmp_path: Path) -> None:
+        """When commit tree has focus, j should move down within the tree."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._commit_tree.focus()
+                await pilot.pause()
+                panel.action_cursor_down()
+                await pilot.pause()
+                assert panel._commit_tree.has_focus
+
+    async def test_cursor_up_transfers_focus_to_file_list(self, tmp_path: Path) -> None:
+        """At the top of the tree, k should transfer focus to the file list."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Focus tree and set cursor to line 0 (top)
+                panel._commit_tree.focus()
+                await pilot.pause()
+                panel._commit_tree.cursor_line = 0
+                await pilot.pause()
+
+                panel.action_cursor_up()
+                await pilot.pause()
+                assert panel._file_list.has_focus
+
+    async def test_cursor_up_in_tree_not_at_top(self, tmp_path: Path) -> None:
+        """When not at the top of the tree, k should move up within the tree."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._commit_tree.focus()
+                await pilot.pause()
+                # Move to line 1 so we're not at top
+                panel._commit_tree.cursor_line = 1
+                await pilot.pause()
+
+                panel.action_cursor_up()
+                await pilot.pause()
+                assert panel._commit_tree.has_focus
+
+    async def test_cursor_up_in_file_list(self, tmp_path: Path) -> None:
+        """When file list has focus, k should move up within the file list."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._file_list.focus()
+                await pilot.pause()
+                panel._file_list.index = 3
+                await pilot.pause()
+
+                panel.action_cursor_up()
+                await pilot.pause()
+                assert panel._file_list.has_focus
+
+    async def test_select_cursor_on_tree(self, tmp_path: Path) -> None:
+        """action_select_cursor should delegate to commit tree when it has focus."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._commit_tree.focus()
+                await pilot.pause()
+                with patch.object(panel._commit_tree, "action_select_cursor") as mock:
+                    panel.action_select_cursor()
+                    mock.assert_called_once()
+
+    async def test_select_cursor_on_file_list(self, tmp_path: Path) -> None:
+        """action_select_cursor should delegate to file list when it has focus."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._file_list.focus()
+                await pilot.pause()
+                with patch.object(panel._file_list, "action_select_cursor") as mock:
+                    panel.action_select_cursor()
+                    mock.assert_called_once()
+
+    async def test_page_up_on_tree(self, tmp_path: Path) -> None:
+        """action_page_up should delegate to tree when it has focus."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._commit_tree.focus()
+                await pilot.pause()
+                with patch.object(panel._commit_tree, "action_page_up") as mock:
+                    panel.action_page_up()
+                    mock.assert_called_once()
+
+    async def test_page_up_on_file_list(self, tmp_path: Path) -> None:
+        """action_page_up should adjust file list index when it has focus."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._file_list.focus()
+                await pilot.pause()
+                # Set index to something > 0 so page up can move it
+                panel._file_list.index = 5
+                await pilot.pause()
+
+                panel.action_page_up()
+                await pilot.pause()
+                # Index should have decreased or stayed at 0
+                assert panel._file_list.index is not None
+                assert panel._file_list.index <= 5
+
+    async def test_page_down_on_tree(self, tmp_path: Path) -> None:
+        """action_page_down should delegate to tree when it has focus."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._commit_tree.focus()
+                await pilot.pause()
+                with patch.object(panel._commit_tree, "action_page_down") as mock:
+                    panel.action_page_down()
+                    mock.assert_called_once()
+
+    async def test_page_down_on_file_list(self, tmp_path: Path) -> None:
+        """action_page_down should adjust file list index when it has focus."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._file_list.focus()
+                await pilot.pause()
+                panel._file_list.index = 0
+                await pilot.pause()
+
+                panel.action_page_down()
+                await pilot.pause()
+                assert panel._file_list.index is not None
+
+
+# ---------------------------------------------------------------------------
+# Tree event handling: on_tree_node_highlighted / on_tree_node_selected
+# ---------------------------------------------------------------------------
+
+
+class TestTreeEventHandling:
+    """Tests for tree node highlighted/selected dispatching messages."""
+
+    async def test_commit_node_highlighted_posts_message(self, tmp_path: Path) -> None:
+        """Highlighting a commit node should post CommitHighlighted."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Find a commit node
+                commit_node = next(
+                    n for n in panel._commit_tree.root.children
+                    if n.data and n.data.startswith("commit:")
+                )
+                mock_post = MagicMock()
+                # Create a fake event with the right .node attribute
+                fake_event = MagicMock()
+                fake_event.node = commit_node
+                with patch.object(panel, "post_message", mock_post):
+                    panel.on_tree_node_highlighted(fake_event)
+                assert mock_post.call_count == 1
+                msg = mock_post.call_args[0][0]
+                assert isinstance(msg, GitPanel.CommitHighlighted)
+                assert msg.commit_hash == "aaa111"
+
+    async def test_commit_file_node_highlighted_posts_message(self, tmp_path: Path) -> None:
+        """Highlighting a commit-file node should post CommitFileHighlighted."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Add a commit-file child to a commit node
+                commit_node = next(
+                    n for n in panel._commit_tree.root.children
+                    if n.data and n.data.startswith("commit:")
+                )
+                file_child = commit_node.add_leaf(
+                    "file.py", data="commit-file:aaa111:file.py"
+                )
+
+                mock_post = MagicMock()
+                fake_event = MagicMock()
+                fake_event.node = file_child
+                with patch.object(panel, "post_message", mock_post):
+                    panel.on_tree_node_highlighted(fake_event)
+                assert mock_post.call_count == 1
+                msg = mock_post.call_args[0][0]
+                assert isinstance(msg, GitPanel.CommitFileHighlighted)
+                assert msg.commit_hash == "aaa111"
+                assert msg.path == "file.py"
+
+    async def test_load_more_sentinel_highlighted_triggers_load(self, tmp_path: Path) -> None:
+        """Highlighting the sentinel node should trigger _load_more_commits."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._commit_page_size = len(_SAMPLE_COMMITS)
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                sentinel = next(
+                    n for n in panel._commit_tree.root.children
+                    if n.data == "load-more-commits"
+                )
+                fake_event = MagicMock()
+                fake_event.node = sentinel
+                with patch.object(panel, "_load_more_commits") as mock:
+                    panel.on_tree_node_highlighted(fake_event)
+                    mock.assert_called_once()
+
+    async def test_commit_node_selected_posts_toggled(self, tmp_path: Path) -> None:
+        """Selecting a commit node should post CommitToggled."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                commit_node = next(
+                    n for n in panel._commit_tree.root.children
+                    if n.data and n.data.startswith("commit:")
+                )
+                mock_post = MagicMock()
+                fake_event = MagicMock()
+                fake_event.node = commit_node
+                with patch.object(panel, "post_message", mock_post):
+                    panel.on_tree_node_selected(fake_event)
+                assert mock_post.call_count == 1
+                msg = mock_post.call_args[0][0]
+                assert isinstance(msg, GitPanel.CommitToggled)
+                assert msg.commit_hash == "aaa111"
+
+    async def test_none_data_node_highlighted_is_noop(self, tmp_path: Path) -> None:
+        """Highlighting a node with None data should not post any message."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+
+                # Root node has data=None
+                root = panel._commit_tree.root
+                mock_post = MagicMock()
+                fake_event = MagicMock()
+                fake_event.node = root
+                with patch.object(panel, "post_message", mock_post):
+                    panel.on_tree_node_highlighted(fake_event)
+                mock_post.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# highlighted_item_name when commit tree has focus
+# ---------------------------------------------------------------------------
+
+
+class TestHighlightedItemNameFromTree:
+    """Test highlighted_item_name returns tree data when tree has focus."""
+
+    async def test_returns_commit_data(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                panel._commit_tree.focus()
+                await pilot.pause()
+                # Move cursor to the first visible line (first commit node)
+                panel._commit_tree.cursor_line = 0
+                await pilot.pause()
+                name = panel.highlighted_item_name()
+                assert name is not None
+                assert name.startswith("commit:")
+
+    async def test_returns_none_when_tree_empty(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, [])
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, [])
+                await pilot.pause()
+
+                panel._commit_tree.focus()
+                await pilot.pause()
+                name = panel.highlighted_item_name()
+                # With no children, cursor_node may be root with data=None
+                assert name is None
+
+
+# ---------------------------------------------------------------------------
+# _update_file_sections
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateFileSections:
+    """Tests for the file-only refresh path."""
+
+    async def test_update_file_sections_rebuilds_list(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Update with different status
+                new_status = GitStatusData(
+                    unstaged=[GitFile(path="changed.py", status="modified", staged=False)],
+                )
+                panel._update_file_sections(new_status)
+                await pilot.pause()
+
+                # Check that the new file appears
+                names = [
+                    n.name for n in panel._file_list._nodes
+                    if isinstance(n, ListItem) and n.name
+                ]
+                assert "changed.py" in names
+
+
+# ---------------------------------------------------------------------------
+# activate_current_selection with commit-prefixed names
+# ---------------------------------------------------------------------------
+
+
+class TestActivateCurrentSelectionCommitPrefix:
+    """Test that activate_current_selection returns False for commit items."""
+
+    async def test_commit_prefixed_returns_false(self, tmp_path: Path) -> None:
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services()
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                # Manually insert a commit-prefixed item
+                panel._file_list.clear()
+                item = ListItem(Label("commit item"), name="commit:abc123")
+                panel._file_list.append(item)
+                panel._file_list.index = 0
+                await pilot.pause()
+
+                result = panel.activate_current_selection()
+                assert result is False

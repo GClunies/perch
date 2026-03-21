@@ -1,5 +1,6 @@
 """Tests for PerchApp tabbed layout and tree-to-viewer wiring."""
 
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -706,9 +707,10 @@ class TestListViewSelectedFocusesViewer:
                 pilot.app.query_one(TabbedContent).active = "tab-git"
                 await pilot.pause()
 
-                # Build a fake Selected event
+                # Build a fake Selected event using the internal file list
+                panel = pilot.app.query_one(GitPanel)
                 item = ListItem(name="hello.py")
-                event = ListView.Selected(pilot.app.query_one(GitPanel), item, 0)
+                event = ListView.Selected(panel._file_list, item, 0)
                 pilot.app.on_list_view_selected(event)
                 await pilot.pause()
                 viewer = pilot.app.query_one(Viewer)
@@ -772,9 +774,10 @@ class TestOnListViewHighlighted:
                 await pilot.pause()
 
                 viewer = pilot.app.query_one(Viewer)
+                panel = pilot.app.query_one(GitPanel)
                 with patch.object(viewer, "show_deleted_file_diff") as mock:
                     item = ListItem(name="hello.py")
-                    event = ListView.Highlighted(pilot.app.query_one(GitPanel), item)
+                    event = ListView.Highlighted(panel._file_list, item)
                     pilot.app.on_list_view_highlighted(event)
                     mock.assert_called_once_with(
                         git_worktree / "hello.py", "hello.py", staged=False
@@ -783,7 +786,7 @@ class TestOnListViewHighlighted:
 
 class TestCommitExpandFromApp:
     async def test_select_commit_toggles_expand(self, git_worktree: Path) -> None:
-        """Pressing Enter on a commit item should expand it."""
+        """CommitToggled message should expand the commit in the tree."""
         app = PerchApp(git_worktree)
         async with app.run_test(size=(120, 40)) as pilot:
             # Wait for the background git refresh to complete
@@ -792,20 +795,494 @@ class TestCommitExpandFromApp:
 
             panel = pilot.app.query_one(GitPanel)
 
-            commit_idx = None
-            for i, node in enumerate(panel._nodes):
-                if isinstance(node, ListItem) and node.name and node.name.startswith("commit:"):
-                    commit_idx = i
+            # Find a commit node in the tree
+            root = panel._commit_tree.root
+            commit_node = None
+            for n in root.children:
+                if n.data and n.data.startswith("commit:"):
+                    commit_node = n
                     break
-            assert commit_idx is not None
+            assert commit_node is not None
 
-            # Switch to git tab so on_list_view_selected recognizes the context
+            commit_hash = commit_node.data.removeprefix("commit:")
+
+            # Switch to git tab
             pilot.app.query_one(TabbedContent).active = "tab-git"
             await pilot.pause()
-            panel.index = commit_idx
+
+            # Post CommitToggled message which the app handler forwards to toggle_commit
+            panel.post_message(GitPanel.CommitToggled(commit_hash))
             await pilot.pause()
 
-            panel.action_select_cursor()
+            assert panel._expanded_commit == commit_hash
+
+
+class TestCommitTreeAppEvents:
+    """Tests for the new commit tree message handlers in the app."""
+
+    async def test_commit_highlighted_loads_summary(self, git_worktree: Path) -> None:
+        """CommitHighlighted should trigger _load_commit_summary."""
+        app = PerchApp(git_worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            for _ in range(20):
+                await pilot.pause()
+
+            panel = pilot.app.query_one(GitPanel)
+            root = panel._commit_tree.root
+            commit_node = next(
+                n for n in root.children if n.data and n.data.startswith("commit:")
+            )
+            commit_hash = commit_node.data.removeprefix("commit:")
+
+            viewer = pilot.app.query_one(Viewer)
+            with patch.object(pilot.app, "_load_commit_summary") as mock:
+                event = GitPanel.CommitHighlighted(commit_hash)
+                pilot.app.on_git_panel_commit_highlighted(event)
+                mock.assert_called_once_with(commit_hash)
+            assert viewer.worktree_root == git_worktree
+
+    async def test_commit_file_highlighted_loads_diff(self, git_worktree: Path) -> None:
+        """CommitFileHighlighted should call load_commit_file_diff on viewer."""
+        app = PerchApp(git_worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            viewer = pilot.app.query_one(Viewer)
+            with patch.object(viewer, "load_commit_file_diff") as mock:
+                event = GitPanel.CommitFileHighlighted("abc123", "hello.py")
+                pilot.app.on_git_panel_commit_file_highlighted(event)
+                mock.assert_called_once_with("abc123", "hello.py")
+            assert viewer.worktree_root == git_worktree
+
+    async def test_commit_toggled_expands(self, git_worktree: Path) -> None:
+        """CommitToggled message should expand the commit."""
+        (git_worktree / "hello.py").write_text("changed\n")
+        import subprocess
+
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "change"],
+            cwd=git_worktree,
+            check=True,
+        )
+        app = PerchApp(git_worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            for _ in range(20):
+                await pilot.pause()
+            panel = pilot.app.query_one(GitPanel)
+            root = panel._commit_tree.root
+            commit_node = next(
+                n for n in root.children if n.data and n.data.startswith("commit:")
+            )
+            hash = commit_node.data.removeprefix("commit:")
+            panel.post_message(GitPanel.CommitToggled(hash))
+            await pilot.pause()
+            assert panel._expanded_commit == hash
+
+
+# ---------------------------------------------------------------------------
+# _show_current_git_item: commit, commit-file, deleted file paths
+# ---------------------------------------------------------------------------
+
+
+class TestShowCurrentGitItem:
+    """Tests for _show_current_git_item with different highlighted items."""
+
+    async def test_show_commit_item(self, worktree: Path) -> None:
+        """When tree has focus on a commit node, should load commit summary."""
+        from perch.models import Commit, CommitSummary, GitFile, GitStatusData
+
+        status = GitStatusData(
+            unstaged=[GitFile(path="hello.py", status="modified", staged=False)]
+        )
+        commits = [
+            Commit(hash="aaa111", message="first", author="A", relative_time="now"),
+        ]
+        summary = CommitSummary(
+            hash="aaa111", subject="first", body="", author="A", date="now", stats=""
+        )
+        with (
+            patch("perch.services.git.get_status", return_value=status),
+            patch("perch.services.git.get_log", return_value=commits),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                pilot.app.query_one(TabbedContent).active = "tab-git"
+                panel = pilot.app.query_one(GitPanel)
+                panel._update_display(status, commits)
+                await pilot.pause()
+
+                # Focus tree and select commit node
+                panel._commit_tree.focus()
+                panel._commit_tree.cursor_line = 0
+                await pilot.pause()
+
+                viewer = pilot.app.query_one(Viewer)
+                # Patch the underlying git service instead of the @work-wrapped method
+                with patch(
+                    "perch.services.git.get_commit_summary", return_value=summary
+                ) as mock:
+                    pilot.app._show_current_git_item(panel, viewer)
+                    for _ in range(10):
+                        await pilot.pause()
+                    mock.assert_called_once_with(worktree, "aaa111")
+
+    async def test_show_commit_file_item(self, worktree: Path) -> None:
+        """When tree has focus on a commit-file node, should load commit file diff."""
+        from perch.models import Commit, GitFile, GitStatusData
+
+        status = GitStatusData(
+            unstaged=[GitFile(path="hello.py", status="modified", staged=False)]
+        )
+        commits = [
+            Commit(hash="aaa111", message="first", author="A", relative_time="now"),
+        ]
+        with (
+            patch("perch.services.git.get_status", return_value=status),
+            patch("perch.services.git.get_log", return_value=commits),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                pilot.app.query_one(TabbedContent).active = "tab-git"
+                panel = pilot.app.query_one(GitPanel)
+                panel._update_display(status, commits)
+                await pilot.pause()
+
+                # Add a commit-file child and focus tree on it
+                commit_node = next(
+                    n for n in panel._commit_tree.root.children
+                    if n.data and n.data.startswith("commit:")
+                )
+                file_child = commit_node.add_leaf(
+                    "file.py", data="commit-file:aaa111:file.py"
+                )
+                commit_node.expand()
+                panel._commit_tree.focus()
+                await pilot.pause()
+                # Move cursor to the file child (line after commit)
+                panel._commit_tree.cursor_line = 1
+                await pilot.pause()
+
+                viewer = pilot.app.query_one(Viewer)
+                with patch.object(viewer, "load_commit_file_diff") as mock:
+                    pilot.app._show_current_git_item(panel, viewer)
+                    mock.assert_called_once_with("aaa111", "file.py")
+
+    async def test_show_deleted_file_item(self, worktree: Path) -> None:
+        """When highlighting a deleted file, should call show_deleted_file_diff."""
+        from perch.models import GitFile, GitStatusData
+
+        status = GitStatusData(
+            unstaged=[GitFile(path="gone.py", status="deleted", staged=False)]
+        )
+        with (
+            patch("perch.services.git.get_status", return_value=status),
+            patch("perch.services.git.get_log", return_value=[]),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                pilot.app.query_one(TabbedContent).active = "tab-git"
+                panel = pilot.app.query_one(GitPanel)
+                panel._update_display(status, [])
+                await pilot.pause()
+
+                panel._file_list.focus()
+                await pilot.pause()
+
+                viewer = pilot.app.query_one(Viewer)
+                with patch.object(viewer, "show_deleted_file_diff") as mock:
+                    pilot.app._show_current_git_item(panel, viewer)
+                    mock.assert_called_once_with(
+                        worktree / "gone.py", "gone.py", staged=False
+                    )
+
+
+# ---------------------------------------------------------------------------
+# _show_current_github_item
+# ---------------------------------------------------------------------------
+
+
+class TestShowCurrentGitHubItem:
+    """Tests for _show_current_github_item with different preview kinds."""
+
+    async def test_no_item_shows_placeholder(self, worktree: Path) -> None:
+        """When no item is highlighted, should show placeholder."""
+        with (
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                github = pilot.app.query_one(GitHubPanel)
+                viewer = pilot.app.query_one(Viewer)
+                with patch.object(viewer, "show_placeholder") as mock:
+                    pilot.app._show_current_github_item(github, viewer)
+                    mock.assert_called_once()
+
+    async def test_pr_body_item(self, worktree: Path) -> None:
+        """A pr_body item should call show_pr_body."""
+        from perch.widgets.github_panel import ClickableItem
+
+        with (
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                github = pilot.app.query_one(GitHubPanel)
+                viewer = pilot.app.query_one(Viewer)
+
+                # Clear and add a ClickableItem with pr_body kind
+                github.clear()
+                item = ClickableItem(
+                    preview_kind="pr_body",
+                    preview_title="#42",
+                    preview_body="PR body text",
+                )
+                github.append(item)
+                github.index = 0
+                await pilot.pause()
+
+                with patch.object(viewer, "show_pr_body") as mock:
+                    pilot.app._show_current_github_item(github, viewer)
+                    mock.assert_called_once_with("PR body text", title="#42")
+
+    async def test_review_item(self, worktree: Path) -> None:
+        """A review item should call show_review."""
+        from perch.widgets.github_panel import ClickableItem
+
+        with (
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                github = pilot.app.query_one(GitHubPanel)
+                viewer = pilot.app.query_one(Viewer)
+
+                github.clear()
+                item = ClickableItem(
+                    preview_kind="review",
+                    preview_title="reviewer",
+                    preview_body="review body",
+                )
+                github.append(item)
+                github.index = 0
+                await pilot.pause()
+
+                with patch.object(viewer, "show_review") as mock:
+                    pilot.app._show_current_github_item(github, viewer)
+                    mock.assert_called_once_with("review body", title="reviewer")
+
+    async def test_ci_check_item(self, worktree: Path) -> None:
+        """A ci_check item should call show_ci_loading and fetch_ci_log."""
+        from perch.widgets.github_panel import ClickableItem
+
+        with (
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                github = pilot.app.query_one(GitHubPanel)
+                viewer = pilot.app.query_one(Viewer)
+
+                github.clear()
+                item = ClickableItem(
+                    url="https://example.com/log",
+                    preview_kind="ci_check",
+                    preview_title="CI Run",
+                    preview_body="",
+                )
+                github.append(item)
+                github.index = 0
+                await pilot.pause()
+
+                with (
+                    patch.object(viewer, "show_ci_loading") as mock_loading,
+                    patch.object(viewer, "fetch_ci_log") as mock_fetch,
+                ):
+                    pilot.app._show_current_github_item(github, viewer)
+                    mock_loading.assert_called_once_with(title="CI Run")
+                    mock_fetch.assert_called_once_with("https://example.com/log")
+
+
+# ---------------------------------------------------------------------------
+# Pane resize actions
+# ---------------------------------------------------------------------------
+
+
+class TestPaneResize:
+    """Tests for action_shrink_pane and action_grow_pane."""
+
+    async def test_shrink_pane_from_viewer(self, worktree: Path) -> None:
+        """Shrinking from the viewer (left) should decrease left pane width."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            viewer.focus()
+            await pilot.pause()
+            splitter = pilot.app.query_one(DraggableSplitter)
+            with patch.object(splitter, "resize_left_pane") as mock:
+                pilot.app.action_shrink_pane()
+                mock.assert_called_once_with(-5)
+
+    async def test_shrink_pane_from_sidebar(self, worktree: Path) -> None:
+        """Shrinking from the sidebar (right) should increase left pane width."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            tree = pilot.app.query_one(FileTree)
+            tree.focus()
+            await pilot.pause()
+            splitter = pilot.app.query_one(DraggableSplitter)
+            with patch.object(splitter, "resize_left_pane") as mock:
+                pilot.app.action_shrink_pane()
+                mock.assert_called_once_with(5)
+
+    async def test_grow_pane_from_viewer(self, worktree: Path) -> None:
+        """Growing from the viewer (left) should increase left pane width."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            viewer.focus()
+            await pilot.pause()
+            splitter = pilot.app.query_one(DraggableSplitter)
+            with patch.object(splitter, "resize_left_pane") as mock:
+                pilot.app.action_grow_pane()
+                mock.assert_called_once_with(5)
+
+    async def test_grow_pane_from_sidebar(self, worktree: Path) -> None:
+        """Growing from the sidebar (right) should decrease left pane width."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            tree = pilot.app.query_one(FileTree)
+            tree.focus()
+            await pilot.pause()
+            splitter = pilot.app.query_one(DraggableSplitter)
+            with patch.object(splitter, "resize_left_pane") as mock:
+                pilot.app.action_grow_pane()
+                mock.assert_called_once_with(-5)
+
+    async def test_shrink_pane_noop_in_focus_mode(self, worktree: Path) -> None:
+        """Shrink should be a no-op in focus mode."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            pilot.app.action_toggle_focus_mode()
+            await pilot.pause()
+            splitter = pilot.app.query_one(DraggableSplitter)
+            with patch.object(splitter, "resize_left_pane") as mock:
+                pilot.app.action_shrink_pane()
+                mock.assert_not_called()
+
+    async def test_grow_pane_noop_in_focus_mode(self, worktree: Path) -> None:
+        """Grow should be a no-op in focus mode."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            pilot.app.action_toggle_focus_mode()
+            await pilot.pause()
+            splitter = pilot.app.query_one(DraggableSplitter)
+            with patch.object(splitter, "resize_left_pane") as mock:
+                pilot.app.action_grow_pane()
+                mock.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# _focus_active_tab: cached path restoration
+# ---------------------------------------------------------------------------
+
+
+class TestFocusActiveTabCachedPath:
+    """Tests for _focus_active_tab restoring cached paths."""
+
+    async def test_files_tab_restores_cached_file(self, worktree: Path) -> None:
+        """Switching back to files tab should call load_file with the cached path."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            cached = worktree / "hello.py"
+
+            # Switch away to git tab first so the tree stops sending events
+            pilot.app.action_next_tab()
             await pilot.pause()
 
-            assert panel._expanded_commit is not None
+            # Now set the cached path (after the tree settled)
+            pilot.app._files_tab_last_path = cached
+            assert cached.exists() and cached.is_file()
+
+            # Switch back to files tab
+            with (
+                patch.object(viewer, "load_file") as mock_load,
+                patch.object(pilot.app, "_sync_tree_to_path") as mock_sync,
+            ):
+                pilot.app.action_prev_tab()  # git -> files
+                await pilot.pause()
+                mock_load.assert_called_once_with(cached)
+
+    async def test_files_tab_restores_cached_folder(self, worktree: Path) -> None:
+        """Switching back to files tab should restore a cached folder path."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            # Set a cached folder path
+            pilot.app._files_tab_last_path = worktree / "sub"
+            pilot.app.action_next_tab()
+            await pilot.pause()
+            pilot.app.action_prev_tab()
+            await pilot.pause()
+            # Should have called show_folder
+            # Just verify it didn't crash and the tree has focus
+            tree = pilot.app.query_one(FileTree)
+            assert tree.has_focus
+
+
+# ---------------------------------------------------------------------------
+# _load_commit_summary background worker
+# ---------------------------------------------------------------------------
+
+
+class TestLoadCommitSummary:
+    """Tests for _load_commit_summary background execution."""
+
+    async def test_load_commit_summary_runtime_error(self, git_worktree: Path) -> None:
+        """RuntimeError in _load_commit_summary should be swallowed."""
+        app = PerchApp(git_worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            with patch(
+                "perch.services.git.get_commit_summary",
+                side_effect=RuntimeError("bad"),
+            ):
+                pilot.app._load_commit_summary("bad_hash")
+                for _ in range(10):
+                    await pilot.pause()
+            # Should not crash
+
+    async def test_load_commit_summary_success(self, git_worktree: Path) -> None:
+        """Successful _load_commit_summary should call show_commit_summary."""
+        from perch.models import CommitSummary
+
+        summary = CommitSummary(
+            hash="abc123",
+            subject="test",
+            body="body",
+            author="A",
+            date="now",
+            stats="1 file",
+        )
+        app = PerchApp(git_worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            viewer = pilot.app.query_one(Viewer)
+            with patch(
+                "perch.services.git.get_commit_summary",
+                return_value=summary,
+            ):
+                pilot.app._load_commit_summary("abc123")
+                for _ in range(10):
+                    await pilot.pause()
+            # Viewer should have shown the summary (no crash is the main check)
