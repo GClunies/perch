@@ -12,6 +12,7 @@ from textual.widgets import DirectoryTree
 from textual.widgets._tree import Tree, TreeNode
 
 from perch._bindings import (
+    COPY_BINDING,
     FOCUS_BINDING,
     HELP_BINDING,
     PAGE_BINDINGS,
@@ -51,6 +52,7 @@ class FileTree(DirectoryTree):
         Binding("ctrl+p", "app.file_search", "Search"),
         REFRESH_BINDING,
         Binding("o", "app.open_editor", "Open"),
+        COPY_BINDING,
         *make_nav_bindings(),
         *TAB_BINDINGS,
         FOCUS_BINDING,

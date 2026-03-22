@@ -32,6 +32,8 @@ def make_nav_bindings(
 
 QUIT_BINDING = Binding("ctrl+q", "app.quit", "Quit", key_display="^q")
 
+COPY_BINDING = Binding("c", "app.copy", "Copy")
+
 HELP_BINDING = Binding("question_mark", "app.show_help", "Help", key_display="?")
 
 TAB_BINDINGS: tuple[Binding, ...] = (

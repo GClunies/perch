@@ -44,8 +44,8 @@ def test_stale_commands_removed():
 
 
 def test_commands_count():
-    """COMMANDS should have exactly 11 entries after adding Help."""
-    assert len(COMMANDS) == 11
+    """COMMANDS should have exactly 12 entries after adding Copy."""
+    assert len(COMMANDS) == 12
 
 
 def test_every_command_has_app_action_method():

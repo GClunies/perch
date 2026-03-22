@@ -39,6 +39,7 @@ class PerchApp(App):
         Binding("s", "toggle_diff_layout", "Diff Layout", show=False),
         Binding("m", "toggle_markdown_preview", "Markdown Preview", show=False),
         Binding("o", "open_editor", "Open", show=False),
+        Binding("c", "copy", "Copy", show=False),
         Binding("minus", "shrink_pane", "Shrink", show=False, key_display="-"),
         Binding("equals_sign", "grow_pane", "Grow", show=False, key_display="="),
         Binding("question_mark", "show_help", "Help", key_display="?", priority=True, show=False),
@@ -50,6 +51,7 @@ class PerchApp(App):
             Binding("tab", "focus_next_pane", "Switch Pane", key_display="Tab"),
             Binding("left_square_bracket", "prev_tab", "Prev/Next Tab", key_display="[/]"),
             Binding("ctrl+p", "file_search", "File Search", key_display="Ctrl+P"),
+            Binding("c", "copy", "Copy", key_display="c"),
             Binding("question_mark", "show_help", "Help", key_display="?"),
             Binding("f", "toggle_focus_mode", "Focus Mode", key_display="f"),
             Binding("minus", "shrink_pane", "Shrink Pane", key_display="-"),
@@ -516,6 +518,41 @@ class PerchApp(App):
     def action_show_help(self) -> None:
         """Open the help screen modal."""
         self.push_screen(HelpScreen())
+
+    def action_copy(self) -> None:
+        """Copy context-dependent text to clipboard.
+
+        File tree / git file list → absolute path
+        Commit tree              → commit SHA
+        GitHub panel             → item URL
+        """
+        text: str | None = None
+        tabbed = self.query_one(TabbedContent)
+
+        if tabbed.active == "tab-files":
+            tree = self.query_one(FileTree)
+            node = tree.cursor_node
+            if node is not None and hasattr(node.data, "path"):
+                text = str(node.data.path)
+        elif tabbed.active == "tab-git":
+            panel = self.query_one(GitPanel)
+            name = panel.highlighted_item_name()
+            if name is not None:
+                if name.startswith("commit:"):
+                    text = name.removeprefix("commit:")
+                elif name.startswith("commit-file:"):
+                    text = str(self.worktree_path / name.split(":", 2)[-1])
+                else:
+                    text = str(self.worktree_path / name)
+        elif tabbed.active == "tab-github":
+            github = self.query_one(GitHubPanel)
+            item = github.highlighted_child
+            if isinstance(item, ClickableItem) and item.url:
+                text = item.url
+
+        if text:
+            self.copy_to_clipboard(text)
+            self.notify(f"Copied: {text}", timeout=2)
 
     # ------------------------------------------------------------------
     # Viewer action delegates

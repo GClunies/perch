@@ -17,6 +17,7 @@ COMMANDS: list[tuple[str, str, str]] = [
     ("Focus Mode", "f", "toggle_focus_mode"),
     ("Fuzzy File Search", "Ctrl+P", "file_search"),
     ("Open in Editor", "o", "open_editor"),
+    ("Copy", "c", "copy"),
     ("Help", "?", "show_help"),
 ]
 
