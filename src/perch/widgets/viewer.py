@@ -15,6 +15,14 @@ from textual.binding import Binding
 from textual.containers import Horizontal, ScrollableContainer, VerticalScroll
 from textual.widgets import Static
 
+from perch._bindings import (
+    FOCUS_BINDING,
+    HELP_BINDING,
+    QUIT_BINDING,
+    TAB_BINDINGS,
+    make_nav_bindings,
+)
+
 if TYPE_CHECKING:
     from perch.models import CommitSummary
 
@@ -375,17 +383,15 @@ class Viewer(VerticalScroll):
     """Renders files, diffs, markdown, logs, and status messages."""
 
     BINDINGS = [
+        QUIT_BINDING,
         Binding("d", "toggle_diff", "Diff"),
         Binding("s", "toggle_diff_layout", "Layout"),
         Binding("m", "toggle_markdown_preview", "Markdown"),
-        Binding("e", "app.open_editor", "Editor"),
-        Binding("f", "app.toggle_focus_mode", "Focus"),
-        Binding(
-            "j", "scroll_down", "Scroll", key_display="hjkl/\u2190\u2193\u2191\u2192"
-        ),
-        Binding("k", "scroll_up", "Up", show=False),
-        Binding("h", "scroll_left", "Left", show=False),
-        Binding("l", "scroll_right", "Right", show=False),
+        *make_nav_bindings("scroll_down", "scroll_up", "scroll_left", "scroll_right"),
+        *TAB_BINDINGS,
+        FOCUS_BINDING,
+        Binding("e", "app.open_editor", "Editor", show=False),
+        HELP_BINDING,
     ]
 
     def __init__(
@@ -542,9 +548,14 @@ class Viewer(VerticalScroll):
 
     def load_file(self, path: Path) -> None:
         """Load and display a file with syntax highlighting."""
+        same_file = self._current_path == path
         self._current_path = path
-        self._diff_mode = False
-        self._diff_layout = "unified"
+        if not same_file:
+            self._diff_mode = False
+            self._diff_layout = "unified"
+        if self._diff_mode:
+            self._load_diff()
+            return
         self._show_content_view()
         self._update_border_title(self._path_label(path))
 
@@ -859,9 +870,35 @@ class Viewer(VerticalScroll):
             return
 
         if not diff_text:
-            self._show_content_view()
-            self._content.update(Text("No changes", style="dim italic"))
-        elif self._diff_layout == "side-by-side":
+            # No diff from git — file may be untracked/new. Synthesize an
+            # all-additions diff so the user sees the full content in green.
+            if self._current_path.is_file():
+                try:
+                    raw = self._current_path.read_text(errors="replace")
+                except OSError:
+                    raw = ""
+                if raw:
+                    lines = raw.splitlines()
+                    header = (
+                        f"diff --git a/{rel_path} b/{rel_path}\n"
+                        f"new file mode 100644\n"
+                        f"--- /dev/null\n"
+                        f"+++ b/{rel_path}\n"
+                        f"@@ -0,0 +1,{len(lines)} @@\n"
+                    )
+                    diff_text = header + "\n".join(f"+{ln}" for ln in lines)
+                else:
+                    self._show_content_view()
+                    self._content.update(Text("Empty file", style="dim italic"))
+                    self.scroll_home(animate=False)
+                    return
+            else:
+                self._show_content_view()
+                self._content.update(Text("No changes", style="dim italic"))
+                self.scroll_home(animate=False)
+                return
+
+        if self._diff_layout == "side-by-side":
             self._show_side_by_side_view(diff_text)
         else:
             self._show_content_view()

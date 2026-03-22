@@ -7,18 +7,17 @@ from textual.command import DiscoveryHit, Hit, Hits, Provider
 
 # Commands: (display_name, hotkey_display, action_name)
 COMMANDS: list[tuple[str, str, str]] = [
-    ("Quit", "q", "quit"),
+    ("Quit", "Ctrl+Q", "quit"),
     ("Switch Pane", "Tab", "focus_next_pane"),
     ("Previous Tab", "[", "prev_tab"),
     ("Next Tab", "]", "next_tab"),
     ("Toggle Diff View", "d", "toggle_diff"),
     ("Toggle Diff Layout", "s", "toggle_diff_layout"),
     ("Markdown Preview", "m", "toggle_markdown_preview"),
-    ("Next File in Diff", "n", "next_diff_file"),
-    ("Previous File in Diff", "p", "prev_diff_file"),
     ("Focus Mode", "f", "toggle_focus_mode"),
     ("Fuzzy File Search", "Ctrl+P", "file_search"),
     ("Open in Editor", "o", "open_editor"),
+    ("Help", "?", "show_help"),
 ]
 
 

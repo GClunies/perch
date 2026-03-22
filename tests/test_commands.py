@@ -33,6 +33,28 @@ def test_all_app_actions_covered():
     assert "prev_tab" in actions
     assert "next_tab" in actions
     assert "focus_next_pane" in actions
+    assert "show_help" in actions
+
+
+def test_stale_commands_removed():
+    """next_diff_file and prev_diff_file should no longer be in COMMANDS."""
+    actions = {action for _, _, action in COMMANDS}
+    assert "next_diff_file" not in actions
+    assert "prev_diff_file" not in actions
+
+
+def test_commands_count():
+    """COMMANDS should have exactly 11 entries after adding Help."""
+    assert len(COMMANDS) == 11
+
+
+def test_every_command_has_app_action_method():
+    """Every action in COMMANDS must have a corresponding action_* method on PerchApp."""
+    for _, _, action in COMMANDS:
+        method_name = f"action_{action}"
+        assert hasattr(PerchApp, method_name), (
+            f"PerchApp is missing {method_name!r} for command action {action!r}"
+        )
 
 
 def test_discovery_command_provider_subclasses_provider():

@@ -112,15 +112,15 @@ class TestCommandPalette:
 
     def test_ctrl_shift_p_binding_exists(self) -> None:
         """App should have ctrl+shift+p as the command palette binding."""
-        assert PerchApp.COMMAND_PALETTE_BINDING == "question_mark"
+        assert PerchApp.COMMAND_PALETTE_BINDING == "ctrl+shift+p"
 
 
 class TestQuitBinding:
-    """Test that q quits the app."""
+    """Test that ctrl+q quits the app."""
 
-    async def test_q_quits(self, worktree: Path) -> None:
+    async def test_ctrl_q_quits(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
-            await pilot.press("q")
+            await pilot.press("ctrl+q")
             await pilot.pause()
             assert pilot.app.return_code is not None or not pilot.app.is_running
 
@@ -1284,3 +1284,378 @@ class TestLoadCommitSummary:
                 for _ in range(10):
                     await pilot.pause()
             # Viewer should have shown the summary (no crash is the main check)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: TabActivated behavior verification
+# ---------------------------------------------------------------------------
+
+
+class TestTabActivatedFiringBehavior:
+    """Step 2.1: Verify whether TabbedContent.TabActivated fires on programmatic
+    ``tabbed.active = ...`` assignment.
+
+    This determines the Phase 3 refactor strategy:
+    - If it fires: we can add an ``on_tabbed_content_tab_activated`` handler and
+      potentially remove explicit ``_focus_active_tab()`` calls from ``action_next_tab``
+      / ``action_prev_tab``.
+    - If it does NOT fire: we must keep the explicit calls.
+    """
+
+    async def test_tab_activated_fires_on_programmatic_active_change(
+        self, worktree: Path
+    ) -> None:
+        """Setting ``tabbed.active`` programmatically should post TabActivated."""
+        app = PerchApp(worktree)
+        activated_events: list[TabbedContent.TabActivated] = []
+
+        def hook(msg) -> None:
+            if isinstance(msg, TabbedContent.TabActivated):
+                activated_events.append(msg)
+
+        async with app.run_test(size=(120, 40), message_hook=hook) as pilot:
+            tabbed = pilot.app.query_one(TabbedContent)
+
+            # Wait for initial mount events to settle
+            for _ in range(5):
+                await pilot.pause()
+            activated_events.clear()
+
+            # Programmatically switch to the git tab
+            tabbed.active = "tab-git"
+            for _ in range(5):
+                await pilot.pause()
+
+            # CRITICAL ASSERTION: TabActivated should have been posted
+            assert len(activated_events) >= 1, (
+                "TabActivated was NOT posted for programmatic active change. "
+                "Phase 3 must keep explicit _focus_active_tab() calls."
+            )
+            # Verify the event references the correct pane
+            assert activated_events[-1].pane.id == "tab-git"
+
+    async def test_tab_activated_fires_for_each_programmatic_switch(
+        self, worktree: Path
+    ) -> None:
+        """Each programmatic tab switch should fire a separate TabActivated."""
+        app = PerchApp(worktree)
+        activated_pane_ids: list[str] = []
+
+        def hook(msg) -> None:
+            if isinstance(msg, TabbedContent.TabActivated):
+                activated_pane_ids.append(msg.pane.id or "")
+
+        async with app.run_test(size=(120, 40), message_hook=hook) as pilot:
+            tabbed = pilot.app.query_one(TabbedContent)
+
+            for _ in range(5):
+                await pilot.pause()
+            activated_pane_ids.clear()
+
+            # Switch through all tabs programmatically
+            tabbed.active = "tab-git"
+            for _ in range(5):
+                await pilot.pause()
+            tabbed.active = "tab-github"
+            for _ in range(5):
+                await pilot.pause()
+            tabbed.active = "tab-files"
+            for _ in range(5):
+                await pilot.pause()
+
+            assert "tab-git" in activated_pane_ids
+            assert "tab-github" in activated_pane_ids
+            assert "tab-files" in activated_pane_ids
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Mouse click tests (RED — expected to fail)
+# ---------------------------------------------------------------------------
+
+
+class TestMouseClickTabSwitching:
+    """Step 2.2: Mouse click on tab headers should switch tabs AND focus content.
+
+    These tests are expected to FAIL (RED state) because the app currently
+    has no ``on_tabbed_content_tab_activated`` handler to focus content on
+    mouse-driven tab switches. Phase 3 will make them pass.
+    """
+
+    async def test_click_git_tab_switches_active_tab(self, worktree: Path) -> None:
+        """Clicking the Git tab header should switch the active tab to tab-git."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            tabbed = pilot.app.query_one(TabbedContent)
+            assert tabbed.active == "tab-files"
+
+            # Click the Git tab header (ID: --content-tab-tab-git)
+            await pilot.click("#--content-tab-tab-git")
+            await pilot.pause()
+
+            assert tabbed.active == "tab-git"
+
+    async def test_click_git_tab_focuses_git_panel(self, worktree: Path) -> None:
+        """Clicking the Git tab header should focus the GitPanel widget.
+
+        This test should FAIL because the app has no on_tabbed_content_tab_activated
+        handler to call _focus_active_tab() on mouse clicks.
+        """
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            # Wait for mount to settle
+            for _ in range(5):
+                await pilot.pause()
+
+            # Click the Git tab header
+            await pilot.click("#--content-tab-tab-git")
+            for _ in range(5):
+                await pilot.pause()
+
+            # This should fail: clicking a tab via mouse doesn't trigger
+            # _focus_active_tab(), so GitPanel won't be focused
+            panel = pilot.app.query_one(GitPanel)
+            assert panel.has_focus, (
+                "GitPanel should be focused after clicking the Git tab header. "
+                "This fails because there is no on_tabbed_content_tab_activated handler."
+            )
+
+    async def test_click_github_tab_focuses_github_panel(self, worktree: Path) -> None:
+        """Clicking the GitHub tab header should focus the GitHubPanel widget."""
+        with (
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                for _ in range(5):
+                    await pilot.pause()
+
+                await pilot.click("#--content-tab-tab-github")
+                for _ in range(5):
+                    await pilot.pause()
+
+                panel = pilot.app.query_one(GitHubPanel)
+                assert panel.has_focus, (
+                    "GitHubPanel should be focused after clicking the GitHub tab header."
+                )
+
+    async def test_click_files_tab_after_git_focuses_file_tree(
+        self, worktree: Path
+    ) -> None:
+        """Clicking back to the Files tab should focus the FileTree."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            for _ in range(5):
+                await pilot.pause()
+
+            # First switch away via click
+            await pilot.click("#--content-tab-tab-git")
+            for _ in range(5):
+                await pilot.pause()
+
+            # Click back to files
+            await pilot.click("#--content-tab-tab-files")
+            for _ in range(5):
+                await pilot.pause()
+
+            tree = pilot.app.query_one(FileTree)
+            assert tree.has_focus, (
+                "FileTree should be focused after clicking back to the Files tab."
+            )
+
+
+class TestMouseClickViewerFocus:
+    """Step 2.2: Clicking the viewer pane should focus it."""
+
+    async def test_click_viewer_focuses_it(self, worktree: Path) -> None:
+        """Clicking the viewer pane should move focus to the viewer."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            for _ in range(5):
+                await pilot.pause()
+
+            # Ensure the file tree has focus initially
+            tree = pilot.app.query_one(FileTree)
+            assert tree.has_focus
+
+            # Click the viewer pane
+            await pilot.click("#left-pane")
+            for _ in range(5):
+                await pilot.pause()
+
+            viewer = pilot.app.query_one("#left-pane", Viewer)
+            assert viewer.has_focus, (
+                "Viewer should be focused after clicking on it."
+            )
+
+
+class TestMouseThenKeyboardNavigation:
+    """Step 2.2: Keyboard navigation should still work after mouse click."""
+
+    async def test_keyboard_tab_switch_after_mouse_click(
+        self, worktree: Path
+    ) -> None:
+        """Pressing ] after clicking a tab should advance to the next tab."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            for _ in range(5):
+                await pilot.pause()
+
+            # Click git tab
+            await pilot.click("#--content-tab-tab-git")
+            for _ in range(5):
+                await pilot.pause()
+
+            tabbed = pilot.app.query_one(TabbedContent)
+            assert tabbed.active == "tab-git"
+
+            # Now use keyboard to go to next tab
+            await pilot.press("right_square_bracket")
+            for _ in range(5):
+                await pilot.pause()
+
+            assert tabbed.active == "tab-github", (
+                "Keyboard ] should advance from git to github after mouse click."
+            )
+
+    async def test_keyboard_focus_toggle_after_mouse_click(
+        self, worktree: Path
+    ) -> None:
+        """Tab key (focus toggle) should work after clicking the viewer."""
+        app = PerchApp(worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            for _ in range(5):
+                await pilot.pause()
+
+            # Click viewer to focus it
+            await pilot.click("#left-pane")
+            for _ in range(5):
+                await pilot.pause()
+
+            viewer = pilot.app.query_one("#left-pane", Viewer)
+            assert viewer.has_focus
+
+            # Press tab to toggle back to sidebar
+            await pilot.press("tab")
+            for _ in range(5):
+                await pilot.pause()
+
+            # The active tab's widget should now be focused
+            tree = pilot.app.query_one(FileTree)
+            assert tree.has_focus, (
+                "FileTree should be focused after pressing Tab from the viewer."
+            )
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Curated footer display
+# ---------------------------------------------------------------------------
+
+
+def _binding_show(bindings: list, key: str) -> bool:
+    """Return the ``show`` attribute for the binding matching *key*."""
+    for b in bindings:
+        if b.key == key:
+            return b.show
+    raise KeyError(f"No binding with key={key!r} found")
+
+
+class TestFooterCompact:
+    """Footer should render in compact mode."""
+
+    async def test_footer_is_compact(self, worktree: Path) -> None:
+        """The Footer widget should be instantiated with compact=True."""
+        async with PerchApp(worktree).run_test() as pilot:
+            footer = pilot.app.query_one(Footer)
+            assert footer.compact is True
+
+
+class TestFileTreeBindingVisibility:
+    """FileTree should show only curated bindings in the footer."""
+
+    def test_refresh_shown(self) -> None:
+        assert _binding_show(FileTree.BINDINGS, "r") is True
+
+    def test_open_shown(self) -> None:
+        assert _binding_show(FileTree.BINDINGS, "o") is True
+
+    def test_search_shown(self) -> None:
+        assert _binding_show(FileTree.BINDINGS, "ctrl+p") is True
+
+    def test_nav_hero_shown(self) -> None:
+        assert _binding_show(FileTree.BINDINGS, "j") is True
+
+    def test_focus_hidden(self) -> None:
+        assert _binding_show(FileTree.BINDINGS, "f") is False
+
+    def test_pageup_hidden(self) -> None:
+        assert _binding_show(FileTree.BINDINGS, "pageup") is False
+
+    def test_pagedown_hidden(self) -> None:
+        assert _binding_show(FileTree.BINDINGS, "pagedown") is False
+
+
+class TestViewerBindingVisibility:
+    """Viewer should show d, s, m, and nav hero; hide e and f."""
+
+    def test_diff_shown(self) -> None:
+        from perch.widgets.viewer import Viewer as V
+        assert _binding_show(V.BINDINGS, "d") is True
+
+    def test_layout_shown(self) -> None:
+        from perch.widgets.viewer import Viewer as V
+        assert _binding_show(V.BINDINGS, "s") is True
+
+    def test_markdown_shown(self) -> None:
+        from perch.widgets.viewer import Viewer as V
+        assert _binding_show(V.BINDINGS, "m") is True
+
+    def test_nav_hero_shown(self) -> None:
+        from perch.widgets.viewer import Viewer as V
+        assert _binding_show(V.BINDINGS, "j") is True
+
+    def test_editor_hidden(self) -> None:
+        from perch.widgets.viewer import Viewer as V
+        assert _binding_show(V.BINDINGS, "e") is False
+
+    def test_focus_hidden(self) -> None:
+        from perch.widgets.viewer import Viewer as V
+        assert _binding_show(V.BINDINGS, "f") is False
+
+
+class TestGitPanelBindingVisibility:
+    """GitPanel should show r, l, and nav hero; hide f."""
+
+    def test_refresh_shown(self) -> None:
+        assert _binding_show(GitPanel.BINDINGS, "r") is True
+
+    def test_select_shown(self) -> None:
+        assert _binding_show(GitPanel.BINDINGS, "l") is True
+
+    def test_nav_hero_shown(self) -> None:
+        assert _binding_show(GitPanel.BINDINGS, "j") is True
+
+    def test_focus_hidden(self) -> None:
+        assert _binding_show(GitPanel.BINDINGS, "f") is False
+
+    def test_pageup_hidden(self) -> None:
+        assert _binding_show(GitPanel.BINDINGS, "pageup") is False
+
+
+class TestGitHubPanelBindingVisibility:
+    """GitHubPanel should show o, r, and nav hero; hide f."""
+
+    def test_open_shown(self) -> None:
+        assert _binding_show(GitHubPanel.BINDINGS, "o") is True
+
+    def test_refresh_shown(self) -> None:
+        assert _binding_show(GitHubPanel.BINDINGS, "r") is True
+
+    def test_nav_hero_shown(self) -> None:
+        assert _binding_show(GitHubPanel.BINDINGS, "j") is True
+
+    def test_focus_hidden(self) -> None:
+        assert _binding_show(GitHubPanel.BINDINGS, "f") is False
+
+    def test_pageup_hidden(self) -> None:
+        assert _binding_show(GitHubPanel.BINDINGS, "pageup") is False

@@ -11,6 +11,15 @@ from textual.binding import Binding
 from textual.message import Message
 from textual.widgets import Label, ListItem, ListView
 
+from perch._bindings import (
+    FOCUS_BINDING,
+    HELP_BINDING,
+    PAGE_BINDINGS,
+    QUIT_BINDING,
+    REFRESH_BINDING,
+    TAB_BINDINGS,
+    make_nav_bindings,
+)
 from perch.models import CICheck, PRContext
 
 
@@ -80,15 +89,14 @@ class GitHubPanel(ListView):
             self.title = title
 
     BINDINGS = [
-        ("o", "open_in_browser", "Open"),
-        ("r", "refresh", "Refresh"),
-        Binding("f", "app.toggle_focus_mode", "Focus"),
-        Binding(
-            "j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"
-        ),
-        Binding("k", "cursor_up", "Up", show=False),
-        Binding("pageup", "page_up", "", show=False),
-        Binding("pagedown", "page_down", "", show=False),
+        QUIT_BINDING,
+        Binding("o", "open_in_browser", "Open"),
+        REFRESH_BINDING,
+        *make_nav_bindings(),
+        *TAB_BINDINGS,
+        FOCUS_BINDING,
+        *PAGE_BINDINGS,
+        HELP_BINDING,
     ]
 
     def __init__(

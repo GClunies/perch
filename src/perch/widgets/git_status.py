@@ -12,7 +12,15 @@ from textual.containers import Vertical
 from textual.message import Message
 from textual.widgets import Label, ListItem, ListView, Tree
 
-
+from perch._bindings import (
+    FOCUS_BINDING,
+    HELP_BINDING,
+    PAGE_BINDINGS,
+    QUIT_BINDING,
+    REFRESH_BINDING,
+    TAB_BINDINGS,
+    make_nav_bindings,
+)
 from perch.models import GitFile, GitStatusData
 
 
@@ -102,15 +110,15 @@ class GitPanel(Vertical):
         """
 
     BINDINGS = [
-        ("r", "refresh", "Refresh"),
-        Binding("f", "app.toggle_focus_mode", "Focus"),
-        Binding(
-            "j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"
-        ),
-        Binding("k", "cursor_up", "Up", show=False),
-        Binding("l", "select_cursor", "Select", show=False),
-        Binding("pageup", "page_up", "Page Up", show=False),
-        Binding("pagedown", "page_down", "Page Down", show=False),
+        QUIT_BINDING,
+        Binding("d", "app.toggle_diff", "Diff"),
+        REFRESH_BINDING,
+        Binding("l", "select_cursor", "Select"),
+        *make_nav_bindings(),
+        *TAB_BINDINGS,
+        FOCUS_BINDING,
+        *PAGE_BINDINGS,
+        HELP_BINDING,
     ]
 
     def __init__(
@@ -141,6 +149,10 @@ class GitPanel(Vertical):
     def has_focus(self) -> bool:
         """Return True if either child widget has focus."""
         return self._file_list.has_focus or self._commit_tree.has_focus
+
+    def focus_default(self) -> None:
+        """Focus the file list, the default child for this panel."""
+        self._file_list.focus()
 
     def on_mount(self) -> None:
         self._file_list.append(_make_section_header("Loading git status..."))

@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from pathlib import Path
+from typing import ClassVar
 
 from textual import work
 from textual.app import App, ComposeResult
@@ -12,6 +15,7 @@ from perch.widgets.file_search import FileSearchScreen
 from perch.widgets.file_tree import FileTree
 from perch.widgets.git_status import GitPanel
 from perch.widgets.github_panel import ClickableItem, GitHubPanel
+from perch.widgets.help_screen import HelpScreen
 from perch.widgets.splitter import DraggableSplitter
 from perch.widgets.viewer import Viewer
 
@@ -22,13 +26,13 @@ _AUTO_SELECT_MAX_ATTEMPTS = 20  # give up after ~3 seconds
 class PerchApp(App):
     CSS_PATH = "app.tcss"
     COMMANDS = App.COMMANDS | {DiscoveryCommandProvider}
-    COMMAND_PALETTE_BINDING = "question_mark"
+    COMMAND_PALETTE_BINDING = "ctrl+shift+p"
 
     BINDINGS = [
-        ("q", "quit", "Quit"),
-        Binding("tab", "focus_next_pane", "Switch Pane", priority=True),
-        Binding("left_square_bracket", "prev_tab", "Prev Tab", key_display="["),
-        Binding("right_square_bracket", "next_tab", "Next Tab", key_display="]"),
+        Binding("ctrl+q", "quit", "Quit", key_display="^q", show=False),
+        Binding("tab", "focus_next_pane", "Switch Pane", priority=True, show=False),
+        Binding("left_square_bracket", "prev_tab", "Prev/Next Tab", key_display="[/]", show=False),
+        Binding("right_square_bracket", "next_tab", "Next Tab", show=False),
         Binding("f", "toggle_focus_mode", "Focus Mode", show=False),
         Binding("ctrl+p", "file_search", "File Search", show=False),
         Binding("d", "toggle_diff", "Toggle Diff", show=False),
@@ -37,10 +41,43 @@ class PerchApp(App):
         Binding("o", "open_editor", "Open", show=False),
         Binding("minus", "shrink_pane", "Shrink", show=False, key_display="-"),
         Binding("equals_sign", "grow_pane", "Grow", show=False, key_display="="),
-        Binding(
-            "question_mark", "command_palette", "Help", key_display="?", priority=True
-        ),
+        Binding("question_mark", "show_help", "Help", key_display="?", priority=True, show=False),
     ]
+
+    BINDING_REGISTRY: ClassVar[dict[str, list[Binding]]] = {
+        "Global": [
+            Binding("ctrl+q", "quit", "Quit", key_display="Ctrl+Q"),
+            Binding("tab", "focus_next_pane", "Switch Pane", key_display="Tab"),
+            Binding("left_square_bracket", "prev_tab", "Prev/Next Tab", key_display="[/]"),
+            Binding("ctrl+p", "file_search", "File Search", key_display="Ctrl+P"),
+            Binding("question_mark", "show_help", "Help", key_display="?"),
+            Binding("f", "toggle_focus_mode", "Focus Mode", key_display="f"),
+            Binding("minus", "shrink_pane", "Shrink Pane", key_display="-"),
+            Binding("equals_sign", "grow_pane", "Grow Pane", key_display="="),
+        ],
+        "File Tree": [
+            Binding("r", "refresh", "Refresh", key_display="r"),
+            Binding("o", "open_editor", "Open in Editor", key_display="o"),
+            Binding("j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+        ],
+        "Viewer": [
+            Binding("d", "toggle_diff", "Toggle Diff", key_display="d"),
+            Binding("s", "toggle_diff_layout", "Diff Layout", key_display="s"),
+            Binding("m", "toggle_markdown_preview", "Markdown Preview", key_display="m"),
+            Binding("e", "open_editor", "Open in Editor", key_display="e"),
+            Binding("j", "scroll_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+        ],
+        "Git": [
+            Binding("r", "refresh", "Refresh", key_display="r"),
+            Binding("l", "select_cursor", "Select", key_display="l"),
+            Binding("j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+        ],
+        "GitHub": [
+            Binding("r", "refresh", "Refresh", key_display="r"),
+            Binding("o", "open_in_browser", "Open in Browser", key_display="o"),
+            Binding("j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+        ],
+    }
 
     def __init__(self, worktree_path: Path, editor: str | None = None) -> None:
         super().__init__()
@@ -49,6 +86,10 @@ class PerchApp(App):
         self._focus_mode = False
         self._branch: str | None = None
         self._files_tab_last_path: Path | None = None
+        self._auto_select_done = False
+        self._auto_select_attempts = 0
+        self._mounted = False
+        self._tab_click_pending = False
         try:
             from perch.services.git import get_current_branch, get_worktree_root
 
@@ -73,9 +114,8 @@ class PerchApp(App):
         self.sub_title = str(self.worktree_path)
         self.query_one(TabbedContent).active = "tab-files"
         self._focus_active_tab()
-        self._auto_select_done = False
-        self._auto_select_attempts = 0
         self.set_timer(_AUTO_SELECT_INTERVAL, self._auto_select_first_node)
+        self._mounted = True
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -89,7 +129,7 @@ class PerchApp(App):
                     yield GitPanel(self.worktree_path)
                 with TabPane("\uf09b", id="tab-github"):
                     yield GitHubPanel(self.worktree_path)
-        yield Footer()
+        yield Footer(compact=True, show_command_palette=False)
 
     # ------------------------------------------------------------------
     # Auto-select first file on startup
@@ -281,6 +321,52 @@ class PerchApp(App):
 
     _TAB_ORDER = ["tab-files", "tab-git", "tab-github"]
 
+    def on_tabbed_content_tab_activated(
+        self, event: TabbedContent.TabActivated
+    ) -> None:
+        """Focus the correct widget when the user clicks a tab header.
+
+        Textual fires ``TabActivated`` for programmatic ``tabbed.active``
+        changes, descendant focus switches **and** mouse clicks on tab
+        headers.  We only want to react to mouse clicks; the keyboard
+        actions already call ``_focus_active_tab()`` synchronously.
+
+        To distinguish a click from other sources we check
+        ``_tab_click_pending``, which is set by ``on_click`` when the
+        click target is inside the sidebar tabs.
+        """
+        if not self._tab_click_pending:
+            return
+        self._tab_click_pending = False
+        if self._focus_mode:
+            return
+        try:
+            self._focus_active_tab()
+        except Exception:
+            return
+
+    def on_click(self, event) -> None:
+        """Focus the clicked pane and detect tab header clicks."""
+        widget = event.widget
+        from textual.widgets._tabbed_content import ContentTab
+
+        while widget is not None:
+            if isinstance(widget, ContentTab):
+                self._tab_click_pending = True
+                return
+            if isinstance(widget, Viewer):
+                widget.focus()
+                return
+            if isinstance(widget, (FileTree, GitPanel, GitHubPanel)):
+                if hasattr(widget, "focus_default"):
+                    widget.focus_default()
+                else:
+                    widget.focus()
+                return
+            if widget is self:
+                break
+            widget = widget.parent
+
     def action_next_tab(self) -> None:
         """Switch to the next sidebar tab."""
         tabbed = self.query_one(TabbedContent)
@@ -331,7 +417,7 @@ class PerchApp(App):
                 self._show_current_tree_node(tree, viewer)
         elif active == "tab-git":
             panel = self.query_one(GitPanel)
-            panel._file_list.focus()
+            panel.focus_default()
             self._show_current_git_item(panel, viewer)
         elif active == "tab-github":
             github = self.query_one(GitHubPanel)
@@ -424,16 +510,31 @@ class PerchApp(App):
             open_file(self.editor, viewer._current_path, self.worktree_path)
 
     # ------------------------------------------------------------------
+    # Help screen
+    # ------------------------------------------------------------------
+
+    def action_show_help(self) -> None:
+        """Open the help screen modal."""
+        self.push_screen(HelpScreen())
+
+    # ------------------------------------------------------------------
     # Viewer action delegates
     # ------------------------------------------------------------------
 
     def action_toggle_diff(self) -> None:
         """Toggle diff view in the viewer (command palette entry)."""
-        self.query_one(Viewer).action_toggle_diff()
+        viewer = self.query_one(Viewer)
+        viewer.action_toggle_diff()
+        if viewer._diff_mode:
+            viewer.focus()
 
     def action_toggle_diff_layout(self) -> None:
         """Toggle diff layout in the viewer (command palette entry)."""
         self.query_one(Viewer).action_toggle_diff_layout()
+
+    def action_toggle_markdown_preview(self) -> None:
+        """Toggle markdown preview in the viewer (command palette entry)."""
+        self.query_one(Viewer).action_toggle_markdown_preview()
 
     # ------------------------------------------------------------------
     # Focus mode & pane resizing

@@ -19,7 +19,7 @@ Built for agentic workflows, `perch` is a lightweight terminal UI to quickly vie
 - **Git status panel** — Staged, unstaged, and untracked changes plus recent commits. Auto-refreshes every 5s.
 - **GitHub panel** — PR description, reviews, comments, and Actions CI status. Auto-refreshes every 30s.
 - **Editor integration** — `o` opens the current file in your editor.
-- **Command palette** — `?` for quick access to all commands and theme switching.
+- **Keybinding help** — `?` shows all keyboard shortcuts. `Ctrl+Shift+P` opens the command palette for commands and theme switching.
 - **Resizable panes** — Drag the splitter or use `-` / `=` to resize. `f` for full-screen focus mode.
 
 ## Requirements
@@ -62,12 +62,13 @@ uv run perch --editor code
 | `r` | Refresh data (Git / GitHub tabs) |
 | `f` | Focus mode (hide sidebar) |
 | `-` / `=` | Shrink / grow focused pane |
-| `?` | Command palette (lists commands and hotkeys)|
-| `q` | Quit |
+| `?` | Show keybinding help |
+| `Ctrl+Shift+P` | Command palette |
+| `Ctrl+Q` | Quit |
 
 ## Theming
 
-Perch supports all built-in [Textual themes](https://textual.textualize.io/guide/design/#themes). Change the theme via the command palette (`?`), or set `TEXTUAL_THEME`:
+Perch supports all built-in [Textual themes](https://textual.textualize.io/guide/design/#themes). Change the theme via the command palette (`Ctrl+Shift+P`), or set `TEXTUAL_THEME`:
 
 ```bash
 export TEXTUAL_THEME="rose-pine-moon"

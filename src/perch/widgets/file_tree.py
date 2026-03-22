@@ -11,6 +11,16 @@ from textual.binding import Binding
 from textual.widgets import DirectoryTree
 from textual.widgets._tree import Tree, TreeNode
 
+from perch._bindings import (
+    FOCUS_BINDING,
+    HELP_BINDING,
+    PAGE_BINDINGS,
+    QUIT_BINDING,
+    REFRESH_BINDING,
+    TAB_BINDINGS,
+    make_nav_bindings,
+)
+
 ALWAYS_EXCLUDED: set[str] = {
     ".git",
 }
@@ -37,20 +47,19 @@ class FileTree(DirectoryTree):
     ICON_NODE_EXPANDED = "\U000f0770 "
 
     BINDINGS = [
-        ("r", "refresh", "Refresh"),
+        QUIT_BINDING,
         Binding("ctrl+p", "app.file_search", "Search"),
+        REFRESH_BINDING,
         Binding("o", "app.open_editor", "Open"),
-        Binding("f", "app.toggle_focus_mode", "Focus"),
+        *make_nav_bindings(),
+        *TAB_BINDINGS,
+        FOCUS_BINDING,
+        *PAGE_BINDINGS,
         Binding("right", "expand_node", "Expand", show=False),
         Binding("left", "collapse_node", "Collapse", show=False),
         Binding("l", "expand_node", "Expand", show=False),
         Binding("h", "collapse_node", "Collapse", show=False),
-        Binding(
-            "j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"
-        ),
-        Binding("k", "cursor_up", "Up", show=False),
-        Binding("pageup", "page_up", "Page Up", show=False),
-        Binding("pagedown", "page_down", "Page Down", show=False),
+        HELP_BINDING,
     ]
 
     def action_expand_node(self) -> None:
