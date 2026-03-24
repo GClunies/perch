@@ -153,8 +153,14 @@ class GitPanel(Vertical):
         return self._file_list.has_focus or self._commit_tree.has_focus
 
     def focus_default(self) -> None:
-        """Focus the file list, the default child for this panel."""
+        """Focus the file list and ensure an item is highlighted."""
         self._file_list.focus()
+        if self._file_list.index is None:
+            # Select the first enabled (non-header) item
+            for i, node in enumerate(self._file_list._nodes):
+                if isinstance(node, ListItem) and not node.disabled:
+                    self._file_list.index = i
+                    break
 
     def on_mount(self) -> None:
         self._file_list.append(_make_section_header("Loading git status..."))
@@ -206,8 +212,23 @@ class GitPanel(Vertical):
         return True
 
     # ------------------------------------------------------------------
-    # Navigation: j/k cross-widget boundary handling
+    # Navigation: j/k/arrow cross-widget boundary handling
     # ------------------------------------------------------------------
+
+    def on_key(self, event) -> None:
+        """Intercept arrow keys to route through cross-boundary navigation.
+
+        ListView and Tree consume up/down before GitPanel bindings can fire,
+        so we catch them here and delegate to the same boundary logic as j/k.
+        """
+        if event.key == "down":
+            event.prevent_default()
+            event.stop()
+            self.action_cursor_down()
+        elif event.key == "up":
+            event.prevent_default()
+            event.stop()
+            self.action_cursor_up()
 
     def action_cursor_down(self) -> None:
         """Move down -- transfer focus from file list to tree at boundary."""
@@ -392,16 +413,19 @@ class GitPanel(Vertical):
 
     def _restore_selection(self, saved_name: str | None) -> None:
         """Restore selection by file name, or select the first enabled item."""
+        target: int | None = None
         if saved_name is not None:
             for i, node in enumerate(self._file_list._nodes):
                 if isinstance(node, ListItem) and node.name == saved_name:
-                    self._file_list.index = i
-                    return
-        # Select first enabled item
-        for i, node in enumerate(self._file_list._nodes):
-            if isinstance(node, ListItem) and not node.disabled:
-                self._file_list.index = i
-                return
+                    target = i
+                    break
+        if target is None:
+            for i, node in enumerate(self._file_list._nodes):
+                if isinstance(node, ListItem) and not node.disabled:
+                    target = i
+                    break
+        if target is not None:
+            self._file_list.index = target
 
     # ------------------------------------------------------------------
     # File-only refresh (5s timer)
@@ -524,8 +548,6 @@ class GitPanel(Vertical):
 
     def toggle_commit(self, commit_hash: str) -> None:
         """Expand or collapse a commit with accordion behavior."""
-        from perch.services.git import get_commit_files
-
         target = None
         for node in self._commit_tree.root.children:
             if node.data == f"commit:{commit_hash}":
@@ -547,20 +569,42 @@ class GitPanel(Vertical):
                     ):
                         node.collapse()
                         break
-            # Expand and populate children
+            # Show loading placeholder and fetch files in background
             target.remove_children()
-            try:
-                files = get_commit_files(self._worktree_root, commit_hash)
-            except RuntimeError:
-                return
-            for f in files:
-                style = _STATUS_STYLES.get(f.status, "")
-                child_label = Text()
-                child_label.append(f"{f.status:<10}", style=style)
-                child_label.append(f" {f.path}")
-                target.add_leaf(child_label, data=f"commit-file:{commit_hash}:{f.path}")
+            target.add_leaf(
+                Text("Loading...", style="dim italic"),
+                data=f"loading:{commit_hash}",
+            )
             target.expand()
             self._expanded_commit = commit_hash
+            self._fetch_commit_files(commit_hash, target)
+
+    @work(thread=True)
+    def _fetch_commit_files(self, commit_hash: str, target_node) -> None:
+        """Fetch commit files in a background thread."""
+        from perch.services.git import get_commit_files
+
+        try:
+            files = get_commit_files(self._worktree_root, commit_hash)
+        except RuntimeError:
+            return
+        self.app.call_from_thread(
+            self._populate_commit_files, commit_hash, target_node, files
+        )
+
+    def _populate_commit_files(self, commit_hash: str, target_node, files) -> None:
+        """Populate commit tree node with fetched files (runs on main thread)."""
+        if self._expanded_commit != commit_hash:
+            return  # User collapsed or switched before fetch completed
+        target_node.remove_children()
+        for f in files:
+            style = _STATUS_STYLES.get(f.status, "")
+            child_label = Text()
+            child_label.append(f"{f.status:<10}", style=style)
+            child_label.append(f" {f.path}")
+            target_node.add_leaf(
+                child_label, data=f"commit-file:{commit_hash}:{f.path}"
+            )
 
     # ------------------------------------------------------------------
     # Ref watcher (unchanged from original)

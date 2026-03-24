@@ -1606,9 +1606,9 @@ class TestViewerBindingVisibility:
         from perch.widgets.viewer import Viewer as V
         assert _binding_show(V.BINDINGS, "s") is True
 
-    def test_markdown_shown(self) -> None:
+    def test_preview_shown(self) -> None:
         from perch.widgets.viewer import Viewer as V
-        assert _binding_show(V.BINDINGS, "m") is True
+        assert _binding_show(V.BINDINGS, "p") is True
 
     def test_nav_hero_shown(self) -> None:
         from perch.widgets.viewer import Viewer as V

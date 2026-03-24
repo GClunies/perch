@@ -274,7 +274,9 @@ class TestCommitTreeBehavior:
             )
             commit_hash = commit_node.data.removeprefix("commit:")
             panel.toggle_commit(commit_hash)
-            await pilot.pause()
+            # Wait for background worker to fetch and populate files
+            for _ in range(10):
+                await pilot.pause()
             assert commit_node.is_expanded
             file_children = [
                 c
@@ -303,7 +305,8 @@ class TestCommitTreeBehavior:
             )
             commit_hash = commit_node.data.removeprefix("commit:")
             panel.toggle_commit(commit_hash)
-            await pilot.pause()
+            for _ in range(10):
+                await pilot.pause()
             assert panel._expanded_commit == commit_hash
             panel.toggle_commit(commit_hash)
             await pilot.pause()
@@ -335,12 +338,60 @@ class TestCommitTreeBehavior:
             h1 = commits[0].data.removeprefix("commit:")
             h2 = commits[1].data.removeprefix("commit:")
             panel.toggle_commit(h1)
-            await pilot.pause()
+            for _ in range(10):
+                await pilot.pause()
             assert commits[0].is_expanded
             panel.toggle_commit(h2)
-            await pilot.pause()
+            for _ in range(10):
+                await pilot.pause()
             assert commits[1].is_expanded
             assert not commits[0].is_expanded
+
+    async def test_arrow_down_crosses_to_commit_tree(self, git_worktree):
+        """Arrow down at end of file list should focus the commit tree."""
+        (git_worktree / "hello.py").write_text("modified\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(["git", "commit", "-m", "modify"], cwd=git_worktree, check=True)
+
+        from perch.app import PerchApp
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            panel = app.query_one(GitPanel)
+            for _ in range(10):
+                await pilot.pause()
+            panel.focus_default()
+            await pilot.pause()
+            # Navigate to last file list item
+            last_idx = len(panel._file_list) - 1
+            panel._file_list.index = last_idx
+            await pilot.pause()
+            # Press down arrow — should cross to commit tree
+            await pilot.press("down")
+            await pilot.pause()
+            assert panel._commit_tree.has_focus
+
+    async def test_arrow_up_crosses_to_file_list(self, git_worktree):
+        """Arrow up at top of commit tree should focus the file list."""
+        (git_worktree / "hello.py").write_text("modified\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(["git", "commit", "-m", "modify"], cwd=git_worktree, check=True)
+
+        from perch.app import PerchApp
+
+        app = PerchApp(git_worktree)
+        async with app.run_test() as pilot:
+            panel = app.query_one(GitPanel)
+            for _ in range(10):
+                await pilot.pause()
+            # Focus commit tree at line 0
+            panel._commit_tree.focus()
+            panel._commit_tree.cursor_line = 0
+            await pilot.pause()
+            # Press up arrow — should cross to file list
+            await pilot.press("up")
+            await pilot.pause()
+            assert panel._file_list.has_focus
 
 
 # ---------------------------------------------------------------------------
@@ -916,10 +967,21 @@ class TestToggleCommitErrors:
                     side_effect=RuntimeError("git failed"),
                 ):
                     panel.toggle_commit("aaa111")
-                    await pilot.pause()
+                    for _ in range(10):
+                        await pilot.pause()
 
-                # No expansion should happen
-                assert panel._expanded_commit is None
+                # Node expands with loading placeholder, but files are not populated
+                commit_node = next(
+                    n
+                    for n in panel._commit_tree.root.children
+                    if n.data == "commit:aaa111"
+                )
+                file_children = [
+                    c
+                    for c in commit_node.children
+                    if c.data and c.data.startswith("commit-file:")
+                ]
+                assert len(file_children) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -1706,3 +1768,37 @@ class TestActivateCurrentSelectionCommitPrefix:
 
                 result = panel.activate_current_selection()
                 assert result is False
+
+
+# ---------------------------------------------------------------------------
+# focus_default
+# ---------------------------------------------------------------------------
+
+
+class TestFocusDefault:
+    """Tests for GitPanel.focus_default() public API."""
+
+    async def test_focus_default_focuses_file_list(self, tmp_path: Path) -> None:
+        """focus_default() should focus the internal file list widget."""
+        from perch.app import PerchApp
+
+        _init_git_repo(tmp_path)
+        patches = _patch_git_services(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+        with patches[0], patches[1], patches[2], patches[3]:
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                panel = pilot.app.query_one(GitPanel)
+                await pilot.pause()
+                await pilot.pause()
+                panel._update_display(_SAMPLE_STATUS, _SAMPLE_COMMITS)
+                await pilot.pause()
+
+                # Focus something else first (the commit tree)
+                panel._commit_tree.focus()
+                await pilot.pause()
+                assert not panel._file_list.has_focus
+
+                # Call focus_default and verify file list gets focus
+                panel.focus_default()
+                await pilot.pause()
+                assert panel._file_list.has_focus

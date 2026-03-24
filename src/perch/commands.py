@@ -13,7 +13,7 @@ COMMANDS: list[tuple[str, str, str]] = [
     ("Next Tab", "]", "next_tab"),
     ("Toggle Diff View", "d", "toggle_diff"),
     ("Toggle Diff Layout", "s", "toggle_diff_layout"),
-    ("Markdown Preview", "m", "toggle_markdown_preview"),
+    ("Markdown Preview", "p", "toggle_markdown_preview"),
     ("Focus Mode", "f", "toggle_focus_mode"),
     ("Fuzzy File Search", "Ctrl+P", "file_search"),
     ("Open in Editor", "o", "open_editor"),

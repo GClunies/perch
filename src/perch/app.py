@@ -35,14 +35,9 @@ class PerchApp(App):
         Binding("right_square_bracket", "next_tab", "Next Tab", show=False),
         Binding("f", "toggle_focus_mode", "Focus Mode", show=False),
         Binding("ctrl+p", "file_search", "File Search", show=False),
-        Binding("d", "toggle_diff", "Toggle Diff", show=False),
-        Binding("s", "toggle_diff_layout", "Diff Layout", show=False),
-        Binding("m", "toggle_markdown_preview", "Markdown Preview", show=False),
         Binding("o", "open_editor", "Open", show=False),
-        Binding("c", "copy", "Copy", show=False),
         Binding("minus", "shrink_pane", "Shrink", show=False, key_display="-"),
         Binding("equals_sign", "grow_pane", "Grow", show=False, key_display="="),
-        Binding("question_mark", "show_help", "Help", key_display="?", priority=True, show=False),
     ]
 
     BINDING_REGISTRY: ClassVar[dict[str, list[Binding]]] = {
@@ -65,9 +60,11 @@ class PerchApp(App):
         "Viewer": [
             Binding("d", "toggle_diff", "Toggle Diff", key_display="d"),
             Binding("s", "toggle_diff_layout", "Diff Layout", key_display="s"),
-            Binding("m", "toggle_markdown_preview", "Markdown Preview", key_display="m"),
+            Binding("p", "toggle_markdown_preview", "Preview", key_display="p"),
             Binding("e", "open_editor", "Open in Editor", key_display="e"),
             Binding("j", "scroll_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+            Binding("shift+drag", "noop", "Select", key_display="\u21e7+Drag"),
+            Binding("f20", "noop", "Open URL/File", key_display="\u2318+Click"),
         ],
         "Git": [
             Binding("r", "refresh", "Refresh", key_display="r"),

@@ -60,6 +60,13 @@ GitPanel, GitHubPanel {
     overflow-x: auto;
 }
 
+/* Keep highlight visible when focus moves to the viewer pane */
+GitPanel ListView > ListItem.--highlight,
+GitHubPanel > ListItem.--highlight,
+GitHubPanel > ClickableItem.--highlight {
+    background: $accent 30%;
+}
+
 GitPanel > ListItem,
 GitHubPanel > ListItem,
 GitHubPanel > ClickableItem {

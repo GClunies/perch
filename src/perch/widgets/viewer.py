@@ -16,10 +16,10 @@ from textual.containers import Horizontal, ScrollableContainer, VerticalScroll
 from textual.widgets import Static
 
 from perch._bindings import (
+    COPY_BINDING,
     FOCUS_BINDING,
     HELP_BINDING,
     QUIT_BINDING,
-    TAB_BINDINGS,
     make_nav_bindings,
 )
 
@@ -386,9 +386,11 @@ class Viewer(VerticalScroll):
         QUIT_BINDING,
         Binding("d", "toggle_diff", "Diff"),
         Binding("s", "toggle_diff_layout", "Layout"),
-        Binding("m", "toggle_markdown_preview", "Markdown"),
+        Binding("p", "toggle_markdown_preview", "Preview"),
+        COPY_BINDING,
         *make_nav_bindings("scroll_down", "scroll_up", "scroll_left", "scroll_right"),
-        *TAB_BINDINGS,
+        Binding("f19", "hint_select", "Select", key_display="\u21e7+drag"),
+        Binding("f20", "hint_open_link", "Open URL/File", key_display="\u2318+click"),
         FOCUS_BINDING,
         Binding("e", "app.open_editor", "Editor", show=False),
         HELP_BINDING,
@@ -928,6 +930,12 @@ class Viewer(VerticalScroll):
             return
         self._markdown_preview = not self._markdown_preview
         self.load_file(self._current_path)
+
+    def action_hint_select(self) -> None:
+        """No-op hint for shift+drag text selection."""
+
+    def action_hint_open_link(self) -> None:
+        """No-op hint for cmd+click to open links."""
 
     def action_toggle_diff_layout(self) -> None:
         """Toggle between unified and side-by-side diff layout."""
