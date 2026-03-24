@@ -31,7 +31,13 @@ class PerchApp(App):
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit", key_display="^q", show=False),
         Binding("tab", "focus_next_pane", "Switch Pane", priority=True, show=False),
-        Binding("left_square_bracket", "prev_tab", "Prev/Next Tab", key_display="[/]", show=False),
+        Binding(
+            "left_square_bracket",
+            "prev_tab",
+            "Prev/Next Tab",
+            key_display="[/]",
+            show=False,
+        ),
         Binding("right_square_bracket", "next_tab", "Next Tab", show=False),
         Binding("f", "toggle_focus_mode", "Focus Mode", show=False),
         Binding("ctrl+p", "file_search", "File Search", show=False),
@@ -44,7 +50,9 @@ class PerchApp(App):
         "Global": [
             Binding("ctrl+q", "quit", "Quit", key_display="Ctrl+Q"),
             Binding("tab", "focus_next_pane", "Switch Pane", key_display="Tab"),
-            Binding("left_square_bracket", "prev_tab", "Prev/Next Tab", key_display="[/]"),
+            Binding(
+                "left_square_bracket", "prev_tab", "Prev/Next Tab", key_display="[/]"
+            ),
             Binding("ctrl+p", "file_search", "File Search", key_display="Ctrl+P"),
             Binding("c", "copy", "Copy", key_display="c"),
             Binding("question_mark", "show_help", "Help", key_display="?"),
@@ -55,26 +63,46 @@ class PerchApp(App):
         "File Tree": [
             Binding("r", "refresh", "Refresh", key_display="r"),
             Binding("o", "open_editor", "Open in Editor", key_display="o"),
-            Binding("j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+            Binding(
+                "j",
+                "cursor_down",
+                "Navigate",
+                key_display="hjkl/\u2190\u2193\u2191\u2192",
+            ),
         ],
         "Viewer": [
             Binding("d", "toggle_diff", "Toggle Diff", key_display="d"),
             Binding("s", "toggle_diff_layout", "Diff Layout", key_display="s"),
             Binding("p", "toggle_markdown_preview", "Preview", key_display="p"),
             Binding("e", "open_editor", "Open in Editor", key_display="e"),
-            Binding("j", "scroll_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+            Binding(
+                "j",
+                "scroll_down",
+                "Navigate",
+                key_display="hjkl/\u2190\u2193\u2191\u2192",
+            ),
             Binding("shift+drag", "noop", "Select", key_display="\u21e7+Drag"),
             Binding("f20", "noop", "Open URL/File", key_display="\u2318+Click"),
         ],
         "Git": [
             Binding("r", "refresh", "Refresh", key_display="r"),
             Binding("l", "select_cursor", "Select", key_display="l"),
-            Binding("j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+            Binding(
+                "j",
+                "cursor_down",
+                "Navigate",
+                key_display="hjkl/\u2190\u2193\u2191\u2192",
+            ),
         ],
         "GitHub": [
             Binding("r", "refresh", "Refresh", key_display="r"),
             Binding("o", "open_in_browser", "Open in Browser", key_display="o"),
-            Binding("j", "cursor_down", "Navigate", key_display="hjkl/\u2190\u2193\u2191\u2192"),
+            Binding(
+                "j",
+                "cursor_down",
+                "Navigate",
+                key_display="hjkl/\u2190\u2193\u2191\u2192",
+            ),
         ],
     }
 

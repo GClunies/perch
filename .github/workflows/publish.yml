@@ -37,11 +37,11 @@ jobs:
             exit 1
           fi
 
-      - name: Ensure pyproject.toml version matches
+      - name: Ensure __init__.py version matches
         run: |
-          CURRENT=$(grep '^version' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          CURRENT=$(grep '__version__' src/perch/__init__.py | sed 's/.*"\(.*\)"/\1/')
           if [ "$CURRENT" != "${{ inputs.version }}" ]; then
-            echo "::error::pyproject.toml version is $CURRENT but expected ${{ inputs.version }}. Update it first."
+            echo "::error::src/perch/__init__.py version is $CURRENT but expected ${{ inputs.version }}. Update it first."
             exit 1
           fi
 

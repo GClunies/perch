@@ -89,9 +89,7 @@ class TestBindingRegistry:
         for section, bindings in PerchApp.BINDING_REGISTRY.items():
             assert isinstance(bindings, list), f"{section} is not a list"
             for b in bindings:
-                assert isinstance(b, Binding), (
-                    f"{section} contains non-Binding: {b!r}"
-                )
+                assert isinstance(b, Binding), f"{section} contains non-Binding: {b!r}"
 
     def test_global_section_has_quit(self) -> None:
         """Global section should include a 'quit' action."""

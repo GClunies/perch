@@ -1484,17 +1484,13 @@ class TestMouseClickViewerFocus:
                 await pilot.pause()
 
             viewer = pilot.app.query_one("#left-pane", Viewer)
-            assert viewer.has_focus, (
-                "Viewer should be focused after clicking on it."
-            )
+            assert viewer.has_focus, "Viewer should be focused after clicking on it."
 
 
 class TestMouseThenKeyboardNavigation:
     """Step 2.2: Keyboard navigation should still work after mouse click."""
 
-    async def test_keyboard_tab_switch_after_mouse_click(
-        self, worktree: Path
-    ) -> None:
+    async def test_keyboard_tab_switch_after_mouse_click(self, worktree: Path) -> None:
         """Pressing ] after clicking a tab should advance to the next tab."""
         app = PerchApp(worktree)
         async with app.run_test(size=(120, 40)) as pilot:
@@ -1600,26 +1596,32 @@ class TestViewerBindingVisibility:
 
     def test_diff_shown(self) -> None:
         from perch.widgets.viewer import Viewer as V
+
         assert _binding_show(V.BINDINGS, "d") is True
 
     def test_layout_shown(self) -> None:
         from perch.widgets.viewer import Viewer as V
+
         assert _binding_show(V.BINDINGS, "s") is True
 
     def test_preview_shown(self) -> None:
         from perch.widgets.viewer import Viewer as V
+
         assert _binding_show(V.BINDINGS, "p") is True
 
     def test_nav_hero_shown(self) -> None:
         from perch.widgets.viewer import Viewer as V
+
         assert _binding_show(V.BINDINGS, "j") is True
 
     def test_editor_hidden(self) -> None:
         from perch.widgets.viewer import Viewer as V
+
         assert _binding_show(V.BINDINGS, "e") is False
 
     def test_focus_hidden(self) -> None:
         from perch.widgets.viewer import Viewer as V
+
         assert _binding_show(V.BINDINGS, "f") is False
 
 
