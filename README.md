@@ -6,6 +6,12 @@
 
 <p align="center"><em>A vantage point to observe agents in worktrees.</em></p>
 
+<p align="center">
+  <a href="https://github.com/GClunies/perch/actions/workflows/ci.yml"><img src="https://github.com/GClunies/perch/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://pypi.org/project/perch-ai/"><img src="https://img.shields.io/pypi/v/perch-ai" alt="PyPI"></a>
+  <a href="https://pypi.org/project/perch-ai/"><img src="https://img.shields.io/pypi/pyversions/perch-ai" alt="Python"></a>
+</p>
+
 Built for agentic workflows, `perch` is a lightweight terminal UI to quickly view:
 - Files (syntax highlighted, markdown preview, image rendering)
 - Git (status, diffs, commits)
