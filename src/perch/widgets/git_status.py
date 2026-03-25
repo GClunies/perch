@@ -1,4 +1,4 @@
-"""Git status panel showing unstaged, staged, untracked files and recent commits."""
+"""Git status panel showing unstaged, staged, untracked files and commits."""
 
 from __future__ import annotations
 
@@ -60,12 +60,30 @@ class CommitTree(Tree[str]):
     """Tree widget for commit history. GitPanel handles j/k navigation."""
 
     can_focus = True
+    auto_expand = False  # Expansion managed by GitPanel.toggle_commit
 
     BINDINGS = [
         Binding("l", "select_cursor", "Select", show=False),
         Binding("pageup", "page_up", "Page Up", show=False),
         Binding("pagedown", "page_down", "Page Down", show=False),
     ]
+
+    def action_select_cursor(self) -> None:
+        """Post NodeSelected without toggling expand/collapse.
+
+        Expansion is handled by GitPanel.toggle_commit via the app's
+        CommitToggled handler.  The default Tree.action_select_cursor
+        calls _toggle_node before posting, which would conflict.
+        """
+        node = self.cursor_node
+        if node is not None:
+            self.post_message(self.NodeSelected(node))
+
+    def action_toggle_node(self) -> None:
+        """Route space through NodeSelected so toggle_commit handles it."""
+        node = self.cursor_node
+        if node is not None:
+            self.post_message(self.NodeSelected(node))
 
 
 class GitPanel(Vertical):
@@ -144,7 +162,7 @@ class GitPanel(Vertical):
 
     def compose(self) -> ComposeResult:
         yield self._file_list
-        yield Label("\nRecent Commits", classes="section-header commits-header")
+        yield Label("\nCommits", classes="section-header commits-header")
         yield self._commit_tree
 
     @property

@@ -16,7 +16,7 @@ Built for agentic workflows, `perch` is a lightweight terminal UI to quickly vie
 - **File browser** — Navigate folders and files in a worktree with git status indicators.
 - **Viewer** — Syntax highlighting, unified/side-by-side diffs, markdown preview, and terminal image rendering.
 - **Fuzzy file search** — `Ctrl+P` opens a fast fuzzy finder.
-- **Git status panel** — Staged, unstaged, and untracked changes plus recent commits. Auto-refreshes every 5s.
+- **Git status panel** — Staged, unstaged, and untracked changes plus commits. Auto-refreshes every 5s.
 - **GitHub panel** — PR description, reviews, comments, and Actions CI status. Auto-refreshes every 30s.
 - **Editor integration** — `o` opens the current file in your editor.
 - **Keybinding help** — `?` shows all keyboard shortcuts. `Ctrl+Shift+P` opens the command palette for commands and theme switching.
@@ -31,40 +31,50 @@ Built for agentic workflows, `perch` is a lightweight terminal UI to quickly vie
 ## Getting Started
 
 ```bash
-# Clone and install
-git clone <repo-url> && cd perch
-uv sync
+# Install from PyPI
+uv pip install perch-ai
 
 # Launch in the current directory
-uv run perch
+perch
 
 # Or point at a specific worktree
-uv run perch /path/to/your/project
+perch /path/to/your/project
 
 # Use a specific editor (defaults to $EDITOR, then cursor)
-uv run perch --editor code
+perch --editor code
 ```
+
+## CLI Usage
+
+```
+perch [path] [--editor EDITOR]
+```
+
+| Argument | Description |
+| --- | --- |
+| `path` | Directory to browse (default: current directory) |
+| `--editor` | Editor command for opening files (default: `$EDITOR`, then `cursor`) |
 
 ## Keyboard Shortcuts
 
 | Key | Action |
 | --- | ------ |
+| `?` | Show keybinding help |
+| `Ctrl+Q` | Quit |
+| `Tab` | Switch focus between sidebar and viewer |
 | `[` / `]` | Previous / next sidebar tab |
-| `Tab` | Toggle focus between viewer and sidebar panes|
 | `j` / `k` | Navigate down / up (vim-style) |
 | `h` / `l` | Collapse / expand (file tree), scroll left / right (viewer) |
 | `d` | Toggle diff view |
 | `s` | Toggle diff layout (unified / side-by-side) |
-| `m` | Toggle markdown preview (`.md` files) |
-| `n` / `p` | Next / previous file in multi-file diff |
+| `p` | Toggle markdown preview (`.md` files) |
 | `Ctrl+P` | Fuzzy file search |
-| `o` | Open file in editor (file tree / viewer) or browser (GitHub tab) |
+| `o` / `e` | Open in editor (file tree / viewer) or browser (GitHub tab) |
+| `c` | Copy path to clipboard |
 | `r` | Refresh data (Git / GitHub tabs) |
 | `f` | Focus mode (hide sidebar) |
 | `-` / `=` | Shrink / grow focused pane |
-| `?` | Show keybinding help |
 | `Ctrl+Shift+P` | Command palette |
-| `Ctrl+Q` | Quit |
 
 ## Theming
 
@@ -77,10 +87,17 @@ export TEXTUAL_THEME="rose-pine-moon"
 ## Development
 
 ```bash
-uv sync --group dev    # Install dev dependencies
-uv run pytest          # Run tests
+# Clone and install in editable mode
+git clone <repo-url> && cd perch
+uv pip install -e .
+
+# Now you can run perch directly
+perch
+
+# Run tests and linting
+uv run pytest                # Run tests
 uv run ruff check src tests  # Lint
-uv run ty check src    # Type check
+uv run ty check src          # Type check
 ```
 
 ## Deployment
@@ -96,6 +113,9 @@ The version is read automatically from `__init__.py`. The workflow runs: tests �
 ```
 src
 └── perch
+    ├── __init__.py         # Package version
+    ├── __main__.py         # python -m perch entry point
+    ├── _bindings.py        # Shared keybinding constants
     ├── app.py              # Main Textual application
     ├── app.tcss            # Stylesheet
     ├── cli.py              # CLI entry point (argparse)
@@ -110,6 +130,7 @@ src
         ├── file_tree.py    # Directory tree with git status indicators
         ├── git_status.py   # Git status panel (files + commits)
         ├── github_panel.py # PR reviews, comments, GitHub Actions panel
+        ├── help_screen.py  # Keybinding help overlay
         ├── splitter.py     # Draggable pane splitter
         └── viewer.py       # Content viewer (files, diffs, markdown, images)
 ```

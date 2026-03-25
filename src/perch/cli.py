@@ -1,4 +1,5 @@
 import argparse
+import sys
 from pathlib import Path
 
 
@@ -21,7 +22,21 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    resolved = args.path.resolve()
+
+    from perch.services.git import get_worktree_root
+
+    try:
+        get_worktree_root(resolved)
+    except RuntimeError:
+        print(
+            f"Error: {resolved} is not a Git repository.\n"
+            "Run `git init` first, then run `perch`.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     from perch.app import PerchApp
 
-    app = PerchApp(worktree_path=args.path.resolve(), editor=args.editor)
-    app.run(mouse=False)
+    app = PerchApp(worktree_path=resolved, editor=args.editor)
+    app.run()

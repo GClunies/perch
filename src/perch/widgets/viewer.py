@@ -91,10 +91,18 @@ def _strip_html_for_markdown(text: str) -> str:
     * ``<img …>`` tags are left intact (handled separately by the image
       renderer).
     """
-    # Strip <p …>…</p> wrappers — keep inner content
+    # Strip <p …>…</p> wrappers — keep inner content.
+    # Preserve align="center" as a Unicode marker so the renderer can center.
+    def _p_repl(m: re.Match) -> str:
+        tag = m.group(0)
+        inner = m.group(1).strip()
+        if re.search(r'align\s*=\s*["\']?center', tag, re.IGNORECASE):
+            return f"\n<center>{inner}</center>\n"
+        return inner
+
     text = re.sub(
         r"<p\b[^>]*>(.*?)</p>",
-        lambda m: m.group(1).strip(),
+        _p_repl,
         text,
         flags=re.DOTALL | re.IGNORECASE,
     )
@@ -135,19 +143,29 @@ def render_markdown_with_images(
     # Pre-process HTML blocks into markdown equivalents
     text = _strip_html_for_markdown(text)
 
-    # Match markdown images and HTML img tags
-    img_pattern = re.compile(
+    # Match markdown images, HTML img tags, and centered blocks
+    chunk_pattern = re.compile(
         r"!\[([^\]]*)\]\(([^)]+)\)"  # ![alt](src)
         r'|<img\s[^>]*src=["\']([^"\']+)["\'][^>]*/?>'  # <img src="...">
+        r"|<center>(.*?)</center>",  # centered blocks from _strip_html
+        re.DOTALL,
     )
 
     parts: list = []
     last_end = 0
-    for m in img_pattern.finditer(text):
+    for m in chunk_pattern.finditer(text):
         # Add preceding markdown
         before = text[last_end : m.start()].strip()
         if before:
             parts.append(Markdown(before))
+
+        # Centered block
+        if m.group(4) is not None:
+            inner = m.group(4).strip()
+            inner_md = Markdown(inner)
+            parts.append(Align.center(inner_md))
+            last_end = m.end()
+            continue
 
         # Resolve image path
         src = m.group(2) or m.group(3)
