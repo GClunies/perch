@@ -13,15 +13,12 @@ permissions:
   id-token: write
 
 jobs:
-  publish:
+  validate:
     runs-on: ubuntu-latest
-    environment: pypi
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - uses: astral-sh/setup-uv@v4
 
       - name: Validate version input
         run: |
@@ -45,6 +42,72 @@ jobs:
             exit 1
           fi
 
+  test:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Run tests
+        run: |
+          uv sync --group dev
+          uv run pytest
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Build package
+        run: uv build
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-testpypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+      - name: Verify install from TestPyPI
+        run: |
+          sleep 10
+          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ perch-ai==${{ inputs.version }}
+          python -c "from perch import __version__; assert __version__ == '${{ inputs.version }}', f'Version mismatch: {__version__}'"
+
+  publish-pypi:
+    needs: publish-testpypi
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - name: Download dist
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  release:
+    needs: publish-pypi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Generate changelog
         id: changelog
         run: |
@@ -64,17 +127,6 @@ jobs:
             echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG:-initial}...v${{ inputs.version }}"
             echo "CHANGELOG_EOF"
           } >> "$GITHUB_OUTPUT"
-
-      - name: Run tests
-        run: |
-          uv sync --group dev
-          uv run pytest
-
-      - name: Build package
-        run: uv build
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
 
       - name: Create git tag
         run: |
