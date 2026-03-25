@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   validate:
@@ -70,7 +69,6 @@ jobs:
   publish-testpypi:
     needs: build
     runs-on: ubuntu-latest
-    environment: testpypi
     steps:
       - name: Download dist
         uses: actions/download-artifact@v4
@@ -80,6 +78,7 @@ jobs:
       - name: Publish to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
           repository-url: https://test.pypi.org/legacy/
       - name: Verify install from TestPyPI
         run: |
@@ -90,7 +89,6 @@ jobs:
   publish-pypi:
     needs: publish-testpypi
     runs-on: ubuntu-latest
-    environment: pypi
     steps:
       - name: Download dist
         uses: actions/download-artifact@v4
@@ -99,6 +97,8 @@ jobs:
           path: dist/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
   release:
     needs: publish-pypi
