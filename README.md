@@ -83,6 +83,14 @@ uv run ruff check src tests  # Lint
 uv run ty check src    # Type check
 ```
 
+## Deployment
+
+1. Update `__version__` in `src/perch/__init__.py` (e.g. `"0.2.0"`)
+2. Commit and push
+3. Go to GitHub → Actions → **Publish** → Run workflow
+
+The version is read automatically from `__init__.py`. The workflow runs: tests → build → TestPyPI → PyPI → git tag → GitHub Release.
+
 ## Project Layout
 
 ```

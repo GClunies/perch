@@ -2,11 +2,6 @@ name: Publish
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to release (e.g. 0.2.0)"
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -14,30 +9,31 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Validate version input
+      - name: Read version from __init__.py
+        id: version
         run: |
-          if ! echo "${{ inputs.version }}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Version must be semver (e.g. 0.2.0)"
+          VERSION=$(grep '__version__' src/perch/__init__.py | sed 's/.*"\(.*\)"/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
+
+      - name: Validate semver
+        run: |
+          if ! echo "${{ steps.version.outputs.version }}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version in __init__.py must be semver (e.g. 0.2.0), got: ${{ steps.version.outputs.version }}"
             exit 1
           fi
 
       - name: Check tag does not already exist
         run: |
-          if git rev-parse "v${{ inputs.version }}" >/dev/null 2>&1; then
-            echo "::error::Tag v${{ inputs.version }} already exists. Cannot re-release."
-            exit 1
-          fi
-
-      - name: Ensure __init__.py version matches
-        run: |
-          CURRENT=$(grep '__version__' src/perch/__init__.py | sed 's/.*"\(.*\)"/\1/')
-          if [ "$CURRENT" != "${{ inputs.version }}" ]; then
-            echo "::error::src/perch/__init__.py version is $CURRENT but expected ${{ inputs.version }}. Update it first."
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "::error::Tag v${{ steps.version.outputs.version }} already exists. Bump the version in __init__.py first."
             exit 1
           fi
 
@@ -67,7 +63,7 @@ jobs:
           path: dist/
 
   publish-testpypi:
-    needs: build
+    needs: [validate, build]
     runs-on: ubuntu-latest
     steps:
       - name: Download dist
@@ -83,11 +79,11 @@ jobs:
       - name: Verify install from TestPyPI
         run: |
           sleep 10
-          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ perch-ai==${{ inputs.version }}
-          python -c "from perch import __version__; assert __version__ == '${{ inputs.version }}', f'Version mismatch: {__version__}'"
+          pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ perch-ai==${{ needs.validate.outputs.version }}
+          python -c "from perch import __version__; assert __version__ == '${{ needs.validate.outputs.version }}', f'Version mismatch: {__version__}'"
 
   publish-pypi:
-    needs: publish-testpypi
+    needs: [validate, publish-testpypi]
     runs-on: ubuntu-latest
     steps:
       - name: Download dist
@@ -101,7 +97,7 @@ jobs:
           password: ${{ secrets.PYPI_API_TOKEN }}
 
   release:
-    needs: publish-pypi
+    needs: [validate, publish-pypi]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -124,19 +120,19 @@ jobs:
             git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges
             echo ""
             echo ""
-            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG:-initial}...v${{ inputs.version }}"
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG:-initial}...v${{ needs.validate.outputs.version }}"
             echo "CHANGELOG_EOF"
           } >> "$GITHUB_OUTPUT"
 
       - name: Create git tag
         run: |
-          git tag "v${{ inputs.version }}"
-          git push origin "v${{ inputs.version }}"
+          git tag "v${{ needs.validate.outputs.version }}"
+          git push origin "v${{ needs.validate.outputs.version }}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ inputs.version }}
-          name: v${{ inputs.version }}
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: v${{ needs.validate.outputs.version }}
           body: ${{ steps.changelog.outputs.body }}
           files: dist/*
