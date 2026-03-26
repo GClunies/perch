@@ -8,8 +8,8 @@
 
 <p align="center">
   <a href="https://github.com/GClunies/perch/actions/workflows/ci.yml"><img src="https://github.com/GClunies/perch/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
-  <a href="https://pypi.org/project/perch-ai/"><img src="https://img.shields.io/pypi/v/perch-ai" alt="PyPI"></a>
-  <a href="https://pypi.org/project/perch-ai/"><img src="https://img.shields.io/pypi/pyversions/perch-ai" alt="Python"></a>
+  <a href="https://pypi.org/project/perch-tui/"><img src="https://img.shields.io/pypi/v/perch-tui" alt="PyPI"></a>
+  <a href="https://pypi.org/project/perch-tui/"><img src="https://img.shields.io/pypi/pyversions/perch-tui" alt="Python"></a>
 </p>
 
 Built for agentic workflows, `perch` is a lightweight terminal UI to quickly view:
@@ -38,7 +38,7 @@ Built for agentic workflows, `perch` is a lightweight terminal UI to quickly vie
 
 ```bash
 # Install from PyPI
-uv pip install perch-ai
+uv pip install perch-tui
 
 # Launch in the current directory
 perch

@@ -186,7 +186,7 @@ wheels = [
 ]
 
 [[package]]
-name = "perch-ai"
+name = "perch-tui"
 source = { editable = "." }
 dependencies = [
     { name = "pillow" },
