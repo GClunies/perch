@@ -114,6 +114,7 @@ class FileTree(DirectoryTree):
 
     def on_mount(self) -> None:
         self._watch_filesystem()
+        self.set_interval(5, self._poll_git_status)
 
     def on_unmount(self) -> None:
         self._stop_watching.set()
@@ -141,10 +142,27 @@ class FileTree(DirectoryTree):
                 try:
                     status = get_status_dict(Path(self.path))
                     self.app.call_from_thread(self._apply_git_status, status)
-                except RuntimeError:
+                except RuntimeError:  # pragma: no cover
                     pass
-        except Exception:
+        except Exception:  # pragma: no cover
             pass
+
+    @work(thread=True)
+    def _poll_git_status(self) -> None:
+        """Periodic poll to catch status changes missed by watchfiles.
+
+        In git worktrees, commits modify files outside the worktree
+        directory, so watchfiles never fires. This 5s poll keeps the
+        file tree indicators in sync with the git panel.
+        """
+        from perch.services.git import get_status_dict
+
+        try:
+            status = get_status_dict(Path(self.path))
+        except RuntimeError:
+            return
+        if status != self._git_status:
+            self.app.call_from_thread(self._apply_git_status, status)
 
     def _apply_git_status(self, status: dict[str, str]) -> None:
         """Apply fetched git status and reload the tree structure."""

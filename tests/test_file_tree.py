@@ -742,6 +742,38 @@ class TestDirectoryStatusIndicators:
         assert tree._dir_statuses["src/perch"] == {"modified", "added"}
         assert tree._dir_statuses["tests"] == {"modified"}
 
+    async def test_poll_refreshes_stale_status(self, tmp_path: Path) -> None:
+        """Periodic poll should update status when git state changes."""
+        from unittest.mock import patch
+
+        from perch.app import PerchApp
+        from perch.models import GitStatusData
+
+        _init_git_repo_with_commit(tmp_path)
+
+        with (
+            patch("perch.services.git.get_status", return_value=GitStatusData()),
+            patch("perch.services.git.get_log", return_value=[]),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                tree = pilot.app.query_one(FileTree)
+                for _ in range(10):
+                    await pilot.pause()
+
+                # Inject stale status
+                tree._git_status = {"old.py": "modified"}
+
+                # Patch get_status_dict to return clean status
+                with patch("perch.services.git.get_status_dict", return_value={}):
+                    tree._poll_git_status()
+                    for _ in range(10):
+                        await pilot.pause()
+
+                assert tree._git_status == {}
+
 
 class TestRefreshBinding:
     async def test_r_keybinding_exists(self, tmp_path: Path) -> None:
