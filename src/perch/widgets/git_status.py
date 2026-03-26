@@ -304,7 +304,12 @@ class GitPanel(Vertical):
     # ------------------------------------------------------------------
 
     def on_tree_node_highlighted(self, event: Tree.NodeHighlighted) -> None:
-        """Post messages when tree nodes are highlighted."""
+        """Post messages when tree nodes are highlighted.
+
+        Stops propagation so the App-level on_tree_node_highlighted
+        (which handles FileTree events) does not also fire.
+        """
+        event.stop()
         node = event.node
         if node.data is None:
             return

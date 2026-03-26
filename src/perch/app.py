@@ -235,6 +235,8 @@ class PerchApp(App):
         self, event: GitPanel.CommitHighlighted
     ) -> None:
         """Load commit summary when a commit is highlighted in the tree."""
+        if self.query_one(TabbedContent).active != "tab-git":
+            return
         viewer = self.query_one(Viewer)
         viewer.worktree_root = self.worktree_path
         self._load_commit_summary(event.commit_hash)
@@ -243,6 +245,8 @@ class PerchApp(App):
         self, event: GitPanel.CommitFileHighlighted
     ) -> None:
         """Load file diff when a commit-file is highlighted in the tree."""
+        if self.query_one(TabbedContent).active != "tab-git":
+            return
         viewer = self.query_one(Viewer)
         viewer.worktree_root = self.worktree_path
         viewer.load_commit_file_diff(event.commit_hash, event.path)
@@ -253,7 +257,17 @@ class PerchApp(App):
         panel.toggle_commit(event.commit_hash)
 
     def on_tree_node_highlighted(self, event) -> None:
-        """Update the viewer when a tree node is highlighted (cursor moves)."""
+        """Update the viewer when a FileTree node is highlighted.
+
+        Only reacts when the Files tab is active to prevent background
+        tree refreshes (watchfiles, git status) from overwriting the
+        viewer while the user is on another tab.
+        """
+        try:
+            if self.query_one(TabbedContent).active != "tab-files":
+                return
+        except Exception:
+            return  # Not yet composed during early startup
         node = event.node
         if node.data is None:
             return
@@ -261,7 +275,7 @@ class PerchApp(App):
         try:
             viewer = self.query_one(Viewer)
         except Exception:
-            return  # Viewer not yet composed during early startup
+            return
         if isinstance(path, Path) and path.is_file():
             viewer.load_file(path)
             self._files_tab_last_path = path
@@ -292,7 +306,7 @@ class PerchApp(App):
             viewer.show_ci_loading(title=event.title)
             viewer.fetch_ci_log(event.url)
 
-    @work(thread=True)
+    @work(thread=True, exclusive=True, group="commit-summary")
     def _load_commit_summary(self, commit_hash: str) -> None:
         """Load commit summary in background and update viewer."""
         from perch.services.git import get_commit_summary
@@ -300,6 +314,8 @@ class PerchApp(App):
         try:
             summary = get_commit_summary(self.worktree_path, commit_hash)
         except RuntimeError:
+            return
+        if self.query_one(TabbedContent).active != "tab-git":
             return
         self.call_from_thread(self.query_one(Viewer).show_commit_summary, summary)
 

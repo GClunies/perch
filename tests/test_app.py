@@ -827,6 +827,10 @@ class TestCommitTreeAppEvents:
             for _ in range(20):
                 await pilot.pause()
 
+            # Activate git tab so the tab guard passes
+            pilot.app.query_one(TabbedContent).active = "tab-git"
+            await pilot.pause()
+
             panel = pilot.app.query_one(GitPanel)
             root = panel._commit_tree.root
             commit_node = next(
@@ -846,6 +850,11 @@ class TestCommitTreeAppEvents:
         app = PerchApp(git_worktree)
         async with app.run_test(size=(120, 40)) as pilot:
             await pilot.pause()
+
+            # Activate git tab so the tab guard passes
+            pilot.app.query_one(TabbedContent).active = "tab-git"
+            await pilot.pause()
+
             viewer = pilot.app.query_one(Viewer)
             with patch.object(viewer, "load_commit_file_diff") as mock:
                 event = GitPanel.CommitFileHighlighted("abc123", "hello.py")
