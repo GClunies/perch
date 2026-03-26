@@ -80,30 +80,30 @@ class TestResizeLeftPane:
 
 
 class TestMouseDrag:
-    """Tests for mouse drag resizing."""
+    """Tests for mouse drag resizing.
+
+    Call handlers directly instead of post_message to avoid
+    platform-dependent mouse event dispatch in headless CI.
+    """
 
     async def test_mouse_down_starts_drag(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
             splitter = pilot.app.query_one(DraggableSplitter)
             assert splitter._dragging is False
-            splitter.post_message(
-                events.MouseDown(
-                    splitter, 0, 5, 0, 0, 1, False, False, False, screen_x=40.0
-                )
+            event = events.MouseDown(
+                splitter, 0, 5, 0, 0, 1, False, False, False, screen_x=40.0
             )
-            await pilot.pause()
+            splitter.on_mouse_down(event)
             assert splitter._dragging is True
 
     async def test_mouse_up_stops_drag(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
             splitter = pilot.app.query_one(DraggableSplitter)
             splitter._dragging = True
-            splitter.post_message(
-                events.MouseUp(
-                    splitter, 0, 5, 0, 0, 1, False, False, False, screen_x=45.0
-                )
+            event = events.MouseUp(
+                splitter, 0, 5, 0, 0, 1, False, False, False, screen_x=45.0
             )
-            await pilot.pause()
+            splitter.on_mouse_up(event)
             assert splitter._dragging is False
 
     async def test_mouse_drag_resizes_pane(self, worktree: Path) -> None:
@@ -117,19 +117,16 @@ class TestMouseDrag:
             await pilot.pause()
 
             # Start drag at screen_x=40
-            splitter.post_message(
-                events.MouseDown(
-                    splitter, 0, 5, 0, 0, 1, False, False, False, screen_x=40.0
-                )
+            down = events.MouseDown(
+                splitter, 0, 5, 0, 0, 1, False, False, False, screen_x=40.0
             )
-            await pilot.pause()
+            splitter.on_mouse_down(down)
 
-            # Move mouse 5 pixels right
-            splitter.post_message(
-                events.MouseMove(
-                    splitter, 5, 5, 5, 0, 1, False, False, False, screen_x=45.0
-                )
+            # Move mouse 5 columns right
+            move = events.MouseMove(
+                splitter, 5, 5, 5, 0, 1, False, False, False, screen_x=45.0
             )
+            splitter.on_mouse_move(move)
             await pilot.pause()
 
             # styles.width should be updated to 45 (40 + 5)
@@ -144,11 +141,10 @@ class TestMouseDrag:
             initial_width = left_pane.outer_size.width
 
             # Move without dragging
-            splitter.post_message(
-                events.MouseMove(
-                    splitter, 10, 5, 10, 0, 0, False, False, False, screen_x=50.0
-                )
+            move = events.MouseMove(
+                splitter, 10, 5, 10, 0, 0, False, False, False, screen_x=50.0
             )
+            splitter.on_mouse_move(move)
             await pilot.pause()
 
             assert left_pane.outer_size.width == initial_width
