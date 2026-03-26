@@ -1,0 +1,432 @@
+# feat: Revamp Hotkey Display with Lazygit-Style Contextual Keybinding Bar
+
+## Overview
+
+Revamp Perch's keyboard shortcut system to follow the Lazygit/Lazydocker pattern: a compact, curated footer showing only the most relevant hotkeys for the currently focused widget, plus a dedicated `?` help screen listing all keybindings organized by context. The current system uses Textual's built-in Footer with ad-hoc show/hide decisions and duplicated binding definitions across widgets.
+
+## Desired End State
+
+When complete:
+- The footer shows a **compact, curated** set of hotkeys that change based on the focused widget/panel (like Lazygit)
+- Pressing `?` opens a **dedicated help screen** showing all keybindings organized by panel/context (not the command palette)
+- The command palette remains accessible via `Ctrl+Shift+P` (standard convention)
+- Shared bindings (navigation, focus, refresh) are defined once and reused across widgets
+- Every binding has a `group` and `tooltip` for discoverability
+- Verification: `make test`, visual inspection of footer per panel, `?` help screen
+
+## Problem Statement / Motivation
+
+The current hotkey system has several issues:
+1. **Discoverability is poor** — users don't know what actions are available in each context. The footer shows a flat list of keys with no grouping or prioritization.
+2. **DRY violations** — the `hjkl/←↓↑→` navigation pattern is copy-pasted identically across 4 widgets (`Viewer`, `FileTree`, `GitPanel`, `GitHubPanel`). The `f` (focus) and `r` (refresh) bindings are similarly duplicated.
+3. **`?` opens the command palette** instead of a keybinding reference — the palette is great for fuzzy search but doesn't serve as a "what can I do here?" breadcrumb.
+4. **Stale command entries** — `commands.py` has `next_diff_file` and `prev_diff_file` entries with no corresponding action implementations.
+5. **No binding groups or tooltips** — Textual supports `group` and `tooltip` on Binding objects, but Perch doesn't use them.
+
+## What We're NOT Doing
+
+- Not replacing Textual's built-in `Footer` with a fully custom widget (too much maintenance burden; the built-in Footer already supports `compact`, `group`, and `check_action`)
+- Not implementing user-configurable keybindings / keymap overrides (future enhancement using Textual's `Keymap` system)
+- Not changing the actual key assignments (only changing what's shown and how)
+- Not adding new actions or features — this is purely about display and organization
+
+## Proposed Solution
+
+### Approach: Curated Built-in Footer + Help Screen
+
+Use Textual's built-in `Footer` in `compact` mode with Binding `group` parameter for organization, plus a new `HelpScreen` modal for full keybinding reference. Reclaim `?` for the help screen; keep command palette on `Ctrl+Shift+P`.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  PerchApp                                               │
+│  ├─ BINDINGS (global: q, Tab, [, ], Ctrl+P, Ctrl+Shift+P) │
+│  ├─ compose() → Footer(compact=True)                    │
+│  └─ action_show_help() → push_screen(HelpScreen)        │
+│                                                         │
+│  Widgets (each has curated BINDINGS):                   │
+│  ├─ FileTree    → Refresh, Open, Search, Navigate       │
+│  ├─ Viewer      → Diff, Layout, Markdown, Scroll        │
+│  ├─ GitPanel    → Refresh, Select, Navigate             │
+│  └─ GitHubPanel → Open, Refresh, Navigate               │
+│                                                         │
+│  Shared:                                                │
+│  ├─ _bindings.py → NAV_BINDINGS, FOCUS_BINDING, etc.    │
+│  └─ help_screen.py → HelpScreen (modal, all bindings)   │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Custom vs built-in Footer | Built-in with `compact=True` | Less maintenance; `group` and `check_action` already cover our needs |
+| `?` key | Help screen (not command palette) | Matches Lazygit UX; `Ctrl+Shift+P` is the standard palette key |
+| Shared bindings | Constants in `_bindings.py` | Single source of truth; eliminates DRY violations |
+| Binding groups | `"Navigation"`, `"Actions"`, `"View"` | Organizes footer like Lazygit's categorized display |
+
+## Implementation Phases
+
+### Phase 1: Foundation — Shared Binding Constants
+
+Extract duplicated bindings into a shared module and add `group`/`tooltip` to all bindings.
+
+- [ ] **1.1: Write tests for shared binding constants**
+  - Test that `NAV_BINDINGS` contains expected keys (`j`, `k`, `h`, `l`, `pageup`, `pagedown`)
+  - Test that `FOCUS_BINDING` maps `f` → `app.toggle_focus_mode`
+  - Test that `REFRESH_BINDING` maps `r` → `refresh`
+  - Test that all shared bindings have `group` and `tooltip` set
+  - File: `tests/test_bindings.py` (new)
+
+- [ ] **1.2: Create `src/perch/_bindings.py`**
+  - Define `NAV_BINDINGS`: list of navigation Binding objects with `group="Navigation"`, first entry has `key_display="hjkl/←↓↑→"` and `show=True`, rest have `show=False`
+  - Define `FOCUS_BINDING`: `Binding("f", "app.toggle_focus_mode", "Focus", group="Navigation", tooltip="Toggle focus mode — hide sidebar")`
+  - Define `REFRESH_BINDING`: `Binding("r", "refresh", "Refresh", group="Actions", tooltip="Refresh data for this panel")`
+  - File: `src/perch/_bindings.py` (new)
+
+- [ ] **1.3: Update all widgets to use shared bindings**
+  - `FileTree.BINDINGS` — replace inline nav/focus/refresh with `[*NAV_BINDINGS, FOCUS_BINDING, REFRESH_BINDING, ...]`
+  - `GitPanel.BINDINGS` — same replacement
+  - `GitHubPanel.BINDINGS` — same replacement
+  - `Viewer.BINDINGS` — replace nav bindings (scroll variants) with shared constants
+  - Files: `src/perch/widgets/file_tree.py:39-54`, `src/perch/widgets/git_status.py:104-114`, `src/perch/widgets/github_panel.py:82-92`, `src/perch/widgets/viewer.py:377-389`
+
+- [ ] **1.4: Add `group` and `tooltip` to all remaining bindings**
+  - App-level: `q` → group `"App"`, `Tab` → group `"Navigation"`, `[`/`]` → group `"Navigation"`
+  - Viewer-specific: `d` → group `"View"`, `s` → group `"View"`, `m` → group `"View"`, `e` → group `"Actions"`
+  - FileTree-specific: `Ctrl+P` → group `"Actions"`, `o` → group `"Actions"`
+  - GitPanel-specific: `l` → group `"Actions"` (select)
+  - GitHubPanel-specific: `o` → group `"Actions"`
+  - Files: `src/perch/app.py:27-43`, all widget files above
+
+- [ ] **1.5: Verify** — `make test` passes, existing footer behavior unchanged
+
+### Phase 2: Curated Footer Display
+
+Switch to `compact` mode and curate which bindings appear per widget.
+
+- [ ] **2.1: Write tests for footer behavior**
+  - Test `Footer` is in `compact` mode
+  - Test that when FileTree is focused, footer shows: `r` Refresh, `o` Open, `Ctrl+P` Search, `hjkl` Navigate, `?` Help
+  - Test that when Viewer is focused, footer shows: `d` Diff, `s` Layout, `m` Markdown (conditional), `hjkl` Scroll, `?` Help
+  - Test that when GitPanel is focused, footer shows: `r` Refresh, `l` Select, `hjkl` Navigate, `?` Help
+  - Test that when GitHubPanel is focused, footer shows: `o` Open, `r` Refresh, `hjkl` Navigate, `?` Help
+  - File: `tests/test_app.py` (extend existing footer tests)
+
+- [ ] **2.2: Enable `compact=True` on Footer**
+  - Change `Footer()` → `Footer(compact=True)` in `PerchApp.compose()`
+  - File: `src/perch/app.py:95`
+
+- [ ] **2.3: Audit and curate binding visibility per widget**
+  - Principle: show **max 5-6 bindings** in footer per context (Lazygit shows ~5-7)
+  - Each widget: review `show=True/False` decisions
+  - Always show: context-specific action keys + navigation hint + `?` help
+  - Always hide: `pageup`/`pagedown`, variant keys (`h`/`l` when `j` hero shown)
+  - Files: all widget BINDINGS lists
+
+- [ ] **2.4: Verify** — `make test`, visual check of footer per panel
+
+### Phase 3: Help Screen
+
+Create a dedicated keybinding help screen and rebind `?`.
+
+- [ ] **3.1: Write tests for HelpScreen**
+  - Test `?` key opens `HelpScreen` (not command palette)
+  - Test `HelpScreen` displays bindings organized by group/context
+  - Test `Escape` or `?` closes the help screen
+  - Test all BINDINGS from all widgets appear in help screen
+  - Test `Ctrl+Shift+P` still opens command palette
+  - File: `tests/test_help_screen.py` (new)
+
+- [ ] **3.2: Create `src/perch/widgets/help_screen.py`**
+  - `HelpScreen(ModalScreen)` that reads `active_bindings` from the app
+  - Displays bindings in a formatted table grouped by context:
+    ```
+    ╭─ Global ─────────────────────────╮
+    │  q        Quit                   │
+    │  Tab      Switch Pane            │
+    │  [ / ]    Prev / Next Tab        │
+    │  Ctrl+P   File Search            │
+    │  ?        Help                   │
+    ╰──────────────────────────────────╯
+    ╭─ File Tree ──────────────────────╮
+    │  r        Refresh                │
+    │  o        Open in Editor         │
+    │  hjkl     Navigate               │
+    ╰──────────────────────────────────╯
+    ...
+    ```
+  - Use `Static` or `RichLog` with Rich tables for formatting
+  - Bindings: `Escape` and `?` to dismiss
+  - File: `src/perch/widgets/help_screen.py` (new)
+
+- [ ] **3.3: Rebind `?` from command palette to help screen**
+  - Change `COMMAND_PALETTE_BINDING` to `"ctrl+shift+p"` (Textual's default)
+  - Change `?` binding: `Binding("question_mark", "show_help", "Help", key_display="?", priority=True, group="App")`
+  - Add `action_show_help()` → `self.push_screen(HelpScreen())`
+  - Remove old `?` → `command_palette` binding
+  - Files: `src/perch/app.py:25, 40-42`
+
+- [ ] **3.4: Update `commands.py`**
+  - Remove stale `next_diff_file` and `prev_diff_file` entries (no action implementations exist)
+  - Add `("Help", "?", "show_help")` entry
+  - Ensure all COMMANDS entries have corresponding action implementations
+  - File: `src/perch/commands.py:9-22`
+
+- [ ] **3.5: Verify** — `make test`, `?` opens help screen, `Ctrl+Shift+P` opens palette
+
+### Phase 4: Polish and Test Coverage
+
+- [ ] **4.1: Update existing tests for changed bindings**
+  - `test_app.py` — update `test_ctrl_shift_p_binding_exists` for new `COMMAND_PALETTE_BINDING`
+  - `test_app.py` — update `test_has_footer` to verify compact mode
+  - `test_commands.py` — update for removed/added COMMANDS entries
+  - Files: `tests/test_app.py`, `tests/test_commands.py`
+
+- [ ] **4.2: Update README keyboard shortcuts table**
+  - Add `?` → "Show keybinding help" entry
+  - Update `Ctrl+Shift+P` description to note it's for command palette
+  - File: `README.md`
+
+- [ ] **4.3: Final verification**
+  - `make test` — all tests pass
+  - `make lint` — no lint errors
+  - `make typecheck` — no type errors
+  - Visual: launch app, verify footer per panel, verify help screen
+
+## Technical Considerations
+
+### Architecture
+- `_bindings.py` becomes the single source of truth for shared bindings — widgets import from it
+- The `HelpScreen` needs to collect bindings from multiple widgets. It can use `self.app.screen.active_bindings` for the current context, or iterate over known widget classes' `BINDINGS` for a complete view
+- Binding `group` parameter controls how the Footer groups keys visually
+
+### Textual Version Compatibility
+- Perch uses Textual **1.1** — `group`, `tooltip`, `id` on Binding are available (added in 0.63+)
+- `Footer(compact=True)` is available (added in 0.63+)
+- `ModalScreen` for help screen is available
+
+### Performance
+- No performance impact — binding resolution is already O(widget-chain-depth) per key press
+- Help screen renders once on open; no continuous computation
+
+### Risks
+- **Footer rendering with groups**: Need to verify how Textual 1.1 renders grouped bindings in compact mode — may need CSS tweaks
+- **`check_action` interactions**: Viewer's existing `check_action` must still work correctly after binding reorganization
+
+## Success Criteria
+
+### Automated Verification
+- [ ] `make test` passes with all new and updated tests
+- [ ] `make lint` passes
+- [ ] `make typecheck` passes
+- [ ] No DRY violations in binding definitions (each shared binding defined exactly once)
+
+### Manual Verification
+- [ ] Focus FileTree → footer shows: Refresh, Open, Search, Navigate, Help (~5 items)
+- [ ] Focus Viewer → footer shows: Diff, Layout, Markdown (conditional), Scroll, Help
+- [ ] Focus GitPanel → footer shows: Refresh, Select, Navigate, Help
+- [ ] Focus GitHubPanel → footer shows: Open, Refresh, Navigate, Help
+- [ ] Press `?` → help screen opens with all bindings grouped by context
+- [ ] Press `Escape` on help screen → returns to app
+- [ ] Press `Ctrl+Shift+P` → command palette opens (unchanged)
+- [ ] Footer is visually compact and readable
+
+## Dependencies & Risks
+
+| Risk | Mitigation |
+|------|------------|
+| Textual Footer `group` rendering may not match Lazygit aesthetic | Test early in Phase 2; fall back to CSS customization or custom Footer subclass if needed |
+| Rebinding `?` may break muscle memory for command palette users | Command palette still available via `Ctrl+Shift+P`; document in README |
+| `active_bindings` API may not expose all widget bindings for help screen | Fall back to iterating known widget class BINDINGS directly |
+
+## Open Questions
+
+| Question | Options | Source |
+|----------|---------|--------|
+| Should help screen show ALL bindings or only bindings for current context? | A: All (like Lazygit `?`), B: Current context only | Design decision — Lazygit shows all organized by panel |
+| Should `?` toggle the help screen or always push? | A: Toggle (press again to close), B: Push (Escape to close) | UX preference |
+| Should we add `tooltip` text to footer hover or just use it in help screen? | A: Both, B: Help screen only | Depends on terminal hover support |
+
+## References & Research
+
+### Internal
+- `src/perch/app.py:27-43` — current app BINDINGS
+- `src/perch/widgets/viewer.py:377-452` — Viewer BINDINGS + check_action + _refresh_footer
+- `src/perch/widgets/file_tree.py:39-54` — FileTree BINDINGS
+- `src/perch/widgets/git_status.py:104-114` — GitPanel BINDINGS
+- `src/perch/widgets/github_panel.py:82-92` — GitHubPanel BINDINGS
+- `src/perch/commands.py:9-22` — command palette COMMANDS list
+- `plans/perch-plan.md:168-210` — original key binding spec
+
+### External
+- [Textual Footer widget docs](https://textual.textualize.io/widgets/footer/) — compact mode, binding display
+- [Textual Binding API](https://textual.textualize.io/api/binding/) — group, tooltip, id parameters
+- [Lazygit keybindings](https://github.com/jesseduffield/lazygit/blob/master/docs/keybindings/Keybindings_en.md) — panel-organized keybinding reference
+
+---
+
+# Plan Review Summary
+
+**Plan:** docs/plans/feat-revamp-hotkey-display.md
+**Reviewed:** 2026-03-21
+**Agents run:** 5 | **Responded:** 5
+
+## Findings Overview
+
+| Priority | Count | Status |
+|----------|-------|--------|
+| P1 (Critical) | 3 | BLOCKS APPROVAL |
+| P2 (Important) | 7 | Should address |
+| P3 (Nice-to-have) | 7 | Optional |
+
+## Open Questions (Requires User Decision)
+
+**Questions flagged by reviewers and conflicts between reviewers. These MUST be resolved during consolidation before implementation.**
+
+| # | Question | Options | Source(s) |
+|---|----------|---------|-----------|
+| 1 | `NAV_BINDINGS` cannot be a single shared constant — Viewer uses `scroll_down`/`scroll_up` while FileTree/GitPanel/GitHubPanel use `cursor_down`/`cursor_up`. How should shared nav bindings handle different action names? | A: Factory function `make_nav_bindings(down="cursor_down", up="cursor_up")`, B: Separate `NAV_BINDINGS` and `SCROLL_NAV_BINDINGS` constants, C: Only share `FOCUS_BINDING` and `REFRESH_BINDING`, keep nav per-widget | reviewer-code-quality, reviewer-patterns |
+| 2 | How should `HelpScreen` collect bindings to show ALL panels (Lazygit-style)? `active_bindings` only returns current focus chain. | A: Iterate known widget class `BINDINGS` directly (complete but tightly coupled), B: Registry pattern where widgets register themselves (decoupled but more infrastructure), C: Pure function `collect_all_bindings(widget_classes)` for testability | reviewer-architecture, reviewer-code-quality, reviewer-patterns, reviewer-performance |
+| 3 | Should `?` toggle the help screen or always push? | A: Toggle (press again to close — slightly cheaper, no redundant construction), B: Push (Escape to close — simpler implementation) | reviewer-architecture, reviewer-performance |
+| 4 | Should Phase 3.4 stale-entry removal happen earlier (Phase 1) since it's existing broken behavior? | A: Move to Phase 1 (fix broken behavior first), B: Keep in Phase 3 (group with command palette changes) | reviewer-patterns |
+| 5 | Should this refactor also standardize all BINDINGS to use `Binding()` objects (eliminating mixed tuple syntax)? | A: Yes, standardize during this refactor (touching all files anyway), B: No, out of scope | reviewer-patterns, reviewer-code-quality |
+| 6 | Should `toggle_markdown_preview` get an app-level delegate method (matching `toggle_diff`/`toggle_diff_layout` pattern)? | A: Yes, add delegate for consistency, B: No, implicit Textual resolution works fine | reviewer-architecture |
+
+**Total Open Questions:** 3 (from plan) + 6 (from reviewers) = 9
+
+## Conflicts Between Reviewers (Converted to Open Questions Above)
+
+- **NAV_BINDINGS sharing strategy**: reviewer-code-quality (factory function) vs reviewer-patterns (separate constants) → Open Question #1
+- No other direct conflicts — reviewers converged on the same issues from different perspectives
+
+## P1 Findings (BLOCKS APPROVAL)
+
+### Finding 1: `COMMAND_PALETTE_BINDING` must change atomically with `?` rebind
+**Priority:** P1 (Critical)
+**Sources:** reviewer-architecture, reviewer-code-quality (2 agents)
+**Location:** `src/perch/app.py:25, 40-42`
+
+`COMMAND_PALETTE_BINDING = "question_mark"` is a Textual class-level hook that intercepts `?` at the framework level. If this is not changed to `"ctrl+shift+p"` in the same commit that rebinds `?` to `show_help`, Textual will silently win the key conflict and the help screen binding will never fire. The plan mentions this in Phase 3.3 but doesn't emphasize it must be atomic — `COMMAND_PALETTE_BINDING` change and the new `?` binding must be in the same step/commit.
+
+### Finding 2: `NAV_BINDINGS` cannot be a single shared constant
+**Priority:** P1 (Critical)
+**Sources:** reviewer-code-quality, reviewer-patterns (2 agents)
+**Location:** Phase 1.2-1.3, `viewer.py:384` vs `file_tree.py:49`
+
+The plan proposes a single `NAV_BINDINGS` list, but Viewer maps `j` → `scroll_down` while FileTree/GitPanel/GitHubPanel map `j` → `cursor_down`. A single constant with one action name will break at least one consumer. This must be resolved before Phase 1 implementation begins. See Open Question #1 for options.
+
+### Finding 3: `test_commands.py` will break after Phase 3.4 — update must happen in same step
+**Priority:** P1 (Critical)
+**Sources:** reviewer-architecture, reviewer-code-quality (2 agents)
+**Location:** `tests/test_commands.py:27-35, 63-68`
+
+`test_all_app_actions_covered` checks specific actions, and discovery test asserts `len(hits) == len(COMMANDS)`. Removing 2 stale entries and adding 1 new entry changes the count. Phase 4.1 mentions updating `test_commands.py` but this must happen in Phase 3.4 (same step as COMMANDS changes) or CI will fail between phases.
+
+## P2 Findings (Important)
+
+### Finding 4: `HelpScreen` binding collection strategy underspecified
+**Priority:** P2
+**Sources:** reviewer-architecture, reviewer-code-quality, reviewer-patterns, reviewer-performance (4 agents)
+**Location:** Phase 3.2, Technical Considerations
+
+`active_bindings` only returns bindings for the currently focused widget chain — it cannot show all panels simultaneously. The plan's "show ALL bindings organized by context" goal requires a different approach. See Open Question #2.
+
+### Finding 5: `CommitTree.BINDINGS` not addressed in Phase 1.3
+**Priority:** P2
+**Sources:** reviewer-architecture, reviewer-patterns (2 agents)
+**Location:** `src/perch/widgets/git_status.py:55-59`
+
+`CommitTree` has its own `BINDINGS` with `l` → `select_cursor` and page bindings that overlap with `GitPanel.BINDINGS`. The plan's Phase 1.3 only addresses `GitPanel` but not its child `CommitTree`, which could result in duplicate/inconsistent bindings in the same widget hierarchy.
+
+### Finding 6: Test-after ordering in Phase 1 steps 1.3/1.4
+**Priority:** P2
+**Source:** reviewer-plan-philosophy
+**Location:** Phase 1, steps 1.3-1.4
+
+Steps 1.3 (widget substitutions) and 1.4 (group/tooltip additions) have no paired test steps. Step 1.1 tests only the `_bindings.py` constants, not that each widget actually uses them. A widget left with an old inline binding after 1.3 would not be caught. Add test assertions per widget to verify shared binding usage.
+
+### Finding 7: Duplicated command metadata between `commands.py` and `BINDINGS`
+**Priority:** P2
+**Source:** reviewer-plan-philosophy
+**Location:** `src/perch/commands.py` vs `src/perch/app.py` BINDINGS
+
+The plan adds a new entry to `commands.py` (Phase 3.4) while the same binding is also in `app.py` BINDINGS. This is the same structural duplication that produced the stale `next_diff_file` entries. Flag as follow-on tech debt — consider generating COMMANDS from BINDINGS in a future refactor.
+
+### Finding 8: App-level shadow bindings (`d`, `s`, `m`, `o`) bleed viewer concerns into app scope
+**Priority:** P2
+**Source:** reviewer-patterns
+**Location:** `src/perch/app.py:34-37`
+
+These `show=False` app-level bindings exist so the command palette can discover viewer-specific actions. The plan adds `group`/`tooltip` to them (Phase 1.4), deepening the coupling. Consider whether these should be removed if the help screen replaces the palette as the primary discovery mechanism.
+
+### Finding 9: Footer rendering tests are fragile with Textual's `run_test()`
+**Priority:** P2
+**Source:** reviewer-code-quality
+**Location:** Phase 2.1
+
+Testing which bindings appear in the Footer via `pilot` is unreliable because focus in `run_test()` may not match production. Consider also testing `Binding.show` attribute values directly (not just rendering-based assertions).
+
+### Finding 10: `_refresh_footer` pattern should not be added to more widgets
+**Priority:** P2
+**Source:** reviewer-performance
+**Location:** `src/perch/widgets/viewer.py:447-452`
+
+`_refresh_footer` is called at 13 sites in Viewer for state transitions. Adding this pattern to cursor movement in other widgets during Phase 1.3 would cause Footer redraws on every keystroke. Keep it limited to explicit state transitions.
+
+## P3 Findings (Nice-to-have)
+
+### Finding 11: Use `tuple` not `list` for `_bindings.py` constants
+**Priority:** P3
+**Sources:** reviewer-architecture, reviewer-performance (2 agents)
+**Location:** Phase 1.2
+
+Define shared constants as `tuple[Binding, ...]` to prevent accidental in-place mutation.
+
+### Finding 12: `_make_section_header` duplicated across `git_status.py` and `github_panel.py`
+**Priority:** P3
+**Sources:** reviewer-code-quality, reviewer-patterns (2 agents)
+**Location:** `git_status.py:42-47`, `github_panel.py:59-64`
+
+Pre-existing DRY violation. Not introduced by this plan, but the `_bindings.py` extraction creates a natural moment to also extract shared widget utilities.
+
+### Finding 13: `HelpScreen` should separate collection from rendering
+**Priority:** P3
+**Source:** reviewer-plan-philosophy
+**Location:** Phase 3.2
+
+Extract a pure function `collect_all_bindings(widget_classes) -> dict[str, list[Binding]]` so the ModalScreen's responsibility is rendering only. Improves testability.
+
+### Finding 14: `SyncScrollView.BINDINGS` duplicates `Viewer.BINDINGS` hjkl keys
+**Priority:** P3
+**Source:** reviewer-patterns
+**Location:** `viewer.py:302-315` vs `viewer.py:377-389`
+
+Inner `SyncScrollView` has its own full hjkl + arrow-key BINDINGS that shadow outer `Viewer` BINDINGS in diff mode. Should be addressed as part of Phase 1.3.
+
+### Finding 15: Standardize `key_display` unicode encoding
+**Priority:** P3
+**Source:** reviewer-patterns
+**Location:** All widget BINDINGS files
+
+Some files use `\u2190\u2193\u2191\u2192`, others use literal `←↓↑→`. The `_bindings.py` extraction will resolve this naturally — use the readable literal form.
+
+### Finding 16: Verify `COMMAND_PALETTE_BINDING = "ctrl+shift+p"` Textual compatibility
+**Priority:** P3
+**Source:** reviewer-patterns
+**Location:** Phase 3.3
+
+Textual's default `COMMAND_PALETTE_BINDING` is `"ctrl+backslash"`. Verify `"ctrl+shift+p"` works correctly in Textual 1.1 with a quick smoke test.
+
+### Finding 17: `_bindings.py` underscore prefix but imported by test files
+**Priority:** P3
+**Source:** reviewer-code-quality
+**Location:** Phase 1.1-1.2
+
+Leading underscore signals private module. Tests importing `from perch._bindings import ...` is acceptable Python but worth a conscious naming choice.
+
+## Agent Coverage
+**Provided findings:** reviewer-architecture: 7, reviewer-code-quality: 8, reviewer-patterns: 10, reviewer-performance: 4, reviewer-plan-philosophy: 3
+**No findings:** none
+**Failed:** none
