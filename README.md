@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/perch-ai.png" alt="perch" width="200">
+  <img src="docs/images/perch-tui.png" alt="perch" width="200">
 </p>
 
 <h1 align="center">perch</h1>
