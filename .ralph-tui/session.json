@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "sessionId": "a25151dc-7737-4596-803d-6fd5636b4e06",
+  "status": "running",
+  "startedAt": "2026-03-18T22:08:33.213Z",
+  "updatedAt": "2026-03-18T22:08:33.213Z",
+  "currentIteration": 0,
+  "maxIterations": 100,
+  "tasksCompleted": 0,
+  "isPaused": false,
+  "agentPlugin": "claude",
+  "trackerState": {
+    "plugin": "beads-rust",
+    "epicId": "perch-54y",
+    "totalTasks": 10,
+    "tasks": [
+      {
+        "id": "perch-54y.1",
+        "title": "US-001: Git Service — Diff and Status Dict Functions",
+        "status": "completed",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-54y.2",
+        "title": "US-002: File Viewer — Theme-Aware Syntax Highlighting",
+        "status": "completed",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-54y.3",
+        "title": "US-003: File Viewer — Unified Diff View",
+        "status": "completed",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-54y.4",
+        "title": "US-004: File Viewer — Side-by-Side Diff Layout",
+        "status": "completed",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-54y.5",
+        "title": "US-005: File Tree — Git Status Indicators",
+        "status": "completed",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-54y.6",
+        "title": "US-006: File Tree — Filesystem Watching for Auto-Refresh",
+        "status": "completed",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-54y.7",
+        "title": "US-007: Git Tab — Interactive ListView Sections",
+        "status": "completed",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-54y.8",
+        "title": "US-008: Git Tab — File Selection Links to File Viewer",
+        "status": "completed",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-54y.9",
+        "title": "US-009: Git Tab — Refresh Stability",
+        "status": "completed",
+        "completedInSession": false
+      },
+      {
+        "id": "perch-54y.10",
+        "title": "US-010: CSS and Command Palette Updates",
+        "status": "completed",
+        "completedInSession": false
+      }
+    ]
+  },
+  "iterations": [],
+  "skippedTaskIds": [],
+  "cwd": "/Users/gclunies/.worktrunk/worktrees/perch.mvp",
+  "activeTaskIds": [],
+  "subagentPanelVisible": false
+}

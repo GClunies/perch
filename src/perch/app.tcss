@@ -1,0 +1,85 @@
+#main-content {
+    layout: horizontal;
+    height: 1fr;
+}
+
+#left-pane {
+    width: 75%;
+    height: 100%;
+    border: solid $border;
+}
+
+#left-pane:focus-within {
+    border: solid $accent;
+}
+
+Viewer {
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+#file-content {
+    min-width: 100%;
+    width: auto;
+}
+
+#sidebar {
+    width: 1fr;
+    height: 100%;
+    border: solid $border;
+}
+
+#sidebar:focus-within {
+    border: solid $accent;
+}
+
+#sidebar Tab {
+    width: 1fr;
+    text-align: center;
+}
+
+#diff-container {
+    display: none;
+    height: 1fr;
+}
+
+#diff-panels {
+    layout: horizontal;
+    height: 1fr;
+}
+
+#diff-left, #diff-right {
+    width: 1fr;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+GitPanel, GitHubPanel {
+    height: 1fr;
+    overflow-x: auto;
+}
+
+/* Keep highlight visible when focus moves to the viewer pane */
+GitPanel ListView > ListItem.--highlight,
+GitHubPanel > ListItem.--highlight,
+GitHubPanel > ClickableItem.--highlight {
+    background: $accent 30%;
+}
+
+GitPanel > ListItem,
+GitHubPanel > ListItem,
+GitHubPanel > ClickableItem {
+    height: auto;
+    width: auto;
+}
+
+GitPanel > .section-header,
+GitHubPanel > .section-header {
+    height: auto;
+}
+
+.placeholder {
+    padding: 1 2;
+    color: $text-muted;
+}

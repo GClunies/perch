@@ -1,0 +1,212 @@
+# feat: Enable mouse click support for pane and sidebar selection
+
+## Overview
+
+Enable mouse interaction in the perch TUI so users can click to select sidebar tabs, sidebar items, and switch focus between panes. Currently mouse support is entirely disabled via `app.run(mouse=False)` in `cli.py:27`.
+
+## Desired End State
+
+Users can:
+- Click on sidebar tab headers (Files, Git, GitHub) to switch tabs
+- Click on items within sidebar widgets (file tree nodes, git file list items, commit tree nodes, GitHub PR items) to select them and update the viewer
+- Click on the viewer pane to focus it
+- Continue using all existing keyboard bindings unchanged
+
+Verification: Run `make test` and manually verify click interactions in the terminal.
+
+## Problem Statement / Motivation
+
+The TUI is currently keyboard-only. Mouse interaction is a natural expectation for terminal UIs, especially for pane/tab selection. Enabling it reduces the learning curve and makes the app more accessible.
+
+## What We're NOT Doing
+
+- Not adding mouse drag for the `DraggableSplitter` (separate feature)
+- Not adding mouse scroll customization (Textual handles this natively once mouse is enabled)
+- Not adding right-click context menus
+- Not adding mouse hover effects or tooltips
+
+## Proposed Solution
+
+### Root Cause
+
+`cli.py:27` passes `mouse=False` to `app.run()`, which disables all mouse event handling at the Textual framework level.
+
+### Approach
+
+1. **Enable mouse** — Change `mouse=False` to `mouse=True` (or remove the kwarg, since `True` is the default)
+2. **Handle tab click focus routing** — When a user clicks a sidebar tab header, Textual's `TabbedContent` switches the tab but doesn't focus the content widget. Add a `on_tabbed_content_tab_activated` handler that calls `_focus_active_tab()`.
+3. **Deduplicate focus routing** — Refactor `action_next_tab`/`action_prev_tab` to avoid double-calling `_focus_active_tab()` (once from the action, once from the new `TabActivated` handler). The actions should only set `tabbed.active`; the event handler handles focus.
+
+### Why This Works
+
+Textual's built-in behavior already handles most of the work once mouse is enabled:
+- Focusable widgets (`can_focus=True`) auto-focus on click via the `FOCUS_ON_CLICK` class variable (default `True`)
+- `ListView` items fire `ListView.Selected` on click → existing `on_list_view_selected()` handlers update the viewer
+- `Tree` nodes fire `Tree.NodeHighlighted` on click → existing `on_tree_node_highlighted()` handlers update the viewer
+- `TabbedContent` tabs switch on click, posting `TabbedContent.TabActivated`
+
+The only gap is that `_focus_active_tab()` (which routes focus to the correct child widget and restores viewer content) is only called from keyboard actions today.
+
+### Implementation Steps (Test-First)
+
+- [ ] **Step 1.1: Write tests for mouse click behavior**
+  - Test: clicking a sidebar tab switches the tab AND focuses the content widget
+  - Test: clicking on the viewer pane focuses it
+  - Test: clicking a sidebar item selects it and updates viewer content
+  - Test: keyboard navigation still works after mouse interactions
+  - Use Textual's `async with app.run_test()` and `pilot.click()` for simulated clicks
+- [ ] **Step 1.2: Enable mouse support** — Change `cli.py:27` from `app.run(mouse=False)` to `app.run()`
+- [ ] **Step 1.3: Add `on_tabbed_content_tab_activated` handler** in `app.py`
+  - Call `_focus_active_tab()` to route focus to the active tab's content widget
+- [ ] **Step 1.4: Refactor keyboard tab actions to avoid double focus routing**
+  - `action_next_tab` and `action_prev_tab` currently call `_focus_active_tab()` directly after setting `tabbed.active`
+  - Since setting `tabbed.active` will now trigger `TabActivated` → `on_tabbed_content_tab_activated` → `_focus_active_tab()`, remove the direct call from the actions
+  - Guard `_focus_active_tab()` against redundant calls if needed (e.g., check if already focused)
+- [ ] **Step 1.5: Verify** — `make test` passes, `make lint` passes, `make typecheck` passes
+
+## Technical Considerations
+
+### Focus State Consistency
+
+The app tracks focus state implicitly via `viewer.has_focus` checks (e.g., `action_focus_next_pane` at `app.py:304-311`, `_focused_pane_is_left` at `app.py:462-465`). Mouse-initiated focus changes update `has_focus` natively through Textual's focus system, so these checks remain correct.
+
+### GitPanel Compound Widget
+
+`GitPanel` has `can_focus=False` (`git_status.py:65`) — clicking directly on the `GitPanel` container won't focus it. However, its children (`_file_list: ListView` and `_commit_tree: CommitTree`) are focusable, so clicking on visible items routes focus correctly. The custom `has_focus` property (`git_status.py:141-143`) delegates to children, which remains correct.
+
+### TabActivated Event Timing
+
+`TabbedContent.TabActivated` fires when `tabbed.active` is set, whether by click or programmatically. This means:
+- **Mouse tab click**: `TabActivated` fires → handler calls `_focus_active_tab()` ✓
+- **Keyboard `]`/`[`**: `action_next_tab` sets `tabbed.active` → `TabActivated` fires → handler calls `_focus_active_tab()` ✓
+- Risk: if `_focus_active_tab()` is called both from the action AND from the event handler, we get double execution. The refactor in Step 1.4 eliminates this.
+
+### Focus Mode
+
+When `_focus_mode=True`, the sidebar is hidden (`display=False`). Clicks can't reach hidden widgets, so no conflict.
+
+### Priority Tab Binding
+
+The `Tab` key has `priority=True` (`app.py:29`). This intercepts Tab before child widgets see it. Mouse clicks don't interact with key bindings, so no conflict.
+
+## Success Criteria
+
+### Manual Verification (Acceptance Criteria)
+
+- [ ] Click on "Files" tab header → Files tab activates, FileTree focuses
+- [ ] Click on "Git" tab header → Git tab activates, file list focuses
+- [ ] Click on "GitHub" tab header → GitHub tab activates, GitHubPanel focuses
+- [ ] Click on a file in FileTree → file highlights, viewer shows file content
+- [ ] Click on a file in GitPanel file list → file selects, viewer shows diff
+- [ ] Click on a commit node in CommitTree → node highlights, viewer updates
+- [ ] Click on a GitHub PR item → item selects, viewer shows preview
+- [ ] Click on the viewer pane → viewer focuses (border highlights)
+- [ ] Press `]` after mouse click → tab cycles correctly
+- [ ] Press `Tab` after mouse click → pane toggle works correctly
+- [ ] All existing keyboard bindings work unchanged
+
+## Dependencies & Risks
+
+- **Textual framework behavior**: Relies on Textual's built-in `FOCUS_ON_CLICK` and `TabActivated` event. Validated via Context7 docs — these are stable, documented APIs.
+- **Test infrastructure**: `pilot.click()` requires widget identifiers or coordinates. Sidebar items render dynamically from git state, so tests may need mock data.
+- **Double focus routing**: The refactor in Step 1.4 must be done carefully to avoid breaking keyboard-only tab switching. The `TabActivated` handler is the single source of truth for focus routing after tab changes.
+
+## Open Questions
+
+| Question | Options | Source |
+|----------|---------|--------|
+| Should `on_tabbed_content_tab_activated` guard against being called during `on_mount` initial setup? | A: No guard (simplest), B: Skip if `_auto_select_done` is False | analyzer-codebase |
+| Should the `mouse` flag be exposed as a CLI argument (`--no-mouse`) for users who prefer keyboard-only? | A: Yes (flexibility), B: No (YAGNI) | planning |
+
+## References & Research
+
+### Internal
+
+- `src/perch/cli.py:27` — `app.run(mouse=False)` — the root cause
+- `src/perch/app.py:284-302` — `action_next_tab`/`action_prev_tab` — keyboard tab switching
+- `src/perch/app.py:304-311` — `action_focus_next_pane` — keyboard pane toggle
+- `src/perch/app.py:312-347` — `_focus_active_tab()` — focus routing dispatch
+- `src/perch/app.py:442-458` — `action_toggle_focus_mode` — focus mode toggle
+- `src/perch/widgets/git_status.py:65` — `GitPanel.can_focus = False`
+- `src/perch/widgets/git_status.py:141-143` — `GitPanel.has_focus` custom property
+- `src/perch/app.tcss:12-14, 32-34` — `:focus-within` CSS for pane borders
+
+### External
+
+- Textual `Widget.FOCUS_ON_CLICK` — auto-focuses widget on click (default True for focusable widgets)
+- Textual `Widget.focus_on_click()` property — overridable click-to-focus behavior
+- Textual `TabbedContent.TabActivated` event — fired when a tab is activated by click or programmatically
+- Textual `App.run(mouse=)` parameter — enables/disables mouse support
+
+---
+
+## Plan Review Summary
+
+**Reviewed by:** reviewer-architecture, reviewer-code-quality, reviewer-patterns, reviewer-performance, reviewer-plan-philosophy
+**Date:** 2026-03-21
+
+### P1 — Critical (Must Address Before Implementation)
+
+**1. Double execution of `_focus_active_tab()` — atomic refactor required** (Identified by 4 agents)
+Step 1.3 (add handler) and Step 1.4 (remove direct calls) must be done atomically in the same commit. If the handler is added first without removing the calls from `action_next_tab`/`action_prev_tab`, every keyboard tab switch fires `_focus_active_tab()` twice — causing duplicate `query_one()` lookups, viewer loads, and for the GitHub tab, doubled `PreviewRequested` messages via the index toggle at `app.py:341-344`.
+- **Location:** `app.py:284-302`, `app.py:312-347`
+- **Action:** Merge Steps 1.3 and 1.4 into a single atomic step.
+
+**2. `on_mount` timing: double-fire at startup** (Identified by 3 agents)
+`on_mount` sets `tabbed.active = "tab-files"` (line 74) then calls `_focus_active_tab()` (line 75). The new handler will also fire from the reactive assignment on line 74, causing two calls. Additionally, `_auto_select_done` is initialized on line 76 — after the assignment that triggers `TabActivated` — so any guard using that attribute will fail with `AttributeError`.
+- **Location:** `app.py:68-78`
+- **Action:** Move `_auto_select_done` and `_auto_select_attempts` initialization to `__init__`. Add a `_mounted = False` guard initialized in `__init__`, set to `True` at end of `on_mount`. Handler skips if `not self._mounted`. Remove the direct `_focus_active_tab()` call from `on_mount` (let the handler do it after `_mounted` is set, or keep the direct call and guard the handler).
+
+**3. OPEN QUESTION: Does `TabActivated` fire reliably for programmatic `tabbed.active` changes?** (Conflict: architecture vs code-quality)
+Architecture reviewer assumes `TabActivated` fires for all `tabbed.active` assignments. Code-quality reviewer warns this may not be reliable across Textual versions. If it doesn't fire for programmatic changes, removing `_focus_active_tab()` from keyboard actions breaks tab switching silently.
+- **Action:** Must verify empirically before committing to the refactor. Write a test that sets `tabbed.active` programmatically and asserts `TabActivated` is posted. If it doesn't fire, keep direct calls in actions and treat the handler as additive (mouse-only path).
+
+### P2 — Important (Should Address)
+
+**4. Private attribute `panel._file_list.focus()` needs public API** (Identified by 4 agents)
+`app.py:334` reaches into `GitPanel`'s private `_file_list`. The mouse feature adds a second code path hitting this. `GitPanel` already has a `has_focus` property — it should also expose a `focus_default()` method.
+- **Action:** Add `def focus_default(self) -> None: self._file_list.focus()` to `GitPanel`. Replace `panel._file_list.focus()` in `app.py:334` with `panel.focus_default()`.
+
+**5. `_focus_active_tab()` has dual responsibility (focus + viewer content restore)** (Identified by 1 agent)
+The function both routes focus AND loads viewer content. Making it the sole handler for `TabActivated` works but the dual responsibility makes future changes error-prone.
+- **Action:** Consider splitting in a follow-up. Not blocking for this feature.
+
+**6. `on_tree_node_highlighted` fires on mouse hover — rapid viewer loads** (Identified by 1 agent)
+With mouse enabled, hovering over FileTree nodes fires continuous highlight events, each triggering `viewer.load_file()`. This could cause excessive I/O.
+- **Action:** Add to "What We're NOT Doing" as a known limitation. Consider debouncing in a follow-up if user reports performance issues.
+
+**7. Handler should guard against focus-mode** (Identified by 1 agent)
+If `_focus_mode=True` and the handler somehow fires, it would try to focus hidden widgets.
+- **Action:** Add `if self._focus_mode: return` guard in the handler.
+
+**8. Handler signature must be correctly typed** (Identified by 2 agents)
+`def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None` — CI runs typecheck.
+- **Action:** Ensure correct type annotation in Step 1.3.
+
+### P3 — Minor (Nice to Have)
+
+**9. Missing RED-run checkpoint in TDD ordering** (Identified by 1 agent)
+Step 1.1 writes tests but doesn't explicitly confirm they fail before implementation.
+- **Action:** Add "run `make test`, confirm new tests fail" between Step 1.1 and Step 1.2.
+
+**10. Pre-existing bare `except Exception:` pattern** (Identified by 2 agents)
+Found at `app.py:64, 106, 143, 196, 244, 252, 274`. The new handler should not follow this pattern — use specific `NoMatches` exception.
+- **Action:** Note for implementation; don't propagate the anti-pattern.
+
+**11. Pre-existing: `_auto_select_done` initialized in `on_mount` not `__init__`** (Identified by 2 agents)
+Addressed by P1 #2 fix above.
+
+**12. Pre-existing: commit-label duplication in `git_status.py`** (Identified by 1 agent)
+Three copies of the commit-label builder at lines 361, 448, 496. Unrelated to this feature.
+
+**13. Tab selector for `pilot.click()` tests** (Identified by 1 agent)
+Textual tab headers render as `Tab` widgets with IDs like `--content-tab-tab-files`. Tests should target these selectors.
+
+### Open Questions (Updated)
+
+| # | Question | Options | Source |
+|---|----------|---------|--------|
+| 1 | Does `TabActivated` fire for programmatic `tabbed.active` assignment? | A: Yes (refactor safe), B: No (keep direct calls, handler is additive) | CONFLICT: architecture vs code-quality — **must verify empirically** |
+| 2 | Guard strategy for `on_mount` timing | A: `_mounted` flag in `__init__` (clean), B: Keep direct call in `on_mount` + guard handler | architecture, code-quality |
+| 3 | Should `--no-mouse` CLI flag be added? | A: Yes (flexibility), B: No (YAGNI) — **Reviewers agree: B** | architecture, planning |
+| 4 | Should `_focus_active_tab()` be split (focus vs viewer restore)? | A: Yes (SRP), B: No (follow-up) | patterns |

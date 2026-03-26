@@ -1,7 +1,0 @@
-{
-  "database": "dolt",
-  "backend": "dolt",
-  "dolt_mode": "server",
-  "dolt_database": "perch",
-  "project_id": "28831659-f8d8-49ad-92ce-b394bfd2fb48"
-}

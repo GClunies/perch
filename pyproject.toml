@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "perch-tui"
+dynamic = ["version"]
+description = "A vantage point for agentic workflows"
+requires-python = ">=3.12"
+dependencies = [
+    "textual>=1.0.0",
+    "rich>=13.0.0",
+    "watchfiles>=1.0.0",
+    "pillow>=12.1.1",
+]
+
+[project.scripts]
+perch = "perch.cli:main"
+
+[tool.hatch.version]
+path = "src/perch/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/perch"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0",
+    "ruff>=0.8.0",
+    "ty>=0.0.1a1",
+]
+
+[tool.ty.src]
+include = ["src"]
+
+[tool.ruff]
+src = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--cov=perch --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["perch"]
+
+[tool.coverage.report]
+fail_under = 95
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+    "if TYPE_CHECKING:",
+]

@@ -54,6 +54,9 @@ dolt-server.port
 # Backup data (auto-exported JSONL, local-only)
 backup/
 
+# History snapshots (original beads artifact, not used by beads_rust)
+.br_history/
+
 # Legacy files (from pre-Dolt versions)
 *.db
 *.db?*
