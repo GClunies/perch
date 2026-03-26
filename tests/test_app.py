@@ -862,6 +862,34 @@ class TestCommitTreeAppEvents:
                 mock.assert_called_once_with("abc123", "hello.py")
             assert viewer.worktree_root == git_worktree
 
+    async def test_commit_highlighted_skipped_on_wrong_tab(
+        self, git_worktree: Path
+    ) -> None:
+        """CommitHighlighted should not load summary when git tab is inactive."""
+        app = PerchApp(git_worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            for _ in range(20):
+                await pilot.pause()
+
+            # Stay on files tab (default)
+            with patch.object(pilot.app, "_load_commit_summary") as mock:
+                event = GitPanel.CommitHighlighted("abc123")
+                pilot.app.on_git_panel_commit_highlighted(event)
+                mock.assert_not_called()
+
+    async def test_commit_file_highlighted_skipped_on_wrong_tab(
+        self, git_worktree: Path
+    ) -> None:
+        """CommitFileHighlighted should not load diff when git tab is inactive."""
+        app = PerchApp(git_worktree)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.pause()
+            viewer = pilot.app.query_one(Viewer)
+            with patch.object(viewer, "load_commit_file_diff") as mock:
+                event = GitPanel.CommitFileHighlighted("abc123", "hello.py")
+                pilot.app.on_git_panel_commit_file_highlighted(event)
+                mock.assert_not_called()
+
     async def test_commit_toggled_expands(self, git_worktree: Path) -> None:
         """CommitToggled message should expand the commit."""
         (git_worktree / "hello.py").write_text("changed\n")

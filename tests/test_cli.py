@@ -102,3 +102,13 @@ class TestCLIEntryPoint:
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1
+
+    def test_main_module_entry_point(self) -> None:
+        """__main__.py should call main()."""
+        with patch("perch.cli.main") as mock_main:
+            import importlib
+
+            import perch.__main__  # noqa: F401
+
+            importlib.reload(importlib.import_module("perch.__main__"))
+            mock_main.assert_called()

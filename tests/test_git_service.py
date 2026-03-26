@@ -2,6 +2,8 @@ import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from perch.models import Commit, CommitFile, CommitSummary, GitFile, GitStatusData
 from perch.services.git import (
     get_commit_diff,
@@ -318,6 +320,34 @@ class TestGetCommitDiff:
         with pytest.raises(RuntimeError, match="git show failed"):
             get_commit_diff(Path("/tmp"), "abc123")
 
+    @patch("perch.services.git._run_git")
+    def test_returns_diff_on_success(self, mock_run: object) -> None:
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["git", "show"],
+            returncode=0,
+            stdout="diff --git a/f.py b/f.py\n",
+            stderr="",
+        )
+        result = get_commit_diff(Path("/tmp"), "abc123")
+        assert "diff --git" in result
+
+
+class TestGetCommitSummaryMalformed:
+    """Tests for get_commit_summary error paths."""
+
+    @patch("perch.services.git._run_git")
+    def test_raises_on_malformed_output(self, mock_run: object) -> None:
+        from perch.services.git import get_commit_summary
+
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["git", "show"],
+            returncode=0,
+            stdout="bad",
+            stderr="",
+        )
+        with pytest.raises(RuntimeError, match="Unexpected"):
+            get_commit_summary(Path("/tmp"), "abc123")
+
 
 class TestGetLog:
     """Tests for get_log error path."""
@@ -411,6 +441,49 @@ class TestGetCommitFiles:
         ).stdout.strip()
         files = get_commit_files(git_worktree, head)
         assert any(f.path == "hello.py" and f.status == "deleted" for f in files)
+
+    @patch("perch.services.git._run_git")
+    def test_renamed_file(self, mock_run: object) -> None:
+        from perch.services.git import get_commit_files
+
+        # Simulate git diff-tree output with a rename entry
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["git"],
+            returncode=0,
+            stdout="R100\thello.py\thello2.py\n",
+            stderr="",
+        )
+        files = get_commit_files(Path("/tmp"), "abc123")
+        assert len(files) == 1
+        assert files[0].status == "renamed"
+        assert files[0].path == "hello2.py"
+        assert files[0].old_path == "hello.py"
+
+    @patch("perch.services.git._run_git")
+    def test_raises_on_failure(self, mock_run: object) -> None:
+        from perch.services.git import get_commit_files
+
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["git"],
+            returncode=1,
+            stdout="",
+            stderr="fatal: bad object",
+        )
+        with pytest.raises(RuntimeError):
+            get_commit_files(Path("/tmp"), "abc123")
+
+    @patch("perch.services.git._run_git")
+    def test_skips_malformed_lines(self, mock_run: object) -> None:
+        from perch.services.git import get_commit_files
+
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["git"],
+            returncode=0,
+            stdout="M\thello.py\nbadline\nA\tnew.py\n",
+            stderr="",
+        )
+        files = get_commit_files(Path("/tmp"), "abc123")
+        assert len(files) == 2
 
 
 class TestGetCommitFileDiff:

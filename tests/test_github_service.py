@@ -231,6 +231,20 @@ class TestGetPrContext:
         result = get_pr_context(Path("/tmp"))
         assert result is None
 
+    @patch("perch.services.github._run_gh")
+    def test_returns_pr_context_on_success(self, mock_run: object) -> None:
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["gh", "pr", "view"],
+            returncode=0,
+            stdout='{"title":"fix","body":"desc","number":1,"state":"OPEN",'
+            '"headRefName":"main","baseRefName":"main","url":"http://x",'
+            '"reviewDecision":"","reviews":[],"comments":[]}',
+            stderr="",
+        )
+        result = get_pr_context(Path("/tmp"))
+        assert result is not None
+        assert result.title == "fix"
+
 
 class TestGetChecks:
     """Tests for get_checks when _run_gh fails."""
@@ -245,6 +259,20 @@ class TestGetChecks:
         )
         result = get_checks(Path("/tmp"))
         assert result == []
+
+    @patch("perch.services.github._run_gh")
+    def test_returns_checks_on_success(self, mock_run: object) -> None:
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["gh", "pr", "checks"],
+            returncode=0,
+            stdout='[{"name":"CI","state":"SUCCESS","bucket":"pass",'
+            '"link":"https://github.com/o/r/actions/runs/1/job/2",'
+            '"workflow":{"name":"ci"}}]',
+            stderr="",
+        )
+        result = get_checks(Path("/tmp"))
+        assert len(result) == 1
+        assert result[0].name == "CI"
 
 
 class TestParseCiLink:
