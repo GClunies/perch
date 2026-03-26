@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from textual import events
 
 from perch.app import PerchApp
 from perch.widgets.splitter import DraggableSplitter
@@ -76,3 +77,78 @@ class TestResizeLeftPane:
             await pilot.pause()
             new_width = left_pane.styles.width
             assert new_width is not None
+
+
+class TestMouseDrag:
+    """Tests for mouse drag resizing."""
+
+    async def test_mouse_down_starts_drag(self, worktree: Path) -> None:
+        async with PerchApp(worktree).run_test() as pilot:
+            splitter = pilot.app.query_one(DraggableSplitter)
+            assert splitter._dragging is False
+            splitter.post_message(
+                events.MouseDown(
+                    splitter, 0, 5, 0, 0, 1, False, False, False, screen_x=40.0
+                )
+            )
+            await pilot.pause()
+            assert splitter._dragging is True
+
+    async def test_mouse_up_stops_drag(self, worktree: Path) -> None:
+        async with PerchApp(worktree).run_test() as pilot:
+            splitter = pilot.app.query_one(DraggableSplitter)
+            splitter._dragging = True
+            splitter.post_message(
+                events.MouseUp(
+                    splitter, 0, 5, 0, 0, 1, False, False, False, screen_x=45.0
+                )
+            )
+            await pilot.pause()
+            assert splitter._dragging is False
+
+    async def test_mouse_drag_resizes_pane(self, worktree: Path) -> None:
+        """Dragging the splitter should change the left pane width style."""
+        async with PerchApp(worktree).run_test() as pilot:
+            splitter = pilot.app.query_one(DraggableSplitter)
+            left_pane = pilot.app.query_one("#left-pane")
+
+            # Set a known starting width
+            left_pane.styles.width = 40
+            await pilot.pause()
+
+            # Start drag at screen_x=40
+            splitter.post_message(
+                events.MouseDown(
+                    splitter, 0, 5, 0, 0, 1, False, False, False, screen_x=40.0
+                )
+            )
+            await pilot.pause()
+
+            # Move mouse 5 pixels right
+            splitter.post_message(
+                events.MouseMove(
+                    splitter, 5, 5, 5, 0, 1, False, False, False, screen_x=45.0
+                )
+            )
+            await pilot.pause()
+
+            # styles.width should be updated to 45 (40 + 5)
+            width = left_pane.styles.width
+            assert width is not None
+            assert width.value == 45
+
+    async def test_mouse_move_without_drag_is_noop(self, worktree: Path) -> None:
+        async with PerchApp(worktree).run_test() as pilot:
+            splitter = pilot.app.query_one(DraggableSplitter)
+            left_pane = pilot.app.query_one("#left-pane")
+            initial_width = left_pane.outer_size.width
+
+            # Move without dragging
+            splitter.post_message(
+                events.MouseMove(
+                    splitter, 10, 5, 10, 0, 0, False, False, False, screen_x=50.0
+                )
+            )
+            await pilot.pause()
+
+            assert left_pane.outer_size.width == initial_width

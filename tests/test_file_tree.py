@@ -670,6 +670,79 @@ class TestRenderLabel:
                 assert label.plain  # label exists and is non-empty
 
 
+class TestDirectoryStatusIndicators:
+    """Tests for aggregated git status indicators on folder nodes."""
+
+    async def test_folder_shows_child_statuses(self, tmp_path: Path) -> None:
+        """A folder containing changed files should show status codes."""
+        from unittest.mock import patch
+
+        from perch.app import PerchApp
+        from perch.models import GitStatusData
+        from rich.style import Style
+
+        _init_git_repo_with_commit(tmp_path)
+        sub = tmp_path / "src"
+        sub.mkdir()
+        (sub / "app.py").write_text("x = 1\n")
+
+        with (
+            patch("perch.services.git.get_status", return_value=GitStatusData()),
+            patch("perch.services.git.get_log", return_value=[]),
+            patch("perch.services.github.get_pr_context", return_value=None),
+            patch("perch.services.github.get_checks", return_value=[]),
+        ):
+            app = PerchApp(tmp_path)
+            async with app.run_test(size=(120, 40)) as pilot:
+                tree = pilot.app.query_one(FileTree)
+                for _ in range(10):
+                    await pilot.pause()
+                    if tree.last_line > 0:
+                        break
+
+                # Simulate git status with a modified file inside src/
+                tree._git_status = {"src/app.py": "modified"}
+                tree._dir_statuses = {"src": {"modified"}}
+
+                # Find the src/ folder node
+                folder_node = None
+                for line_idx in range(tree.last_line + 1):
+                    tree.cursor_line = line_idx
+                    node = tree.cursor_node
+                    if node is not None and node.data is not None:
+                        data_path = (
+                            node.data.path if hasattr(node.data, "path") else node.data
+                        )
+                        if isinstance(data_path, Path) and data_path.name == "src":
+                            folder_node = node
+                            break
+
+                assert folder_node is not None, "Expected to find src/ folder node"
+                label = tree.render_label(folder_node, Style(), Style())
+                assert " M" in label.plain
+
+    def test_apply_git_status_builds_dir_statuses(self) -> None:
+        """_apply_git_status should precompute directory status sets."""
+        from perch.widgets.file_tree import FileTree
+
+        tree = FileTree.__new__(FileTree)
+        tree._git_status = {}
+        tree._dir_statuses = {}
+        # Bypass reload by patching
+        tree.reload = lambda: None  # type: ignore[assignment]
+
+        status = {
+            "src/perch/app.py": "modified",
+            "src/perch/cli.py": "added",
+            "tests/test_app.py": "modified",
+        }
+        tree._apply_git_status(status)
+
+        assert tree._dir_statuses["src"] == {"modified", "added"}
+        assert tree._dir_statuses["src/perch"] == {"modified", "added"}
+        assert tree._dir_statuses["tests"] == {"modified"}
+
+
 class TestRefreshBinding:
     async def test_r_keybinding_exists(self, tmp_path: Path) -> None:
         """FileTree should have an 'r' refresh binding."""

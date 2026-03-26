@@ -91,6 +91,7 @@ def _strip_html_for_markdown(text: str) -> str:
     * ``<img …>`` tags are left intact (handled separately by the image
       renderer).
     """
+
     # Strip <p …>…</p> wrappers — keep inner content.
     # Preserve align="center" as a Unicode marker so the renderer can center.
     def _p_repl(m: re.Match) -> str:

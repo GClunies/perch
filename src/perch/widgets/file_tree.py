@@ -108,6 +108,7 @@ class FileTree(DirectoryTree):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._git_status: dict[str, str] = {}
+        self._dir_statuses: dict[str, set[str]] = {}
         self._ignored_paths: set[Path] = set()
         self._stop_watching = threading.Event()
 
@@ -148,6 +149,14 @@ class FileTree(DirectoryTree):
     def _apply_git_status(self, status: dict[str, str]) -> None:
         """Apply fetched git status and reload the tree structure."""
         self._git_status = status
+        # Precompute directory → set of statuses for folder indicators
+        dir_statuses: dict[str, set[str]] = {}
+        for rel_path, file_status in status.items():
+            parts = Path(rel_path).parts
+            for i in range(1, len(parts)):
+                dir_key = str(Path(*parts[:i]))
+                dir_statuses.setdefault(dir_key, set()).add(file_status)
+        self._dir_statuses = dir_statuses
         self.reload()
 
     def filter_paths(self, paths: Iterable[Path]) -> Iterable[Path]:
@@ -180,16 +189,27 @@ class FileTree(DirectoryTree):
             label.stylize("dim")
             return label
 
-        # Git status indicators (files only)
-        if node._allow_expand:
-            return label
-
         try:
             rel = path.relative_to(self.path)
         except ValueError:
             return label
 
         rel_str = str(rel)
+
+        # Directories: show aggregated status codes from changed children
+        if node._allow_expand:
+            statuses = self._dir_statuses.get(rel_str)
+            if statuses:
+                codes = []
+                for s in sorted(statuses):
+                    ind = _GIT_INDICATORS.get(s)
+                    if ind:
+                        codes.append(ind)
+                for code, color in codes:
+                    label.append(f" {code}", style=color)
+            return label
+
+        # Files: show individual status
         status = self._git_status.get(rel_str)
         if status is None:
             return label
