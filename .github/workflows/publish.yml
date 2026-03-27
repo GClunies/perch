@@ -80,7 +80,7 @@ jobs:
       - name: Verify install from TestPyPI
         run: |
           sleep 10
-          uv pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ perch-tui==${{ needs.validate.outputs.version }}
+          uv pip install --system --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ perch-tui==${{ needs.validate.outputs.version }}
           python -c "from perch import __version__; assert __version__ == '${{ needs.validate.outputs.version }}', f'Version mismatch: {__version__}'"
 
   publish-pypi:
