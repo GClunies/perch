@@ -1,10 +1,7 @@
-name: Publish
+name: Test Publish
 
 on:
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   validate:
@@ -62,7 +59,7 @@ jobs:
           name: dist
           path: dist/
 
-  publish-pypi:
+  publish-testpypi:
     needs: [validate, build]
     runs-on: ubuntu-latest
     steps:
@@ -71,48 +68,14 @@ jobs:
         with:
           name: dist
           path: dist/
-      - name: Publish to PyPI
+      - uses: astral-sh/setup-uv@v4
+      - name: Publish to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-
-  release:
-    needs: [validate, publish-pypi]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Generate changelog
-        id: changelog
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository-url: https://test.pypi.org/legacy/
+      - name: Verify install from TestPyPI
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -z "$PREV_TAG" ]; then
-            RANGE="HEAD"
-          else
-            RANGE="${PREV_TAG}..HEAD"
-          fi
-          {
-            echo "body<<CHANGELOG_EOF"
-            echo "## What's Changed"
-            echo ""
-            git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges
-            echo ""
-            echo ""
-            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG:-initial}...v${{ needs.validate.outputs.version }}"
-            echo "CHANGELOG_EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Create git tag
-        run: |
-          git tag "v${{ needs.validate.outputs.version }}"
-          git push origin "v${{ needs.validate.outputs.version }}"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.validate.outputs.version }}
-          name: v${{ needs.validate.outputs.version }}
-          body: ${{ steps.changelog.outputs.body }}
-          files: dist/*
+          sleep 10
+          uv pip install --system --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ perch-tui==${{ needs.validate.outputs.version }}
+          python -c "from perch import __version__; assert __version__ == '${{ needs.validate.outputs.version }}', f'Version mismatch: {__version__}'"
