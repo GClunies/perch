@@ -418,17 +418,43 @@ class TestOpenEditor:
     """Tests for action_open_editor()."""
 
     async def test_open_editor_calls_open_file(self, worktree: Path) -> None:
-        """action_open_editor should call open_file when a file is loaded."""
+        """action_open_editor should call open_file with the git root."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
             viewer = pilot.app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
-            with patch("perch.app.open_file") as mock:
+            with (
+                patch("perch.app.open_file") as mock,
+                patch(
+                    "perch.services.git.get_worktree_root",
+                    return_value=worktree,
+                ),
+            ):
                 pilot.app.action_open_editor()
                 mock.assert_called_once_with(
                     pilot.app.editor,
                     worktree / "hello.py",
                     worktree,
+                )
+
+    async def test_open_editor_no_git_root(self, worktree: Path) -> None:
+        """action_open_editor passes None when file is not in a git repo."""
+        app = PerchApp(worktree)
+        async with app.run_test() as pilot:
+            viewer = pilot.app.query_one(Viewer)
+            viewer._current_path = worktree / "hello.py"
+            with (
+                patch("perch.app.open_file") as mock,
+                patch(
+                    "perch.services.git.get_worktree_root",
+                    side_effect=RuntimeError("Not a git repository"),
+                ),
+            ):
+                pilot.app.action_open_editor()
+                mock.assert_called_once_with(
+                    pilot.app.editor,
+                    worktree / "hello.py",
+                    None,
                 )
 
     async def test_open_editor_noop_without_file(self, worktree: Path) -> None:

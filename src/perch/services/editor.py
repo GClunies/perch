@@ -21,15 +21,19 @@ def resolve_editor(cli_editor: str | None) -> str:
     return editor
 
 
-def open_file(editor: str | None, file_path: Path, worktree_root: Path) -> None:
+def open_file(
+    editor: str | None, file_path: Path, worktree_root: Path | None = None
+) -> None:
     """Open *file_path* in *editor* (non-blocking).
 
-    Launches the editor with the worktree root as the first argument and
-    the file path as the second so that editors like VS Code / Cursor open
-    the project folder with the file selected.
+    When *worktree_root* is given the editor receives the repo root as its
+    first argument so that editors like VS Code / Cursor open the project
+    folder with the file selected.  Language servers and project-level
+    configuration (e.g. ``pyproject.toml``) are then discovered correctly.
     """
     cmd = resolve_editor(editor)
-    subprocess.Popen(
-        [*shlex.split(cmd), str(worktree_root), str(file_path)],
-        start_new_session=True,
-    )
+    args = [*shlex.split(cmd)]
+    if worktree_root is not None:
+        args.append(str(worktree_root))
+    args.append(str(file_path))
+    subprocess.Popen(args, start_new_session=True)

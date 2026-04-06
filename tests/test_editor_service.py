@@ -54,6 +54,15 @@ class TestOpenFile:
         )
 
     @patch("perch.services.editor.subprocess.Popen")
+    def test_opens_file_only_when_no_root(self, mock_popen):
+        fp = Path("/project/src/main.py")
+        open_file("code", fp)
+        mock_popen.assert_called_once_with(
+            ["code", str(fp)],
+            start_new_session=True,
+        )
+
+    @patch("perch.services.editor.subprocess.Popen")
     def test_resolves_editor_when_none(self, mock_popen):
         with patch.dict("os.environ", {"EDITOR": "vim"}):
             open_file(None, Path("/a/b.py"), Path("/a"))

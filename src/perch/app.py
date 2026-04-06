@@ -550,7 +550,13 @@ class PerchApp(App):
         """Open the currently highlighted file in the external editor."""
         viewer = self.query_one(Viewer)
         if viewer._current_path is not None:
-            open_file(self.editor, viewer._current_path, self.worktree_path)
+            try:
+                from perch.services.git import get_worktree_root
+
+                repo_root = get_worktree_root(viewer._current_path.parent)
+            except (RuntimeError, FileNotFoundError):
+                repo_root = None
+            open_file(self.editor, viewer._current_path, repo_root)
 
     # ------------------------------------------------------------------
     # Help screen
