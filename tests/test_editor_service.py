@@ -44,6 +44,16 @@ class TestOpenFile:
         )
 
     @patch("perch.services.editor.subprocess.Popen")
+    def test_splits_editor_command_with_flags(self, mock_popen):
+        root = Path("/project")
+        fp = Path("/project/src/main.py")
+        open_file("/opt/homebrew/bin/zed --wait", fp, root)
+        mock_popen.assert_called_once_with(
+            ["/opt/homebrew/bin/zed", "--wait", str(root), str(fp)],
+            start_new_session=True,
+        )
+
+    @patch("perch.services.editor.subprocess.Popen")
     def test_resolves_editor_when_none(self, mock_popen):
         with patch.dict("os.environ", {"EDITOR": "vim"}):
             open_file(None, Path("/a/b.py"), Path("/a"))

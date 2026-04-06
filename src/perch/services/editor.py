@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -29,6 +30,6 @@ def open_file(editor: str | None, file_path: Path, worktree_root: Path) -> None:
     """
     cmd = resolve_editor(editor)
     subprocess.Popen(
-        [cmd, str(worktree_root), str(file_path)],
+        [*shlex.split(cmd), str(worktree_root), str(file_path)],
         start_new_session=True,
     )
