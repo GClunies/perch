@@ -742,8 +742,10 @@ class TestMarkdownPreview:
 
         app = PerchApp(tmp_path)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             viewer.load_file(md_file)
+            await pilot.pause()
             await pilot.pause()
 
             # Default: raw syntax-highlighted view
