@@ -72,8 +72,8 @@ def render_image_halfblocks(
         for x in range(w):
             top = pixels[x, y]
             bot = pixels[x, y + 1]
-            r1, g1, b1 = int(top[0]), int(top[1]), int(top[2])  # type: ignore[index]
-            r2, g2, b2 = int(bot[0]), int(bot[1]), int(bot[2])  # type: ignore[index]
+            r1, g1, b1 = int(top[0]), int(top[1]), int(top[2])  # ty: ignore[not-subscriptable]
+            r2, g2, b2 = int(bot[0]), int(bot[1]), int(bot[2])  # ty: ignore[not-subscriptable]
             result.append(
                 "▀",
                 style=f"rgb({r1},{g1},{b1}) on rgb({r2},{g2},{b2})",
