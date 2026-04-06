@@ -44,7 +44,7 @@ def _make_file_item(f: GitFile, staged: bool = False) -> ListItem:
     text.append(f"{f.status:<12}", style=style)
     text.append(f" {f.path}")
     item = ListItem(Label(text), name=f.path)
-    item._staged = staged  # type: ignore[attr-defined]
+    item._staged = staged  # ty: ignore[unresolved-attribute]
     return item
 
 
