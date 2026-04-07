@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat | jq -r '.tool_input.file_path // empty' | grep -E '\\.py$' | head -1 | xargs -I {} uv run ruff format {}",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "cat | jq -r '.tool_input.file_path // empty' | grep -E '\\.py$' | head -1 | xargs -I {} uv run ruff check --fix {}",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
