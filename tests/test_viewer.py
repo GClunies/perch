@@ -165,7 +165,8 @@ class TestViewerTheme:
     async def test_background_color_matches_theme_surface(self, worktree: Path) -> None:
         """_get_background_color should return the current theme's surface color."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             surface = app.current_theme.surface
             assert viewer._get_background_color() == surface
@@ -175,7 +176,8 @@ class TestViewerTheme:
     ) -> None:
         """Switching themes should change the background color returned."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
 
             app.theme = "textual-dark"
@@ -255,7 +257,8 @@ class TestSyncedDiffView:
 
     async def test_compose_creates_panels(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             sdv = viewer.query_one(SyncedDiffView)
             # The two panels and their content statics exist
@@ -265,7 +268,8 @@ class TestSyncedDiffView:
     async def test_scroll_actions_do_not_raise(self, worktree: Path) -> None:
         """All 8 scroll actions should execute without error."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             sdv = viewer.query_one(SyncedDiffView)
             # Make the diff container visible so scrolls have a target
@@ -287,7 +291,8 @@ class TestViewerScrollActions:
     async def test_scroll_actions_do_not_raise(self, worktree: Path) -> None:
         """Viewer scroll overrides should execute without error."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.action_scroll_up()
             viewer.action_scroll_down()
@@ -301,28 +306,32 @@ class TestViewerScrollActions:
 class TestViewerHelpers:
     async def test_get_syntax_theme_dark(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             app.theme = "textual-dark"
             viewer = app.query_one(Viewer)
             assert viewer._get_syntax_theme() == "monokai"
 
     async def test_get_syntax_theme_light(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             app.theme = "textual-light"
             viewer = app.query_one(Viewer)
             assert viewer._get_syntax_theme() == "default"
 
     async def test_is_dark_theme_dark(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             app.theme = "textual-dark"
             viewer = app.query_one(Viewer)
             assert viewer._is_dark_theme() is True
 
     async def test_is_dark_theme_light(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             app.theme = "textual-light"
             viewer = app.query_one(Viewer)
             assert viewer._is_dark_theme() is False
@@ -334,7 +343,8 @@ class TestViewerHelpers:
 class TestViewerLoadFile:
     async def test_load_normal_file(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             hello = worktree / "hello.py"
             viewer.load_file(hello)
@@ -343,7 +353,8 @@ class TestViewerLoadFile:
 
     async def test_load_nonexistent_path(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.load_file(worktree / "nope.py")
             # _content should say "Not a file"
@@ -353,7 +364,8 @@ class TestViewerLoadFile:
         binary = worktree / "image.png"
         binary.write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00\x00")
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.load_file(binary)
             assert viewer._current_path == binary
@@ -362,7 +374,8 @@ class TestViewerLoadFile:
         subdir = worktree / "subdir"
         subdir.mkdir()
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.load_file(subdir)
             assert viewer._current_path == subdir
@@ -371,18 +384,23 @@ class TestViewerLoadFile:
         big = worktree / "big.txt"
         big.write_text("line\n" * (MAX_LINES + 100))
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.load_file(big)
             assert viewer._current_path == big
 
     async def test_load_file_resets_diff_mode(self, worktree: Path) -> None:
+        other = worktree / "other.py"
+        other.write_text("x = 1\n")
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
+            viewer.load_file(worktree / "hello.py")
             viewer._diff_mode = True
             viewer._diff_layout = "side-by-side"
-            viewer.load_file(worktree / "hello.py")
+            viewer.load_file(other)
             assert viewer._diff_mode is False
             assert viewer._diff_layout == "unified"
 
@@ -393,7 +411,8 @@ class TestViewerLoadFile:
 class TestViewerLoadDiff:
     async def test_load_diff_no_file_selected(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._current_path = None
             viewer.worktree_root = worktree
@@ -402,7 +421,8 @@ class TestViewerLoadDiff:
 
     async def test_load_diff_no_worktree_root(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = None
@@ -410,7 +430,8 @@ class TestViewerLoadDiff:
 
     async def test_load_diff_file_not_in_worktree(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._current_path = Path("/some/other/place.py")
             viewer.worktree_root = worktree
@@ -419,7 +440,8 @@ class TestViewerLoadDiff:
     async def test_load_diff_no_changes(self, worktree: Path) -> None:
         """When get_diff returns empty, show 'No changes'."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
@@ -430,7 +452,8 @@ class TestViewerLoadDiff:
         """When get_diff returns text and layout is unified, render_diff is used."""
         diff_text = "--- a/hello.py\n+++ b/hello.py\n@@ -1 +1 @@\n-old\n+new"
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
@@ -442,7 +465,8 @@ class TestViewerLoadDiff:
         """Side-by-side layout uses _show_side_by_side_view."""
         diff_text = "--- a/hello.py\n+++ b/hello.py\n@@ -1 +1 @@\n-old\n+new"
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
@@ -453,7 +477,8 @@ class TestViewerLoadDiff:
     async def test_load_diff_runtime_error(self, worktree: Path) -> None:
         """RuntimeError from get_diff is caught and displayed."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
@@ -471,7 +496,8 @@ class TestViewerToggleDiff:
     async def test_toggle_diff_no_file(self, worktree: Path) -> None:
         """Toggle diff with no file should be a no-op."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._current_path = None
             viewer.action_toggle_diff()
@@ -479,7 +505,8 @@ class TestViewerToggleDiff:
 
     async def test_toggle_diff_on_and_off(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
@@ -492,7 +519,8 @@ class TestViewerToggleDiff:
     async def test_toggle_diff_layout_not_in_diff_mode(self, worktree: Path) -> None:
         """Toggle layout when not in diff mode is a no-op."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._diff_mode = False
             viewer.action_toggle_diff_layout()
@@ -500,7 +528,8 @@ class TestViewerToggleDiff:
 
     async def test_toggle_diff_layout_unified_to_side(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
@@ -512,7 +541,8 @@ class TestViewerToggleDiff:
 
     async def test_toggle_diff_layout_side_to_unified(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             viewer.worktree_root = worktree
@@ -529,7 +559,8 @@ class TestViewerToggleDiff:
 class TestViewerViewSwitching:
     async def test_show_content_view(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._show_content_view()
             assert viewer._content.display is True
@@ -537,7 +568,8 @@ class TestViewerViewSwitching:
     async def test_show_side_by_side_view(self, worktree: Path) -> None:
         diff_text = "--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-old\n+new"
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._show_side_by_side_view(diff_text)
             assert viewer._content.display is False
@@ -557,7 +589,8 @@ class TestViewerExceptionFallbacks:
     ) -> None:
         """If app.current_theme raises, fall back to 'monokai'."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             with patch.object(
                 type(app),
@@ -573,7 +606,8 @@ class TestViewerExceptionFallbacks:
     ) -> None:
         """If app.current_theme raises, fall back to None."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             with patch.object(
                 type(app),
@@ -587,7 +621,8 @@ class TestViewerExceptionFallbacks:
     async def test_is_dark_theme_exception_returns_true(self, worktree: Path) -> None:
         """If app.current_theme raises, fall back to True (dark)."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             with patch.object(
                 type(app),
@@ -601,7 +636,8 @@ class TestViewerExceptionFallbacks:
     async def test_load_file_oserror(self, worktree: Path) -> None:
         """OSError during read_file_content is caught and displayed."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             target = worktree / "hello.py"
             with patch(
@@ -702,6 +738,7 @@ class TestCheckActions:
     async def test_toggle_diff_requires_file(self, tmp_path: Path) -> None:
         app = PerchApp(tmp_path)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             assert viewer.check_action("toggle_diff", ()) is False
             viewer._current_path = tmp_path / "hello.py"
@@ -710,6 +747,7 @@ class TestCheckActions:
     async def test_diff_layout_requires_diff_mode(self, tmp_path: Path) -> None:
         app = PerchApp(tmp_path)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             assert viewer.check_action("toggle_diff_layout", ()) is False
             viewer._diff_mode = True
@@ -722,7 +760,9 @@ class TestCheckActions:
         py.write_text("x = 1\n")
         app = PerchApp(tmp_path)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
+            viewer._current_path = None
             assert viewer.check_action("toggle_markdown_preview", ()) is False
             viewer._current_path = py
             assert viewer.check_action("toggle_markdown_preview", ()) is False
@@ -763,6 +803,7 @@ class TestMarkdownPreview:
 
         app = PerchApp(tmp_path)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             viewer.load_file(md_file)
             await pilot.pause()
@@ -779,6 +820,7 @@ class TestMarkdownPreview:
 
         app = PerchApp(tmp_path)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             viewer.load_file(py_file)
             await pilot.pause()
@@ -794,6 +836,7 @@ class TestMarkdownPreview:
 
         app = PerchApp(tmp_path)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             viewer.load_file(md_file)
             viewer._diff_mode = True
@@ -823,7 +866,8 @@ class TestShowCiLog:
     async def test_group_annotation(self, worktree: Path) -> None:
         """##[group]Name should render as bold cyan group header."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_ci_log("##[group]Run tests\n##[endgroup]")
             await app._animator.wait_for_idle()
@@ -836,7 +880,8 @@ class TestShowCiLog:
     async def test_endgroup_annotation(self, worktree: Path) -> None:
         """##[endgroup] lines should be skipped (not rendered)."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_ci_log("##[endgroup]")
             await app._animator.wait_for_idle()
@@ -849,7 +894,8 @@ class TestShowCiLog:
     async def test_error_annotation(self, worktree: Path) -> None:
         """##[error]msg should render the error message."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_ci_log("##[error]Something broke")
             await app._animator.wait_for_idle()
@@ -862,7 +908,8 @@ class TestShowCiLog:
     async def test_warning_annotation(self, worktree: Path) -> None:
         """##[warning]msg should render the warning message."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_ci_log("##[warning]Deprecation notice")
             await app._animator.wait_for_idle()
@@ -875,7 +922,8 @@ class TestShowCiLog:
     async def test_ansi_stripping(self, worktree: Path) -> None:
         """ANSI escape codes should be stripped from log lines."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_ci_log("\x1b[32mGreen text\x1b[0m")
             await app._animator.wait_for_idle()
@@ -889,7 +937,8 @@ class TestShowCiLog:
     async def test_timestamp_stripping(self, worktree: Path) -> None:
         """ISO timestamp prefixes should be stripped."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_ci_log("2026-03-17T01:26:13.1234567Z Hello world")
             await app._animator.wait_for_idle()
@@ -903,7 +952,8 @@ class TestShowCiLog:
     async def test_tab_delimited_prefix_stripping(self, worktree: Path) -> None:
         """Tab-delimited job/step/timestamp prefixes should be stripped."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_ci_log("myjob\tstep1\t2026-03-17T01:26:13.1234567Z Actual msg")
             await app._animator.wait_for_idle()
@@ -917,7 +967,8 @@ class TestShowCiLog:
     async def test_empty_log(self, worktree: Path) -> None:
         """Empty or whitespace-only log shows 'No log output available'."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_ci_log("   ")
             await app._animator.wait_for_idle()
@@ -938,7 +989,8 @@ class TestShowCiLog:
             "Normal line"
         )
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_ci_log(log)
             await app._animator.wait_for_idle()
@@ -962,7 +1014,8 @@ class TestFetchCiLogNoWorktree:
     async def test_fetch_ci_log_no_worktree_returns_early(self, worktree: Path) -> None:
         """fetch_ci_log with worktree_root=None should return immediately."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.worktree_root = None
             viewer.fetch_ci_log("https://example.com/log")
@@ -976,7 +1029,8 @@ class TestShowPrBody:
     async def test_empty_body_shows_no_description(self, worktree: Path) -> None:
         """show_pr_body('') should display 'No PR description'."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_pr_body("")
             await app._animator.wait_for_idle()
@@ -989,7 +1043,8 @@ class TestShowPrBody:
     async def test_whitespace_body_shows_no_description(self, worktree: Path) -> None:
         """show_pr_body with only whitespace should also show 'No PR description'."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_pr_body("   \n  ")
             await app._animator.wait_for_idle()
@@ -1002,7 +1057,8 @@ class TestShowPrBody:
     async def test_nonempty_body_renders_markdown(self, worktree: Path) -> None:
         """show_pr_body with actual content should render markdown."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_pr_body("# Hello\n\nSome text", title="PR #42")
             await app._animator.wait_for_idle()
@@ -1021,7 +1077,8 @@ class TestShowReview:
     async def test_empty_body_shows_no_review(self, worktree: Path) -> None:
         """show_review('') should display 'No review body'."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_review("")
             await app._animator.wait_for_idle()
@@ -1034,7 +1091,8 @@ class TestShowReview:
     async def test_whitespace_body_shows_no_review(self, worktree: Path) -> None:
         """show_review with only whitespace should also show 'No review body'."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_review("  \n  ")
             await app._animator.wait_for_idle()
@@ -1052,7 +1110,8 @@ class TestShowEmptyDirectory:
     async def test_shows_no_files_message(self, worktree: Path) -> None:
         """show_empty_directory should display 'No files in this directory'."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.show_empty_directory()
             await app._animator.wait_for_idle()
@@ -1070,7 +1129,8 @@ class TestPathLabel:
     async def test_path_not_relative_to_worktree(self, worktree: Path) -> None:
         """When path is outside worktree_root, _path_label returns str(path)."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             outside_path = Path("/some/other/place/file.py")
@@ -1080,7 +1140,8 @@ class TestPathLabel:
     async def test_path_relative_to_worktree(self, worktree: Path) -> None:
         """When path is inside worktree_root, _path_label returns relative path."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             inside_path = worktree / "src" / "main.py"
@@ -1090,7 +1151,8 @@ class TestPathLabel:
     async def test_path_label_no_worktree_root(self, worktree: Path) -> None:
         """When worktree_root is None, _path_label returns str(path)."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.worktree_root = None
             some_path = Path("/any/file.py")
@@ -1104,7 +1166,8 @@ class TestPathLabel:
 class TestCommitSummaryViewer:
     async def test_show_commit_summary_sets_state(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             summary = CommitSummary(
                 hash="abc1234",
@@ -1137,7 +1200,8 @@ class TestCommitFileDiffViewer:
             check=True,
         ).stdout.strip()
         app = PerchApp(git_worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.load_commit_file_diff(head, "hello.py")
             assert viewer._diff_mode is True
@@ -1154,14 +1218,16 @@ class TestCommitFileDiffIntegration:
         self, git_worktree: Path
     ) -> None:
         app = PerchApp(git_worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._commit_file_context = ("abc123", "file.py")
             assert viewer.check_action("toggle_diff", ()) is True
 
     async def test_toggle_diff_off_shows_summary(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             summary = CommitSummary(
                 hash="abc",
@@ -1180,7 +1246,8 @@ class TestCommitFileDiffIntegration:
 
     async def test_refresh_content_with_summary(self, worktree: Path) -> None:
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             summary = CommitSummary(
                 hash="abc",
@@ -1201,7 +1268,8 @@ class TestCommitFileDiffEdgeCases:
     async def test_load_commit_file_diff_runtime_error(self, worktree: Path) -> None:
         """RuntimeError from get_commit_file_diff is caught and displayed."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             with patch(
@@ -1215,7 +1283,8 @@ class TestCommitFileDiffEdgeCases:
     async def test_load_commit_file_diff_empty(self, worktree: Path) -> None:
         """Empty diff text shows 'No changes' message."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             with patch(
@@ -1228,7 +1297,8 @@ class TestCommitFileDiffEdgeCases:
         """Side-by-side layout for commit file diff."""
         diff_text = "--- a/f.py\n+++ b/f.py\n@@ -1 +1 @@\n-old\n+new"
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             viewer._diff_layout = "side-by-side"
@@ -1241,7 +1311,8 @@ class TestCommitFileDiffEdgeCases:
     async def test_load_commit_file_diff_no_worktree(self, worktree: Path) -> None:
         """load_commit_file_diff returns early when worktree_root is None."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.worktree_root = None
             viewer.load_commit_file_diff("abc123", "file.py")
@@ -1258,7 +1329,8 @@ class TestLoadDiffCommitFileContext:
     ) -> None:
         """_load_diff with _commit_file_context delegates to load_commit_file_diff."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             viewer._commit_file_context = ("abc123", "file.py")
@@ -1279,7 +1351,8 @@ class TestRefreshContentCommitFile:
     ) -> None:
         """refresh_content re-loads commit file diff when context is set."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             viewer._commit_file_context = ("abc123", "file.py")
@@ -1293,7 +1366,8 @@ class TestRefreshContentCommitFile:
     async def test_refresh_content_with_diff_mode(self, worktree: Path) -> None:
         """refresh_content re-loads diff when in diff mode."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer.worktree_root = worktree
             viewer._current_path = worktree / "hello.py"
@@ -1309,7 +1383,8 @@ class TestRefreshFooterException:
     async def test_refresh_footer_swallows_exception(self, worktree: Path) -> None:
         """_refresh_footer catches exceptions from screen.refresh_bindings."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             with patch.object(
                 viewer.screen,
@@ -1383,7 +1458,8 @@ class TestMarkdownPreviewMultipleParts:
         md_file.write_text("Before\n\n![alt](pic.png)\n\nAfter")
 
         app = PerchApp(tmp_path)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             viewer._markdown_preview = True
             viewer.load_file(md_file)
@@ -1396,7 +1472,8 @@ class TestCiLogGroupNewline:
     async def test_group_after_content_adds_newline(self, worktree: Path) -> None:
         """A ##[group] that comes after earlier output should add a leading newline."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = app.query_one(Viewer)
             log = "Normal line\n##[group]Setup"
             viewer.show_ci_log(log)

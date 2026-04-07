@@ -109,6 +109,7 @@ class TestHelpScreenModal:
         """Pressing ? should open the HelpScreen modal."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             await pilot.press("question_mark")
             await pilot.pause()
             assert isinstance(app.screen, HelpScreen)
@@ -117,6 +118,7 @@ class TestHelpScreenModal:
         """Pressing Escape on the HelpScreen should dismiss it."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             await pilot.press("question_mark")
             await pilot.pause()
             assert isinstance(app.screen, HelpScreen)
@@ -128,6 +130,7 @@ class TestHelpScreenModal:
         """The HelpScreen should display content for all BINDING_REGISTRY sections."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             await pilot.press("question_mark")
             await pilot.pause()
             screen = app.screen
@@ -146,6 +149,7 @@ class TestHelpScreenModal:
         """Ctrl+Shift+P should still open the command palette, not the help screen."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             await pilot.press("ctrl+shift+p")
             await pilot.pause()
             # Should NOT be a HelpScreen

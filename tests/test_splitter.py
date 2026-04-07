@@ -21,11 +21,13 @@ class TestSplitterComposition:
 
     async def test_app_has_splitter(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             splitter = pilot.app.query_one(DraggableSplitter)
             assert splitter is not None
 
     async def test_splitter_width_is_one(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             splitter = pilot.app.query_one(DraggableSplitter)
             assert splitter.size.width == 1
 
@@ -35,12 +37,14 @@ class TestClampWidth:
 
     async def test_clamp_enforces_min_left(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             splitter = pilot.app.query_one(DraggableSplitter)
             result = splitter._clamp_width(5)
             assert result == DraggableSplitter.MIN_LEFT
 
     async def test_clamp_enforces_min_right(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             splitter = pilot.app.query_one(DraggableSplitter)
             app_width = pilot.app.size.width
             result = splitter._clamp_width(app_width)
@@ -49,6 +53,7 @@ class TestClampWidth:
 
     async def test_clamp_allows_valid_width(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             splitter = pilot.app.query_one(DraggableSplitter)
             result = splitter._clamp_width(40)
             assert result == 40
@@ -60,6 +65,7 @@ class TestResizeLeftPane:
     async def test_resize_left_pane_grows(self, worktree: Path) -> None:
         """resize_left_pane(+delta) should increase the left pane width."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             splitter = pilot.app.query_one(DraggableSplitter)
             left_pane = pilot.app.query_one("#left-pane")
             splitter.resize_left_pane(5)
@@ -71,6 +77,7 @@ class TestResizeLeftPane:
     async def test_resize_left_pane_shrinks(self, worktree: Path) -> None:
         """resize_left_pane(-delta) should decrease the left pane width."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             splitter = pilot.app.query_one(DraggableSplitter)
             left_pane = pilot.app.query_one("#left-pane")
             splitter.resize_left_pane(-5)
@@ -97,6 +104,7 @@ class TestMouseDrag:
 
     async def test_mouse_down_starts_drag(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             splitter = pilot.app.query_one(DraggableSplitter)
             assert splitter._dragging is False
             _call_handler(
@@ -110,6 +118,7 @@ class TestMouseDrag:
 
     async def test_mouse_up_stops_drag(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             splitter = pilot.app.query_one(DraggableSplitter)
             splitter._dragging = True
             _call_handler(
@@ -124,6 +133,7 @@ class TestMouseDrag:
     async def test_mouse_drag_resizes_pane(self, worktree: Path) -> None:
         """Dragging the splitter should change the left pane width style."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             splitter = pilot.app.query_one(DraggableSplitter)
             left_pane = pilot.app.query_one("#left-pane")
 
@@ -156,6 +166,7 @@ class TestMouseDrag:
 
     async def test_mouse_move_without_drag_is_noop(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             splitter = pilot.app.query_one(DraggableSplitter)
             left_pane = pilot.app.query_one("#left-pane")
             initial_width = left_pane.outer_size.width
