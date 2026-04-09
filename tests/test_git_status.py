@@ -357,6 +357,7 @@ class TestCommitTreeBehavior:
 
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             panel = app.query_one(GitPanel)
             for _ in range(10):
                 await pilot.pause()
@@ -381,6 +382,7 @@ class TestCommitTreeBehavior:
 
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             panel = app.query_one(GitPanel)
             for _ in range(10):
                 await pilot.pause()
