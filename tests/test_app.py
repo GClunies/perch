@@ -31,58 +31,68 @@ class TestPerchAppCompose:
     async def test_has_header(self, worktree: Path) -> None:
         """App should have a Header widget."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             header = pilot.app.query_one(Header)
             assert header is not None
 
     async def test_has_footer(self, worktree: Path) -> None:
         """App should have a Footer widget."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             footer = pilot.app.query_one(Footer)
             assert footer is not None
 
     async def test_title_without_git(self, worktree: Path) -> None:
         """Title should be 'perch' when not in a git repo."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             assert pilot.app.title == "perch"
 
     async def test_sub_title_shows_path(self, worktree: Path) -> None:
         """Sub-title should show the worktree path."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             assert pilot.app.sub_title == str(worktree)
 
     async def test_has_file_viewer(self, worktree: Path) -> None:
         """App should have a Viewer as the left pane."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one("#left-pane", Viewer)
             assert viewer is not None
 
     async def test_has_tabbed_content(self, worktree: Path) -> None:
         """App should have a TabbedContent as the sidebar."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             tabs = pilot.app.query_one("#sidebar", TabbedContent)
             assert tabs is not None
 
     async def test_has_three_tabs(self, worktree: Path) -> None:
         """TabbedContent should have three tab panes: Files, Git, PR."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             panes = pilot.app.query(TabPane)
             assert len(panes) == 3
 
     async def test_files_tab_contains_tree(self, worktree: Path) -> None:
         """Files tab should contain a FileTree."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             tree = pilot.app.query_one(FileTree)
             assert tree is not None
 
     async def test_git_tab_has_status_panel(self, worktree: Path) -> None:
         """Git tab should contain a GitPanel widget."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             panel = pilot.app.query_one(GitPanel)
             assert panel is not None
 
     async def test_pr_tab_has_context_panel(self, worktree: Path) -> None:
         """PR tab should contain a GitHubPanel widget."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             panel = pilot.app.query_one(GitHubPanel)
             assert panel is not None
 
@@ -92,12 +102,14 @@ class TestTabSwitching:
 
     async def test_next_tab_from_files_goes_to_git(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             await pilot.press("right_square_bracket")
             await pilot.pause()
             assert pilot.app.query_one(TabbedContent).active == "tab-git"
 
     async def test_prev_tab_from_files_wraps_to_github(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             await pilot.press("left_square_bracket")
             await pilot.pause()
             assert pilot.app.query_one(TabbedContent).active == "tab-github"
@@ -120,6 +132,7 @@ class TestQuitBinding:
 
     async def test_ctrl_q_quits(self, worktree: Path) -> None:
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             await pilot.press("ctrl+q")
             await pilot.pause()
             assert pilot.app.return_code is not None or not pilot.app.is_running
@@ -132,6 +145,7 @@ class TestTitleWithGitBranch:
         """Title should include the branch when inside a git repo."""
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             assert "perch" in pilot.app.title
             # In a real git repo the branch name should appear
             assert "\u2014" in pilot.app.title  # em dash separator
@@ -144,6 +158,7 @@ class TestTabNavigation:
         """action_next_tab should cycle Files -> Git -> GitHub -> Files."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             tabbed = pilot.app.query_one(TabbedContent)
             assert tabbed.active == "tab-files"
             pilot.app.action_next_tab()
@@ -160,6 +175,7 @@ class TestTabNavigation:
         """action_prev_tab should cycle Files -> GitHub -> Git -> Files."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             tabbed = pilot.app.query_one(TabbedContent)
             assert tabbed.active == "tab-files"
             pilot.app.action_prev_tab()
@@ -173,6 +189,7 @@ class TestTabNavigation:
         """Switching to git tab should focus the GitPanel."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             pilot.app.action_next_tab()
             await pilot.pause()
             panel = pilot.app.query_one(GitPanel)
@@ -182,6 +199,7 @@ class TestTabNavigation:
         """Switching to GitHub tab should focus the GitHubPanel."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             pilot.app.action_next_tab()
             await pilot.pause()
             pilot.app.action_next_tab()
@@ -193,6 +211,7 @@ class TestTabNavigation:
         """Switching back to files tab should focus the FileTree."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             pilot.app.action_next_tab()
             await pilot.pause()
             pilot.app.action_prev_tab()
@@ -208,6 +227,7 @@ class TestFocusPaneToggle:
         """Tab from sidebar should move focus to the file viewer."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             # Start: file tree is focused (sidebar)
             tree = pilot.app.query_one(FileTree)
             tree.focus()
@@ -222,6 +242,7 @@ class TestFocusPaneToggle:
         """Tab from left pane should move focus back to the active tab."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one("#left-pane", Viewer)
             viewer.focus()
             await pilot.pause()
@@ -241,6 +262,7 @@ class TestFocusActiveTab:
         """_focus_active_tab on files tab should set cursor to a valid position."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             tree = pilot.app.query_one(FileTree)
             tree.cursor_line = -1
             pilot.app._focus_active_tab()
@@ -251,6 +273,7 @@ class TestFocusActiveTab:
         """_focus_active_tab on git tab should focus the GitPanel."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             pilot.app.action_next_tab()  # Files -> Git
             await pilot.pause()
             await pilot.pause()
@@ -260,6 +283,7 @@ class TestFocusActiveTab:
         """_focus_active_tab on pr tab should focus the GitHubPanel."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             pilot.app.action_next_tab()  # Files -> Git
             await pilot.pause()
             pilot.app.action_next_tab()  # Git -> GitHub
@@ -321,6 +345,7 @@ class TestToggleDiff:
         """action_toggle_diff should call the viewer's action_toggle_diff."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             with patch.object(viewer, "action_toggle_diff") as mock:
                 pilot.app.action_toggle_diff()
@@ -330,6 +355,7 @@ class TestToggleDiff:
         """action_toggle_diff_layout should call the viewer's method."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             with patch.object(viewer, "action_toggle_diff_layout") as mock:
                 pilot.app.action_toggle_diff_layout()
@@ -343,6 +369,7 @@ class TestToggleFocusMode:
         """Entering focus mode should hide the sidebar and splitter."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             pilot.app.action_toggle_focus_mode()
             await pilot.pause()
             sidebar = pilot.app.query_one("#sidebar", TabbedContent)
@@ -355,6 +382,7 @@ class TestToggleFocusMode:
         """Entering focus mode should set the viewer width to 100%."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             pilot.app.action_toggle_focus_mode()
             await pilot.pause()
             viewer = pilot.app.query_one("#left-pane", Viewer)
@@ -365,6 +393,7 @@ class TestToggleFocusMode:
         """Entering focus mode should focus the viewer."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             pilot.app.action_toggle_focus_mode()
             await pilot.pause()
             viewer = pilot.app.query_one("#left-pane", Viewer)
@@ -374,6 +403,7 @@ class TestToggleFocusMode:
         """Exiting focus mode should restore the sidebar and splitter."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             # Enter focus mode
             pilot.app.action_toggle_focus_mode()
             await pilot.pause()
@@ -390,6 +420,7 @@ class TestToggleFocusMode:
         """Exiting focus mode should restore the viewer width to 60%."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             pilot.app.action_toggle_focus_mode()
             await pilot.pause()
             pilot.app.action_toggle_focus_mode()
@@ -405,6 +436,7 @@ class TestOnTreeNodeHighlighted:
         """A tree node with data=None should be skipped (no crash)."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
 
             class FakeEvent:
                 class node:
@@ -421,6 +453,7 @@ class TestOpenEditor:
         """action_open_editor should call open_file with the git root."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             with (
@@ -441,6 +474,7 @@ class TestOpenEditor:
         """action_open_editor passes None when file is not in a git repo."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             viewer._current_path = worktree / "hello.py"
             with (
@@ -461,6 +495,7 @@ class TestOpenEditor:
         """action_open_editor should do nothing when no file is loaded."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             viewer._current_path = None
             with patch("perch.app.open_file") as mock:
@@ -475,6 +510,7 @@ class TestWatchTheme:
         """watch_theme should not crash when no file is loaded."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             # viewer._current_path is None by default
             pilot.app.watch_theme()
             # No exception expected
@@ -483,6 +519,7 @@ class TestWatchTheme:
         """watch_theme should re-render when a file is loaded."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             viewer.load_file(worktree / "hello.py")
             await pilot.pause()
@@ -493,6 +530,7 @@ class TestWatchTheme:
         """watch_theme in diff mode should call _load_diff."""
         app = PerchApp(git_worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             viewer._current_path = git_worktree / "hello.py"
             viewer._diff_mode = True
@@ -508,6 +546,7 @@ class TestFileSearch:
         """_on_file_selected(None) should not change the viewer state."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             await pilot.pause()
             path_before = viewer._current_path
@@ -519,6 +558,7 @@ class TestFileSearch:
         """_on_file_selected with a valid relative path should load the file."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             pilot.app._on_file_selected("hello.py")
             await pilot.pause()
@@ -530,6 +570,7 @@ class TestFileSearch:
         """_on_file_selected with a non-existent file should not change state."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             viewer = pilot.app.query_one(Viewer)
             await pilot.pause()
             path_before = viewer._current_path
@@ -541,6 +582,7 @@ class TestFileSearch:
         """action_file_search should push a FileSearchScreen."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             with patch.object(pilot.app, "push_screen") as mock:
                 pilot.app.action_file_search()
                 mock.assert_called_once()
@@ -551,6 +593,7 @@ class TestFileSearch:
         """_on_file_selected should cache the path under _files_tab_last_path."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
+            await pilot.pause()
             pilot.app._on_file_selected("hello.py")
             await pilot.pause()
             assert pilot.app._files_tab_last_path == worktree / "hello.py"
@@ -1625,6 +1668,7 @@ class TestFooterCompact:
     async def test_footer_is_compact(self, worktree: Path) -> None:
         """The Footer widget should be instantiated with compact=True."""
         async with PerchApp(worktree).run_test() as pilot:
+            await pilot.pause()
             footer = pilot.app.query_one(Footer)
             assert footer.compact is True
 

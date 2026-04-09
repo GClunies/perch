@@ -84,7 +84,8 @@ class TestDiscoverMethod:
     async def test_discover_yields_all_commands(self, worktree: Path) -> None:
         """discover() should yield one DiscoveryHit per COMMANDS entry."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             provider = DiscoveryCommandProvider(app.screen, None)  # type: ignore[arg-type]
             hits = [hit async for hit in provider.discover()]
             assert len(hits) == len(COMMANDS)
@@ -92,7 +93,8 @@ class TestDiscoverMethod:
     async def test_discover_hits_are_discovery_hits(self, worktree: Path) -> None:
         """Each yielded hit should be a DiscoveryHit instance."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             provider = DiscoveryCommandProvider(app.screen, None)  # type: ignore[arg-type]
             hits = [hit async for hit in provider.discover()]
             for hit in hits:
@@ -103,7 +105,8 @@ class TestDiscoverMethod:
     ) -> None:
         """Each hit display should contain the command name and hotkey."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             provider = DiscoveryCommandProvider(app.screen, None)  # type: ignore[arg-type]
             hits = [hit async for hit in provider.discover()]
             for hit, (display_name, hotkey, _) in zip(hits, COMMANDS):
@@ -113,7 +116,8 @@ class TestDiscoverMethod:
     async def test_discover_help_text(self, worktree: Path) -> None:
         """Each hit help text should show the hotkey."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             provider = DiscoveryCommandProvider(app.screen, None)  # type: ignore[arg-type]
             hits = [hit async for hit in provider.discover()]
             for hit, (_, hotkey, _) in zip(hits, COMMANDS):
@@ -122,7 +126,8 @@ class TestDiscoverMethod:
     async def test_discover_command_is_callable(self, worktree: Path) -> None:
         """Each hit command should be a callable."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             provider = DiscoveryCommandProvider(app.screen, None)  # type: ignore[arg-type]
             hits = [hit async for hit in provider.discover()]
             for hit in hits:
@@ -135,7 +140,8 @@ class TestSearchMethod:
     async def test_search_returns_matching_hits(self, worktree: Path) -> None:
         """search('Quit') should return at least one hit."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             provider = DiscoveryCommandProvider(app.screen, None)  # type: ignore[arg-type]
             hits = [hit async for hit in provider.search("Quit")]
             assert len(hits) >= 1
@@ -143,7 +149,8 @@ class TestSearchMethod:
     async def test_search_hits_are_hit_instances(self, worktree: Path) -> None:
         """Each search result should be a Hit instance."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             provider = DiscoveryCommandProvider(app.screen, None)  # type: ignore[arg-type]
             hits = [hit async for hit in provider.search("Quit")]
             for hit in hits:
@@ -152,7 +159,8 @@ class TestSearchMethod:
     async def test_search_hit_has_positive_score(self, worktree: Path) -> None:
         """Matched hits should have a positive score."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             provider = DiscoveryCommandProvider(app.screen, None)  # type: ignore[arg-type]
             hits = [hit async for hit in provider.search("Quit")]
             for hit in hits:
@@ -161,7 +169,8 @@ class TestSearchMethod:
     async def test_search_no_match_returns_empty(self, worktree: Path) -> None:
         """search() with a non-matching query should yield no results."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             provider = DiscoveryCommandProvider(app.screen, None)  # type: ignore[arg-type]
             hits = [hit async for hit in provider.search("xyznonexistent999")]
             assert len(hits) == 0
@@ -169,7 +178,8 @@ class TestSearchMethod:
     async def test_search_hit_help_text(self, worktree: Path) -> None:
         """Search hits should have help text with the hotkey."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             provider = DiscoveryCommandProvider(app.screen, None)  # type: ignore[arg-type]
             hits = [hit async for hit in provider.search("Quit")]
             for hit in hits:
@@ -179,7 +189,8 @@ class TestSearchMethod:
     async def test_search_hit_command_is_callable(self, worktree: Path) -> None:
         """Search hit commands should be callable."""
         app = PerchApp(worktree)
-        async with app.run_test():
+        async with app.run_test() as pilot:
+            await pilot.pause()
             provider = DiscoveryCommandProvider(app.screen, None)  # type: ignore[arg-type]
             hits = [hit async for hit in provider.search("Diff")]
             assert len(hits) >= 1
