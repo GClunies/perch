@@ -436,8 +436,8 @@ class TestOnTreeNodeHighlighted:
         """A tree node with data=None should be skipped (no crash)."""
         app = PerchApp(worktree)
         async with app.run_test() as pilot:
-
             await pilot.pause()
+
             class FakeEvent:
                 class node:
                     data = None
