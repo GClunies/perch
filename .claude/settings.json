@@ -12,9 +12,7 @@
             "statusMessage": "Running test suite before push..."
           }
         ]
-      }
-    ],
-    "PostToolUse": [
+      },
       {
         "matcher": "Write|Edit",
         "hooks": [
