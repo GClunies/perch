@@ -159,6 +159,15 @@ class PerchApp(App):
         yield Footer(compact=True, show_command_palette=False)
 
     # ------------------------------------------------------------------
+    # Branch change handling
+    # ------------------------------------------------------------------
+
+    def on_git_panel_branch_changed(self, event: GitPanel.BranchChanged) -> None:
+        """Update the header title when the git branch changes."""
+        self._branch = event.branch
+        self.title = f"perch — {event.branch}"
+
+    # ------------------------------------------------------------------
     # Auto-select first file on startup
     # ------------------------------------------------------------------
 
