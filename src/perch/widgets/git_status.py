@@ -121,6 +121,13 @@ class GitPanel(Vertical):
             super().__init__()
             self.commit_hash = commit_hash
 
+    class BranchChanged(Message):
+        """Posted when the ref watcher detects a branch change."""
+
+        def __init__(self, branch: str) -> None:
+            super().__init__()
+            self.branch = branch
+
     class SelectionRestored(Message):
         """Posted after each data refresh once the selection has been set.
 
@@ -699,6 +706,7 @@ class GitPanel(Vertical):
                 new_branch = get_current_branch(self._worktree_root)
                 if new_branch != self._watched_branch:
                     self._watched_branch = new_branch
+                    self.post_message(self.BranchChanged(new_branch))
             except RuntimeError:
                 pass
             self._update_ref_mtimes()
