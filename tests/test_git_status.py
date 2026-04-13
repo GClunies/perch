@@ -1005,7 +1005,13 @@ class TestRefWatcher:
             initial_commits = len(
                 [n for n in root.children if n.data and n.data.startswith("commit:")]
             )
-            # Make a new commit — retry if background workers hold the index lock
+            # Make a new commit.
+            #
+            # The running app has background workers (file status refresh every
+            # 5s, ref watcher every 2.5s) that run git commands on this same
+            # repo.  Those commands can hold .git/index.lock, causing our
+            # `git add` / `git commit` to fail with "index.lock: File exists".
+            # We retry up to 5 times with short sleeps to wait out the lock.
             import time as _time
 
             (git_worktree / "newfile.txt").write_text("new\n")
@@ -1015,9 +1021,7 @@ class TestRefWatcher:
                     _time.sleep(0.5)
                     continue
                 try:
-                    subprocess.run(
-                        ["git", "add", "."], cwd=git_worktree, check=True
-                    )
+                    subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
                     subprocess.run(
                         ["git", "commit", "-m", "new commit"],
                         cwd=git_worktree,
