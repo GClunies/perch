@@ -1005,14 +1005,29 @@ class TestRefWatcher:
             initial_commits = len(
                 [n for n in root.children if n.data and n.data.startswith("commit:")]
             )
-            # Make a new commit
+            # Make a new commit — retry if background workers hold the index lock
+            import time as _time
+
             (git_worktree / "newfile.txt").write_text("new\n")
-            subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-            subprocess.run(
-                ["git", "commit", "-m", "new commit"],
-                cwd=git_worktree,
-                check=True,
-            )
+            for _attempt in range(5):
+                lock = git_worktree / ".git" / "index.lock"
+                if lock.exists():
+                    _time.sleep(0.5)
+                    continue
+                try:
+                    subprocess.run(
+                        ["git", "add", "."], cwd=git_worktree, check=True
+                    )
+                    subprocess.run(
+                        ["git", "commit", "-m", "new commit"],
+                        cwd=git_worktree,
+                        check=True,
+                    )
+                    break
+                except subprocess.CalledProcessError:
+                    if _attempt == 4:
+                        raise
+                    _time.sleep(0.5)
             # Wait for ref watcher
             for _ in range(20):
                 await pilot.pause(delay=0.2)
