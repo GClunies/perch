@@ -7,9 +7,9 @@
           {
             "type": "command",
             "if": "Bash(git push*)",
-            "command": "uv run pytest tests/ -x -q",
-            "timeout": 600,
-            "statusMessage": "Running test suite before push..."
+            "command": "bash scripts/test-changed.sh",
+            "timeout": 300,
+            "statusMessage": "Running tests for changed files..."
           }
         ]
       }
