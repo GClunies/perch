@@ -210,6 +210,14 @@ class GitPanel(Vertical):
             return item.name
         return None
 
+    def reload(self, new_path: Path) -> None:
+        """Switch to a new worktree and refresh everything."""
+        self._worktree_root = new_path
+        self._expanded_commit = None
+        self._commits_loaded = 0
+        self._start_ref_watcher()
+        self._do_refresh()
+
     def refresh_files(self) -> None:
         """Refresh file sections only."""
         self._refresh_file_status_worker()

@@ -13,6 +13,7 @@ from perch.commands import DiscoveryCommandProvider
 from perch.services.editor import open_file
 from perch.widgets.file_search import FileSearchScreen
 from perch.widgets.file_tree import FileTree
+from perch.widgets.git_picker import GitPickerScreen
 from perch.widgets.git_status import GitPanel
 from perch.widgets.github_panel import ClickableItem, GitHubPanel
 from perch.widgets.help_screen import HelpScreen
@@ -44,6 +45,7 @@ class PerchApp(App):
         Binding("o", "open_editor", "Open", show=False),
         Binding("minus", "shrink_pane", "Shrink", show=False, key_display="-"),
         Binding("equals_sign", "grow_pane", "Grow", show=False, key_display="="),
+        Binding("w", "switch_worktree", "Worktree/Branch"),
     ]
 
     BINDING_REGISTRY: ClassVar[dict[str, list[Binding]]] = {
@@ -54,6 +56,7 @@ class PerchApp(App):
                 "left_square_bracket", "prev_tab", "Prev/Next Tab", key_display="[/]"
             ),
             Binding("ctrl+p", "file_search", "File Search", key_display="Ctrl+P"),
+            Binding("w", "switch_worktree", "Worktree/Branch", key_display="w"),
             Binding("c", "copy", "Copy", key_display="c"),
             Binding("question_mark", "show_help", "Help", key_display="?"),
             Binding("f", "toggle_focus_mode", "Focus Mode", key_display="f"),
@@ -554,6 +557,74 @@ class PerchApp(App):
                 self.query_one(Viewer).load_file(path)
                 self._files_tab_last_path = path
                 self._sync_tree_to_path(path)
+
+    # ------------------------------------------------------------------
+    # Worktree switching
+    # ------------------------------------------------------------------
+
+    def action_switch_worktree(self) -> None:
+        """Open the git picker modal."""
+        self.push_screen(
+            GitPickerScreen(self.worktree_path), self._on_worktree_selected
+        )
+
+    def _on_worktree_selected(self, result: str | None) -> None:
+        """Handle the result from the worktree/branch picker modal."""
+        if result is None:
+            return
+        if result.startswith("worktree:"):
+            self._switch_to_worktree(Path(result.removeprefix("worktree:")))
+        elif result.startswith("branch:"):
+            self._switch_to_branch(result.removeprefix("branch:"))
+
+    def _switch_to_worktree(self, new_path: Path) -> None:
+        """Switch all widgets to a different worktree directory."""
+        if not new_path.is_dir():
+            self.notify(f"Worktree not found: {new_path}", severity="error", timeout=3)
+            return
+        self.worktree_path = new_path
+        self._update_header()
+        self.sub_title = str(new_path)
+        self._refresh_all_widgets(new_path)
+
+    @work(thread=True, exclusive=True, group="branch-switch")
+    def _switch_to_branch(self, branch: str) -> None:
+        """Switch the current worktree to a different branch."""
+        from perch.services.git import switch_branch
+
+        try:
+            switch_branch(self.worktree_path, branch)
+        except RuntimeError as e:
+            self.call_from_thread(self.notify, str(e), severity="error", timeout=3)
+            return
+        self.call_from_thread(self._after_branch_switch)
+
+    def _after_branch_switch(self) -> None:
+        """Refresh everything after a successful branch switch."""
+        self._update_header()
+        self._refresh_all_widgets(self.worktree_path)
+
+    def _update_header(self) -> None:
+        """Refresh the header title with the current branch."""
+        try:
+            from perch.services.git import get_current_branch, get_worktree_root
+
+            git_root = get_worktree_root(self.worktree_path)
+            self._branch = get_current_branch(git_root)
+            self.title = f"perch — {self._branch}"
+        except (RuntimeError, FileNotFoundError):
+            self.title = "perch"
+
+    def _refresh_all_widgets(self, path: Path) -> None:
+        """Reset and refresh all widgets for the given worktree path."""
+        self._files_tab_last_path = None
+        self._auto_select_done = False
+        self._auto_select_attempts = 0
+        self.query_one(FileTree).switch_worktree(path)
+        self.query_one(GitPanel).reload(path)
+        self.query_one(GitHubPanel).reload(path)
+        self.query_one(Viewer).worktree_root = path
+        self.set_timer(_AUTO_SELECT_INTERVAL, self._auto_select_first_node)
 
     def action_open_editor(self) -> None:
         """Open the currently highlighted file in the external editor."""

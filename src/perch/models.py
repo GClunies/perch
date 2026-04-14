@@ -43,6 +43,13 @@ class CommitSummary:
 
 
 @dataclass
+class Worktree:
+    path: str
+    head: str
+    branch: str | None
+
+
+@dataclass
 class PRReview:
     author: str
     state: str

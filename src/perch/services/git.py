@@ -3,7 +3,14 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from perch.models import Commit, CommitFile, CommitSummary, GitFile, GitStatusData
+from perch.models import (
+    Commit,
+    CommitFile,
+    CommitSummary,
+    GitFile,
+    GitStatusData,
+    Worktree,
+)
 
 # Porcelain v1 status codes and their human-readable labels
 _STATUS_LABELS: dict[str, str] = {
@@ -73,6 +80,52 @@ def get_current_branch(root: Path) -> str:
     if result.returncode != 0:
         raise RuntimeError(f"Failed to get branch: {result.stderr.strip()}")
     return result.stdout.strip()
+
+
+def get_worktrees(root: Path) -> list[Worktree]:
+    """Return all worktrees for the repo at *root*."""
+    result = _run_git(["worktree", "list", "--porcelain"], cwd=root)
+    if result.returncode != 0:
+        return []
+    return parse_worktree_list(result.stdout)
+
+
+def parse_worktree_list(raw: str) -> list[Worktree]:
+    """Parse ``git worktree list --porcelain`` output into Worktree objects."""
+    worktrees: list[Worktree] = []
+    path = head = branch = None
+    for line in raw.splitlines():
+        if line.startswith("worktree "):
+            path = line.removeprefix("worktree ")
+        elif line.startswith("HEAD "):
+            head = line.removeprefix("HEAD ")
+        elif line.startswith("branch "):
+            ref = line.removeprefix("branch ")
+            branch = ref.removeprefix("refs/heads/")
+        elif line == "detached":
+            branch = None
+        elif line == "" and path and head:
+            worktrees.append(Worktree(path=path, head=head, branch=branch))
+            path = head = branch = None
+    # Handle trailing entry without final blank line
+    if path and head:
+        worktrees.append(Worktree(path=path, head=head, branch=branch))
+    return worktrees
+
+
+def get_branches(root: Path) -> list[str]:
+    """Return local branch names, current branch first."""
+    result = _run_git(["branch", "--format=%(refname:short)"], cwd=root)
+    if result.returncode != 0:
+        return []
+    return [b for b in result.stdout.strip().splitlines() if b]
+
+
+def switch_branch(root: Path, branch: str) -> None:
+    """Switch to *branch* in the worktree at *root*."""
+    result = _run_git(["switch", branch], cwd=root)
+    if result.returncode != 0:
+        raise RuntimeError(f"git switch failed: {result.stderr.strip()}")
 
 
 def get_status(root: Path) -> GitStatusData:

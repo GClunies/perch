@@ -115,6 +115,13 @@ class GitHubPanel(ListView):
         self._actions: list[CICheck] = []
         self._actions_loaded = True
 
+    def reload(self, new_path: Path) -> None:
+        """Switch to a new worktree and refresh."""
+        self._worktree_root = new_path
+        self._pr_context = None
+        self._actions = []
+        self._do_refresh()
+
     def on_mount(self) -> None:
         self.append(_make_section_header("Loading PR context..."))
         self._do_refresh()
