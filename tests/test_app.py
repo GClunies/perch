@@ -26,75 +26,36 @@ def worktree(tmp_path: Path) -> Path:
 
 
 class TestPerchAppCompose:
-    """Tests for the app layout and widget composition."""
+    """Tests for the app layout and widget composition.
 
-    async def test_has_header(self, worktree: Path) -> None:
-        """App should have a Header widget."""
+    All tests are read-only queries against a single mounted app instance.
+    """
+
+    async def test_all_composition(self, worktree: Path) -> None:
+        """App should have the correct layout: header, footer, viewer, tabs, panels."""
         async with PerchApp(worktree).run_test() as pilot:
             await pilot.pause()
-            header = pilot.app.query_one(Header)
-            assert header is not None
+            app = pilot.app
 
-    async def test_has_footer(self, worktree: Path) -> None:
-        """App should have a Footer widget."""
-        async with PerchApp(worktree).run_test() as pilot:
-            await pilot.pause()
-            footer = pilot.app.query_one(Footer)
-            assert footer is not None
+            # Header and footer
+            assert app.query_one(Header) is not None
+            assert app.query_one(Footer) is not None
 
-    async def test_title_without_git(self, worktree: Path) -> None:
-        """Title should be 'perch' when not in a git repo."""
-        async with PerchApp(worktree).run_test() as pilot:
-            await pilot.pause()
-            assert pilot.app.title == "perch"
+            # Title
+            assert app.title == "perch"
+            assert app.sub_title == str(worktree)
 
-    async def test_sub_title_shows_path(self, worktree: Path) -> None:
-        """Sub-title should show the worktree path."""
-        async with PerchApp(worktree).run_test() as pilot:
-            await pilot.pause()
-            assert pilot.app.sub_title == str(worktree)
+            # Left pane
+            assert app.query_one("#left-pane", Viewer) is not None
 
-    async def test_has_file_viewer(self, worktree: Path) -> None:
-        """App should have a Viewer as the left pane."""
-        async with PerchApp(worktree).run_test() as pilot:
-            await pilot.pause()
-            viewer = pilot.app.query_one("#left-pane", Viewer)
-            assert viewer is not None
+            # Sidebar tabs
+            assert app.query_one("#sidebar", TabbedContent) is not None
+            assert len(app.query(TabPane)) == 3
 
-    async def test_has_tabbed_content(self, worktree: Path) -> None:
-        """App should have a TabbedContent as the sidebar."""
-        async with PerchApp(worktree).run_test() as pilot:
-            await pilot.pause()
-            tabs = pilot.app.query_one("#sidebar", TabbedContent)
-            assert tabs is not None
-
-    async def test_has_three_tabs(self, worktree: Path) -> None:
-        """TabbedContent should have three tab panes: Files, Git, PR."""
-        async with PerchApp(worktree).run_test() as pilot:
-            await pilot.pause()
-            panes = pilot.app.query(TabPane)
-            assert len(panes) == 3
-
-    async def test_files_tab_contains_tree(self, worktree: Path) -> None:
-        """Files tab should contain a FileTree."""
-        async with PerchApp(worktree).run_test() as pilot:
-            await pilot.pause()
-            tree = pilot.app.query_one(FileTree)
-            assert tree is not None
-
-    async def test_git_tab_has_status_panel(self, worktree: Path) -> None:
-        """Git tab should contain a GitPanel widget."""
-        async with PerchApp(worktree).run_test() as pilot:
-            await pilot.pause()
-            panel = pilot.app.query_one(GitPanel)
-            assert panel is not None
-
-    async def test_pr_tab_has_context_panel(self, worktree: Path) -> None:
-        """PR tab should contain a GitHubPanel widget."""
-        async with PerchApp(worktree).run_test() as pilot:
-            await pilot.pause()
-            panel = pilot.app.query_one(GitHubPanel)
-            assert panel is not None
+            # Tab contents
+            assert app.query_one(FileTree) is not None
+            assert app.query_one(GitPanel) is not None
+            assert app.query_one(GitHubPanel) is not None
 
 
 class TestTabSwitching:

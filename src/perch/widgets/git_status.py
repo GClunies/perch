@@ -148,6 +148,9 @@ class GitPanel(Vertical):
         HELP_BINDING,
     ]
 
+    _ref_poll_interval: float = 2.5
+    _file_poll_interval: float = 5.0
+
     def __init__(
         self,
         worktree_root: Path,
@@ -190,7 +193,7 @@ class GitPanel(Vertical):
     def on_mount(self) -> None:
         self._file_list.append(_make_section_header("Loading git status..."))
         self._do_refresh()  # initial full refresh
-        self.set_interval(5, self._refresh_file_status_worker)  # auto-refresh files
+        self.set_interval(self._file_poll_interval, self._refresh_file_status_worker)
         self._start_ref_watcher()
 
     # ------------------------------------------------------------------
@@ -666,7 +669,7 @@ class GitPanel(Vertical):
         self._last_head_mtime: float | None = None
         self._last_packed_mtime: float | None = None
         self._update_ref_mtimes()
-        self.set_interval(2.5, self._check_refs)
+        self.set_interval(self._ref_poll_interval, self._check_refs)
 
     def _get_git_dir(self) -> Path:
         """Return the .git directory for the worktree."""

@@ -192,12 +192,9 @@ class TestGitPickerScreen:
             async with app.run_test(size=(120, 40)) as pilot:
                 await pilot.pause()
                 pilot.app.action_switch_worktree()
-                await pilot.pause()
-                await pilot.pause()
-                await pilot.pause()
+                await pilot.pause(delay=0.15)
                 assert isinstance(pilot.app.screen, GitPickerScreen)
                 await pilot.press("escape")
-                await pilot.pause()
                 await pilot.pause()
                 assert not isinstance(pilot.app.screen, GitPickerScreen)
 
@@ -228,9 +225,7 @@ class TestGitPickerScreen:
             async with app.run_test(size=(120, 40)) as pilot:
                 await pilot.pause()
                 pilot.app.action_switch_worktree()
-                await pilot.pause()
-                await pilot.pause()
-                await pilot.pause()
+                await pilot.pause(delay=0.15)
                 screen = pilot.app.screen
                 assert isinstance(screen, GitPickerScreen)
                 list_view = screen.query_one("#git-picker-list", ListView)
@@ -271,9 +266,7 @@ class TestGitPickerScreen:
             async with app.run_test(size=(120, 40)) as pilot:
                 await pilot.pause()
                 pilot.app.action_switch_worktree()
-                await pilot.pause()
-                await pilot.pause()
-                await pilot.pause()
+                await pilot.pause(delay=0.15)
                 screen = pilot.app.screen
                 assert isinstance(screen, GitPickerScreen)
                 list_view = screen.query_one("#git-picker-list", ListView)
@@ -286,12 +279,9 @@ class TestGitPickerScreen:
                 await pilot.pause()
                 await pilot.press("enter")
                 await pilot.pause()
-                await pilot.pause()
                 assert not isinstance(pilot.app.screen, GitPickerScreen)
 
-    async def test_select_current_worktree_dismisses_none(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_select_current_worktree_dismisses_none(self, tmp_path: Path) -> None:
         """Selecting the current worktree should dismiss without switching."""
         from textual.widgets import ListView
 
@@ -317,9 +307,7 @@ class TestGitPickerScreen:
             async with app.run_test(size=(120, 40)) as pilot:
                 await pilot.pause()
                 pilot.app.action_switch_worktree()
-                await pilot.pause()
-                await pilot.pause()
-                await pilot.pause()
+                await pilot.pause(delay=0.15)
                 screen = pilot.app.screen
                 assert isinstance(screen, GitPickerScreen)
                 list_view = screen.query_one("#git-picker-list", ListView)
@@ -328,8 +316,7 @@ class TestGitPickerScreen:
                 list_view.index = 0
                 await pilot.pause()
                 await pilot.press("enter")
-                await pilot.pause()
-                await pilot.pause()
+                await pilot.pause(delay=0.1)
                 # Should dismiss back to main screen
                 assert not isinstance(pilot.app.screen, GitPickerScreen)
 
@@ -397,16 +384,12 @@ class TestAppWorktreeSwitching:
         worktree = tmp_path
         (worktree / "file.py").write_text("x")
         p1, p2, p3, p4 = _service_patches()
-        with p1, p2, p3, p4, patch(
-            "perch.services.git.switch_branch"
-        ) as mock_switch:
+        with p1, p2, p3, p4, patch("perch.services.git.switch_branch") as mock_switch:
             app = PerchApp(worktree)
             async with app.run_test(size=(120, 40)) as pilot:
                 await pilot.pause()
                 pilot.app._on_worktree_selected("branch:feature-x")
-                await pilot.pause()
-                await pilot.pause()
-                await pilot.pause()
+                await pilot.pause(delay=0.15)
                 mock_switch.assert_called_once_with(worktree, "feature-x")
 
 
