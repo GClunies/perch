@@ -1,0 +1,25 @@
+.github/workflows/publish.yml
+  6e46a1388ea43e2a 74,79-84
+.github/workflows/test-publish.yml
+  6e46a1388ea43e2a 80-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "1cd271bc9ffc999b5f28bb24f65253de116882b3",
+  "prompts": {
+    "6e46a1388ea43e2a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "94f96ed8-f879-49e8-902a-c19dfce4edc5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Gregory Clunies",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 2,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}
