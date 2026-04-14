@@ -1,0 +1,29 @@
+src/perch/widgets/git_status.py
+  5e5a36967040f501 151-153,196,672
+tests/test_worktree_picker.py
+  5e5a36967040f501 195,228,269,310,319,392
+tests/test_app.py
+  5e5a36967040f501 29,31-32,34-35,38,40-42,44-46,48-49,51-53,55-58
+tests/test_git_status.py
+  5e5a36967040f501 998-1003,1005-1021,1023-1056
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "e4ef2e7622814dea2bd326d19f8450ea118f4675",
+  "prompts": {
+    "5e5a36967040f501": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18e6fae3-77cb-48d7-9881-fd742e513ba6",
+        "model": "unknown"
+      },
+      "human_author": "Gregory Clunies",
+      "messages": [],
+      "total_additions": 89,
+      "total_deletions": 123,
+      "accepted_lines": 89,
+      "overriden_lines": 0
+    }
+  }
+}
