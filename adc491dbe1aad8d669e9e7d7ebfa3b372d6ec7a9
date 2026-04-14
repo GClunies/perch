@@ -1,0 +1,27 @@
+scripts/test-changed.sh
+  5e5a36967040f501 1-48
+.claude/settings.json
+  5e5a36967040f501 10-12
+pyproject.toml
+  5e5a36967040f501 31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "adc491dbe1aad8d669e9e7d7ebfa3b372d6ec7a9",
+  "prompts": {
+    "5e5a36967040f501": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18e6fae3-77cb-48d7-9881-fd742e513ba6",
+        "model": "unknown"
+      },
+      "human_author": "Gregory Clunies",
+      "messages": [],
+      "total_additions": 59,
+      "total_deletions": 10,
+      "accepted_lines": 52,
+      "overriden_lines": 0
+    }
+  }
+}
