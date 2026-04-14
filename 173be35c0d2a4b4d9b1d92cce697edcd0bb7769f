@@ -1,0 +1,25 @@
+tests/test_worktree_picker.py
+  5e5a36967040f501 204-205,238,240,242,244-246
+src/perch/widgets/git_picker.py
+  5e5a36967040f501 53,85-117,120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "173be35c0d2a4b4d9b1d92cce697edcd0bb7769f",
+  "prompts": {
+    "5e5a36967040f501": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18e6fae3-77cb-48d7-9881-fd742e513ba6",
+        "model": "unknown"
+      },
+      "human_author": "Gregory Clunies",
+      "messages": [],
+      "total_additions": 43,
+      "total_deletions": 85,
+      "accepted_lines": 43,
+      "overriden_lines": 0
+    }
+  }
+}
