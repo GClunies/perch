@@ -148,6 +148,9 @@ class GitPanel(Vertical):
         HELP_BINDING,
     ]
 
+    _ref_poll_interval: float = 2.5
+    _file_poll_interval: float = 5.0
+
     def __init__(
         self,
         worktree_root: Path,
@@ -190,7 +193,7 @@ class GitPanel(Vertical):
     def on_mount(self) -> None:
         self._file_list.append(_make_section_header("Loading git status..."))
         self._do_refresh()  # initial full refresh
-        self.set_interval(5, self._refresh_file_status_worker)  # auto-refresh files
+        self.set_interval(self._file_poll_interval, self._refresh_file_status_worker)
         self._start_ref_watcher()
 
     # ------------------------------------------------------------------
@@ -209,6 +212,14 @@ class GitPanel(Vertical):
         if isinstance(item, ListItem) and item.name is not None:
             return item.name
         return None
+
+    def reload(self, new_path: Path) -> None:
+        """Switch to a new worktree and refresh everything."""
+        self._worktree_root = new_path
+        self._expanded_commit = None
+        self._commits_loaded = 0
+        self._start_ref_watcher()
+        self._do_refresh()
 
     def refresh_files(self) -> None:
         """Refresh file sections only."""
@@ -517,6 +528,9 @@ class GitPanel(Vertical):
             label.append(f" {c.message}  ")
             label.append(c.author, style="dim")
             label.append(f"  {c.relative_time}", style="dim")
+            if c.is_merge:
+                self._commit_tree.root.add_leaf(label, data=f"commit:{c.hash}")
+                continue
             node = self._commit_tree.root.add(label, data=f"commit:{c.hash}")
             if c.hash == expanded and expanded_files:
                 for ef in expanded_files:
@@ -566,7 +580,10 @@ class GitPanel(Vertical):
             label.append(f" {c.message}  ")
             label.append(c.author, style="dim")
             label.append(f"  {c.relative_time}", style="dim")
-            self._commit_tree.root.add(label, data=f"commit:{c.hash}")
+            if c.is_merge:
+                self._commit_tree.root.add_leaf(label, data=f"commit:{c.hash}")
+            else:
+                self._commit_tree.root.add(label, data=f"commit:{c.hash}")
         if len(commits) == self._commit_page_size:
             sentinel_label = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
             self._commit_tree.root.add_leaf(sentinel_label, data="load-more-commits")
@@ -652,7 +669,7 @@ class GitPanel(Vertical):
         self._last_head_mtime: float | None = None
         self._last_packed_mtime: float | None = None
         self._update_ref_mtimes()
-        self.set_interval(2.5, self._check_refs)
+        self.set_interval(self._ref_poll_interval, self._check_refs)
 
     def _get_git_dir(self) -> Path:
         """Return the .git directory for the worktree."""

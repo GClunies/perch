@@ -34,6 +34,7 @@ def test_all_app_actions_covered():
     assert "next_tab" in actions
     assert "focus_next_pane" in actions
     assert "show_help" in actions
+    assert "switch_worktree" in actions
 
 
 def test_stale_commands_removed():
@@ -44,8 +45,8 @@ def test_stale_commands_removed():
 
 
 def test_commands_count():
-    """COMMANDS should have exactly 12 entries after adding Copy."""
-    assert len(COMMANDS) == 12
+    """COMMANDS should have exactly 13 entries after adding Switch Worktree."""
+    assert len(COMMANDS) == 13
 
 
 def test_every_command_has_app_action_method():

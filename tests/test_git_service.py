@@ -103,7 +103,7 @@ class TestParseLog:
         assert parse_log("") == []
 
     def test_single_commit(self) -> None:
-        raw = "abc1234\x1fFix the bug\x1fAlice\x1f2 hours ago\n"
+        raw = "abc1234\x1fFix the bug\x1fAlice\x1f2 hours ago\x1faaa111\n"
         result = parse_log(raw)
         assert result == [
             Commit(
@@ -111,24 +111,37 @@ class TestParseLog:
                 message="Fix the bug",
                 author="Alice",
                 relative_time="2 hours ago",
+                is_merge=False,
             ),
         ]
 
     def test_multiple_commits(self) -> None:
         raw = (
-            "abc1234\x1fFirst commit\x1fAlice\x1f3 days ago\n"
-            "def5678\x1fSecond commit\x1fBob\x1f1 day ago\n"
+            "abc1234\x1fFirst commit\x1fAlice\x1f3 days ago\x1faaa111\n"
+            "def5678\x1fSecond commit\x1fBob\x1f1 day ago\x1fbbb222\n"
         )
         result = parse_log(raw)
         assert len(result) == 2
         assert result[0].hash == "abc1234"
         assert result[1].author == "Bob"
 
+    def test_merge_commit_detected(self) -> None:
+        raw = "abc1234\x1fMerge PR #5\x1fAlice\x1f1 hour ago\x1faaa111 bbb222\n"
+        result = parse_log(raw)
+        assert len(result) == 1
+        assert result[0].is_merge is True
+
+    def test_non_merge_commit(self) -> None:
+        raw = "abc1234\x1fFix bug\x1fAlice\x1f1 hour ago\x1faaa111\n"
+        result = parse_log(raw)
+        assert len(result) == 1
+        assert result[0].is_merge is False
+
     def test_malformed_lines_skipped(self) -> None:
         raw = (
-            "abc1234\x1fGood commit\x1fAlice\x1f1 hour ago\n"
+            "abc1234\x1fGood commit\x1fAlice\x1f1 hour ago\x1faaa111\n"
             "bad line with no separators\n"
-            "def5678\x1fAnother good one\x1fBob\x1f2 hours ago\n"
+            "def5678\x1fAnother good one\x1fBob\x1f2 hours ago\x1fbbb222\n"
         )
         result = parse_log(raw)
         assert len(result) == 2

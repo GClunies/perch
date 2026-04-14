@@ -995,50 +995,65 @@ class TestRefWatcher:
     async def test_new_commit_triggers_refresh(self, git_worktree):
         from perch.app import PerchApp
 
-        app = PerchApp(git_worktree)
-        async with app.run_test() as pilot:
-            await pilot.pause()
-            panel = app.query_one(GitPanel)
-            for _ in range(10):
+        # Speed up polling for tests
+        GitPanel._ref_poll_interval = 0.3
+        GitPanel._file_poll_interval = 10.0
+        try:
+            app = PerchApp(git_worktree)
+            async with app.run_test() as pilot:
                 await pilot.pause()
-            root = panel._commit_tree.root
-            initial_commits = len(
-                [n for n in root.children if n.data and n.data.startswith("commit:")]
-            )
-            # Make a new commit.
-            #
-            # The running app has background workers (file status refresh every
-            # 5s, ref watcher every 2.5s) that run git commands on this same
-            # repo.  Those commands can hold .git/index.lock, causing our
-            # `git add` / `git commit` to fail with "index.lock: File exists".
-            # We retry up to 5 times with short sleeps to wait out the lock.
-            import time as _time
+                panel = app.query_one(GitPanel)
+                for _ in range(5):
+                    await pilot.pause()
+                root = panel._commit_tree.root
+                initial_commits = len(
+                    [
+                        n
+                        for n in root.children
+                        if n.data and n.data.startswith("commit:")
+                    ]
+                )
+                # Make a new commit.
+                #
+                # The running app has background workers that run git commands
+                # on this same repo. Those can hold .git/index.lock, so we
+                # retry up to 5 times with short sleeps.
+                import time as _time
 
-            (git_worktree / "newfile.txt").write_text("new\n")
-            for _attempt in range(5):
-                lock = git_worktree / ".git" / "index.lock"
-                if lock.exists():
-                    _time.sleep(0.5)
-                    continue
-                try:
-                    subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
-                    subprocess.run(
-                        ["git", "commit", "-m", "new commit"],
-                        cwd=git_worktree,
-                        check=True,
-                    )
-                    break
-                except subprocess.CalledProcessError:
-                    if _attempt == 4:
-                        raise
-                    _time.sleep(0.5)
-            # Wait for ref watcher
-            for _ in range(20):
-                await pilot.pause(delay=0.2)
-            final_commits = len(
-                [n for n in root.children if n.data and n.data.startswith("commit:")]
-            )
-            assert final_commits > initial_commits
+                (git_worktree / "newfile.txt").write_text("new\n")
+                for _attempt in range(5):
+                    lock = git_worktree / ".git" / "index.lock"
+                    if lock.exists():
+                        _time.sleep(0.3)
+                        continue
+                    try:
+                        subprocess.run(
+                            ["git", "add", "."], cwd=git_worktree, check=True
+                        )
+                        subprocess.run(
+                            ["git", "commit", "-m", "new commit"],
+                            cwd=git_worktree,
+                            check=True,
+                        )
+                        break
+                    except subprocess.CalledProcessError:
+                        if _attempt == 4:
+                            raise
+                        _time.sleep(0.3)
+                # Wait for ref watcher (faster poll interval)
+                for _ in range(10):
+                    await pilot.pause(delay=0.15)
+                final_commits = len(
+                    [
+                        n
+                        for n in root.children
+                        if n.data and n.data.startswith("commit:")
+                    ]
+                )
+                assert final_commits > initial_commits
+        finally:
+            GitPanel._ref_poll_interval = 2.5
+            GitPanel._file_poll_interval = 5.0
 
 
 class TestGetGitDirWorktree:

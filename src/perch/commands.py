@@ -19,6 +19,7 @@ COMMANDS: list[tuple[str, str, str]] = [
     ("Open in Editor", "o", "open_editor"),
     ("Copy", "c", "copy"),
     ("Help", "?", "show_help"),
+    ("Worktree/Branch", "w", "switch_worktree"),
 ]
 
 

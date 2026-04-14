@@ -64,6 +64,10 @@ class FileTree(DirectoryTree):
         HELP_BINDING,
     ]
 
+    def switch_worktree(self, new_path: Path) -> None:
+        """Switch the tree to a new worktree path."""
+        self.path = str(new_path)
+
     def action_expand_node(self) -> None:
         """Expand the currently highlighted folder node."""
         node = self.cursor_node

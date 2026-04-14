@@ -23,6 +23,7 @@ class Commit:
     message: str
     author: str
     relative_time: str
+    is_merge: bool = False
 
 
 @dataclass
@@ -40,6 +41,13 @@ class CommitSummary:
     author: str
     date: str
     stats: str
+
+
+@dataclass
+class Worktree:
+    path: str
+    head: str
+    branch: str | None
 
 
 @dataclass
