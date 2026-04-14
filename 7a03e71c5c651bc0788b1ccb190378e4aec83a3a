@@ -1,0 +1,29 @@
+src/perch/services/git.py
+  5e5a36967040f501 220,278,280-281,288
+src/perch/widgets/git_status.py
+  5e5a36967040f501 528-530,580-583
+src/perch/models.py
+  5e5a36967040f501 26
+tests/test_git_service.py
+  5e5a36967040f501 106,114,120-121,128-139,142,144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "7a03e71c5c651bc0788b1ccb190378e4aec83a3a",
+  "prompts": {
+    "5e5a36967040f501": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18e6fae3-77cb-48d7-9881-fd742e513ba6",
+        "model": "unknown"
+      },
+      "human_author": "Gregory Clunies",
+      "messages": [],
+      "total_additions": 33,
+      "total_deletions": 8,
+      "accepted_lines": 31,
+      "overriden_lines": 0
+    }
+  }
+}
