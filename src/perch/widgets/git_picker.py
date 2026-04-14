@@ -112,9 +112,7 @@ class GitPickerScreen(ModalScreen[str | None]):
             is_current = branch == current_branch
             marker = " \u2190 current" if is_current else ""
             label = f"{branch}{marker}"
-            list_view.append(
-                ListItem(Label(label), name=f"{_BRANCH_PREFIX}{branch}")
-            )
+            list_view.append(ListItem(Label(label), name=f"{_BRANCH_PREFIX}{branch}"))
 
     def _dismiss_selection(self, name: str | None) -> None:
         """Dismiss with the selected item, skipping current worktree."""
