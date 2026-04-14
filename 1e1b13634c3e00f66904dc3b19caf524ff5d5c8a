@@ -1,0 +1,23 @@
+src/perch/widgets/git_picker.py
+  5e5a36967040f501 115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "1e1b13634c3e00f66904dc3b19caf524ff5d5c8a",
+  "prompts": {
+    "5e5a36967040f501": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18e6fae3-77cb-48d7-9881-fd742e513ba6",
+        "model": "unknown"
+      },
+      "human_author": "Gregory Clunies",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 3,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
