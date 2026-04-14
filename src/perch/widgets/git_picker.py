@@ -42,20 +42,15 @@ class GitPickerScreen(ModalScreen[str | None]):
     #git-picker-list {
         height: 1fr;
     }
-    .section-header {
-        color: $text-muted;
-        text-style: bold;
-    }
     """
 
     def __init__(self, current_worktree: Path) -> None:
         super().__init__()
         self._current_worktree = current_worktree
-        self._worktrees: list[Worktree] = []
 
     def compose(self) -> ComposeResult:
         with Vertical(id="git-picker-container"):
-            yield Label("Switch Branch", id="git-picker-title")
+            yield Label("Switch Worktree / Branch", id="git-picker-title")
             yield ListView(id="git-picker-list")
 
     def on_mount(self) -> None:
@@ -85,48 +80,44 @@ class GitPickerScreen(ModalScreen[str | None]):
         branches: list[str],
         current_branch: str | None,
     ) -> None:
-        self._worktrees = worktrees
         list_view = self.query_one("#git-picker-list", ListView)
         list_view.clear()
-        current = str(self._current_worktree)
+        current_path = str(self._current_worktree)
 
-        # Branches checked out in a worktree — not available for branch switch
-        worktree_branches = {wt.branch for wt in worktrees if wt.branch}
+        # Build a map of branch -> worktree for deduplication
+        branch_to_worktree: dict[str, Worktree] = {}
+        for wt in worktrees:
+            if wt.branch:
+                branch_to_worktree[wt.branch] = wt
 
-        # --- Worktrees section (only if multiple) ---
-        if len(worktrees) > 1:
-            header = ListItem(Label("  Worktrees", classes="section-header"))
-            header.disabled = True
-            list_view.append(header)
-            for wt in worktrees:
-                branch = wt.branch or f"(detached {wt.head[:7]})"
-                marker = " \u2190 current" if wt.path == current else ""
-                label = f"  {branch}  {wt.path}{marker}"
-                list_view.append(
-                    ListItem(Label(label), name=f"{_WORKTREE_PREFIX}{wt.path}")
-                )
+        # Single unified list: worktrees take priority over branches
+        seen_branches: set[str] = set()
 
-        # --- Branches section (exclude any branch already shown in a worktree) ---
-        show_worktree_section = len(worktrees) > 1
-        available_branches = [
-            b
-            for b in branches
-            if b not in worktree_branches
-            or (b == current_branch and not show_worktree_section)
-        ]
-        if available_branches:
-            header = ListItem(Label("  Branches", classes="section-header"))
-            header.disabled = True
-            list_view.append(header)
-            for branch in available_branches:
-                marker = " \u2190 current" if branch == current_branch else ""
-                label = f"  {branch}{marker}"
-                list_view.append(
-                    ListItem(Label(label), name=f"{_BRANCH_PREFIX}{branch}")
-                )
+        # Add worktree entries first
+        for wt in worktrees:
+            branch = wt.branch or f"(detached {wt.head[:7]})"
+            is_current = wt.path == current_path
+            marker = " \u2190 current" if is_current else ""
+            label = f"{branch}  {wt.path}{marker}"
+            list_view.append(
+                ListItem(Label(label), name=f"{_WORKTREE_PREFIX}{wt.path}")
+            )
+            if wt.branch:
+                seen_branches.add(wt.branch)
+
+        # Add branches not already represented by a worktree
+        for branch in branches:
+            if branch in seen_branches:
+                continue
+            is_current = branch == current_branch
+            marker = " \u2190 current" if is_current else ""
+            label = f"{branch}{marker}"
+            list_view.append(
+                ListItem(Label(label), name=f"{_BRANCH_PREFIX}{branch}")
+            )
 
     def _dismiss_selection(self, name: str | None) -> None:
-        """Dismiss with the selected item, skipping current worktree/branch."""
+        """Dismiss with the selected item, skipping current worktree."""
         if not name:
             self.dismiss(None)
             return

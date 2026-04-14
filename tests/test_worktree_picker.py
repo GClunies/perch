@@ -201,44 +201,8 @@ class TestGitPickerScreen:
                 await pilot.pause()
                 assert not isinstance(pilot.app.screen, GitPickerScreen)
 
-    async def test_shows_branches(self, tmp_path: Path) -> None:
-        from textual.widgets import ListView
-
-        from perch.app import PerchApp
-        from perch.widgets.git_picker import GitPickerScreen
-
-        worktree = tmp_path
-        (worktree / "file.py").write_text("x")
-        mock_worktrees = [
-            Worktree(path=str(worktree), head="abc1234", branch="main"),
-        ]
-        mock_branches = ["main", "feature-a", "feature-b"]
-        p1, p2, p3, p4 = _service_patches()
-        with (
-            p1,
-            p2,
-            p3,
-            p4,
-            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
-            patch("perch.services.git.get_branches", return_value=mock_branches),
-        ):
-            app = PerchApp(worktree)
-            async with app.run_test(size=(120, 40)) as pilot:
-                await pilot.pause()
-                pilot.app.action_switch_worktree()
-                await pilot.pause()
-                await pilot.pause()
-                await pilot.pause()
-                screen = pilot.app.screen
-                assert isinstance(screen, GitPickerScreen)
-                list_view = screen.query_one("#git-picker-list", ListView)
-                # 1 section header + 3 branches (main, feature-a, feature-b)
-                # No worktree section since only 1 worktree
-                names = [c.name for c in list_view.children if c.name]
-                assert any("branch:feature-a" in n for n in names)
-                assert any("branch:feature-b" in n for n in names)
-
-    async def test_shows_worktrees_and_branches(self, tmp_path: Path) -> None:
+    async def test_deduplicates_worktrees_and_branches(self, tmp_path: Path) -> None:
+        """Worktree branches should not appear again as plain branches."""
         from textual.widgets import ListView
 
         from perch.app import PerchApp
@@ -271,12 +235,15 @@ class TestGitPickerScreen:
                 assert isinstance(screen, GitPickerScreen)
                 list_view = screen.query_one("#git-picker-list", ListView)
                 names = [c.name for c in list_view.children if c.name]
-                # Worktree section: 2 worktrees
+                # Worktrees shown as worktree entries
                 assert any("worktree:" in n for n in names)
-                # Branch section: only feature-x (main and dev are in worktrees)
+                # feature-x shown as branch (no worktree for it)
                 assert any("branch:feature-x" in n for n in names)
-                assert not any("branch:dev" in n for n in names)
+                # main and dev must NOT appear as branches (already worktrees)
                 assert not any("branch:main" in n for n in names)
+                assert not any("branch:dev" in n for n in names)
+                # Total: 2 worktrees + 1 branch = 3 items
+                assert len(names) == 3
 
 
 def _service_patches():
