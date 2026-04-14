@@ -245,6 +245,170 @@ class TestGitPickerScreen:
                 # Total: 2 worktrees + 1 branch = 3 items
                 assert len(names) == 3
 
+    async def test_select_branch_dismisses(self, tmp_path: Path) -> None:
+        """Selecting a branch item should dismiss with branch: prefix."""
+        from textual.widgets import ListView
+
+        from perch.app import PerchApp
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        mock_worktrees = [
+            Worktree(path=str(worktree), head="abc1234", branch="main"),
+        ]
+        mock_branches = ["main", "feature-a"]
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
+            patch("perch.services.git.get_branches", return_value=mock_branches),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause()
+                await pilot.pause()
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                list_view = screen.query_one("#git-picker-list", ListView)
+                # Focus list and select the branch item (feature-a)
+                list_view.focus()
+                for i, child in enumerate(list_view.children):
+                    if child.name and "branch:feature-a" in child.name:
+                        list_view.index = i
+                        break
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                await pilot.pause()
+                assert not isinstance(pilot.app.screen, GitPickerScreen)
+
+    async def test_select_current_worktree_dismisses_none(
+        self, tmp_path: Path
+    ) -> None:
+        """Selecting the current worktree should dismiss without switching."""
+        from textual.widgets import ListView
+
+        from perch.app import PerchApp
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        mock_worktrees = [
+            Worktree(path=str(worktree), head="abc1234", branch="main"),
+            Worktree(path="/other/wt", head="def5678", branch="dev"),
+        ]
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
+            patch("perch.services.git.get_branches", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause()
+                await pilot.pause()
+                await pilot.pause()
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                list_view = screen.query_one("#git-picker-list", ListView)
+                # Select the current worktree (first item)
+                list_view.focus()
+                list_view.index = 0
+                await pilot.pause()
+                await pilot.press("enter")
+                await pilot.pause()
+                await pilot.pause()
+                # Should dismiss back to main screen
+                assert not isinstance(pilot.app.screen, GitPickerScreen)
+
+
+class TestAppWorktreeSwitching:
+    """Tests for app-level worktree/branch switching."""
+
+    async def test_on_worktree_selected_none(self, tmp_path: Path) -> None:
+        """Selecting None should be a no-op."""
+        from perch.app import PerchApp
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        p1, p2, p3, p4 = _service_patches()
+        with p1, p2, p3, p4:
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                original_path = pilot.app.worktree_path
+                pilot.app._on_worktree_selected(None)
+                await pilot.pause()
+                assert pilot.app.worktree_path == original_path
+
+    async def test_switch_to_worktree(self, tmp_path: Path) -> None:
+        """Selecting a worktree should update worktree_path."""
+        from perch.app import PerchApp
+
+        worktree = tmp_path / "wt1"
+        worktree.mkdir()
+        (worktree / "file.py").write_text("x")
+        other = tmp_path / "wt2"
+        other.mkdir()
+        (other / "other.py").write_text("y")
+        p1, p2, p3, p4 = _service_patches()
+        with p1, p2, p3, p4:
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app._on_worktree_selected(f"worktree:{other}")
+                await pilot.pause()
+                await pilot.pause()
+                assert pilot.app.worktree_path == other
+                assert str(other) in pilot.app.sub_title
+
+    async def test_switch_to_nonexistent_worktree(self, tmp_path: Path) -> None:
+        """Selecting a nonexistent worktree path should show error."""
+        from perch.app import PerchApp
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        p1, p2, p3, p4 = _service_patches()
+        with p1, p2, p3, p4:
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40), notifications=True) as pilot:
+                await pilot.pause()
+                original_path = pilot.app.worktree_path
+                pilot.app._on_worktree_selected("worktree:/nonexistent/path")
+                await pilot.pause()
+                assert pilot.app.worktree_path == original_path
+
+    async def test_on_worktree_selected_branch(self, tmp_path: Path) -> None:
+        """Selecting a branch should call _switch_to_branch."""
+        from perch.app import PerchApp
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        p1, p2, p3, p4 = _service_patches()
+        with p1, p2, p3, p4, patch(
+            "perch.services.git.switch_branch"
+        ) as mock_switch:
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app._on_worktree_selected("branch:feature-x")
+                await pilot.pause()
+                await pilot.pause()
+                await pilot.pause()
+                mock_switch.assert_called_once_with(worktree, "feature-x")
+
 
 def _service_patches():
     """Patch git/github services to prevent real subprocess calls."""
