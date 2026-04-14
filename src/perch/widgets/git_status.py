@@ -525,6 +525,9 @@ class GitPanel(Vertical):
             label.append(f" {c.message}  ")
             label.append(c.author, style="dim")
             label.append(f"  {c.relative_time}", style="dim")
+            if c.is_merge:
+                self._commit_tree.root.add_leaf(label, data=f"commit:{c.hash}")
+                continue
             node = self._commit_tree.root.add(label, data=f"commit:{c.hash}")
             if c.hash == expanded and expanded_files:
                 for ef in expanded_files:
@@ -574,7 +577,10 @@ class GitPanel(Vertical):
             label.append(f" {c.message}  ")
             label.append(c.author, style="dim")
             label.append(f"  {c.relative_time}", style="dim")
-            self._commit_tree.root.add(label, data=f"commit:{c.hash}")
+            if c.is_merge:
+                self._commit_tree.root.add_leaf(label, data=f"commit:{c.hash}")
+            else:
+                self._commit_tree.root.add(label, data=f"commit:{c.hash}")
         if len(commits) == self._commit_page_size:
             sentinel_label = Text("\u2500\u2500 more history \u2500\u2500", style="dim")
             self._commit_tree.root.add_leaf(sentinel_label, data="load-more-commits")

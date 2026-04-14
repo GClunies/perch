@@ -217,7 +217,7 @@ def get_status_dict(root: Path) -> dict[str, str]:
 
 
 _LOG_SEP = "\x1f"  # unit separator — unlikely in commit data
-_LOG_FORMAT = f"%h{_LOG_SEP}%s{_LOG_SEP}%an{_LOG_SEP}%cr"
+_LOG_FORMAT = f"%h{_LOG_SEP}%s{_LOG_SEP}%an{_LOG_SEP}%cr{_LOG_SEP}%P"
 _SUMMARY_FORMAT = f"%H{_LOG_SEP}%s{_LOG_SEP}%an{_LOG_SEP}%aI{_LOG_SEP}%b"
 
 
@@ -275,14 +275,17 @@ def parse_log(raw: str) -> list[Commit]:
     commits: list[Commit] = []
     for line in raw.strip().splitlines():
         parts = line.split(_LOG_SEP)
-        if len(parts) != 4:
+        if len(parts) < 4:
             continue
+        parents = parts[4] if len(parts) >= 5 else ""
+        is_merge = len(parents.split()) > 1
         commits.append(
             Commit(
                 hash=parts[0],
                 message=parts[1],
                 author=parts[2],
                 relative_time=parts[3],
+                is_merge=is_merge,
             )
         )
     return commits

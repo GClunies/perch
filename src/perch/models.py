@@ -23,6 +23,7 @@ class Commit:
     message: str
     author: str
     relative_time: str
+    is_merge: bool = False
 
 
 @dataclass
