@@ -406,6 +406,7 @@ class Viewer(VerticalScroll):
         Binding("d", "toggle_diff", "Diff"),
         Binding("s", "toggle_diff_layout", "Layout"),
         Binding("p", "toggle_markdown_preview", "Preview"),
+        Binding("ctrl+w", "toggle_word_wrap", "Wrap"),
         COPY_BINDING,
         *make_nav_bindings("scroll_down", "scroll_up", "scroll_left", "scroll_right"),
         Binding("f19", "hint_select", "Select", key_display="\u21e7+drag"),
@@ -433,6 +434,7 @@ class Viewer(VerticalScroll):
         self._diff_mode: bool = False
         self._diff_layout: str = "unified"
         self._markdown_preview: bool = False
+        self._word_wrap: bool = False
         self._commit_file_context: tuple[str, str] | None = None  # (hash, path)
         self._current_summary: CommitSummary | None = None
 
@@ -469,6 +471,8 @@ class Viewer(VerticalScroll):
                 and self._is_markdown(self._current_path)
                 and not self._diff_mode
             )
+        if action == "toggle_word_wrap":
+            return self._current_path is not None and not self._diff_mode
         return True
 
     def _refresh_footer(self) -> None:
@@ -611,7 +615,7 @@ class Viewer(VerticalScroll):
             text,
             lexer,
             line_numbers=True,
-            word_wrap=False,
+            word_wrap=self._word_wrap,
             theme=self._get_syntax_theme(),
             background_color=self._get_background_color(),
         )
@@ -948,6 +952,19 @@ class Viewer(VerticalScroll):
         if self._diff_mode:
             return
         self._markdown_preview = not self._markdown_preview
+        self.load_file(self._current_path)
+
+    def action_toggle_word_wrap(self) -> None:
+        """Toggle word wrap for the current file."""
+        if self._current_path is None or self._diff_mode:
+            return
+        self._word_wrap = not self._word_wrap
+        if self._word_wrap:
+            self._content.styles.width = "100%"
+            self.styles.overflow_x = "hidden"
+        else:
+            self._content.styles.width = "auto"
+            self.styles.overflow_x = "auto"
         self.load_file(self._current_path)
 
     def action_hint_select(self) -> None:

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from textual import on, work
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Label, ListItem, ListView
@@ -21,7 +22,10 @@ class GitPickerScreen(ModalScreen[str | None]):
     """Modal screen for selecting a git worktree or branch to switch to."""
 
     BINDINGS = [
-        ("escape", "cancel", "Cancel"),
+        Binding("enter", "select", "Select"),
+        Binding("d", "delete", "Delete"),
+        Binding("shift+d", "force_delete", "Force Delete"),
+        Binding("escape", "cancel", "Cancel"),
     ]
 
     DEFAULT_CSS = """
@@ -42,6 +46,10 @@ class GitPickerScreen(ModalScreen[str | None]):
     #git-picker-list {
         height: 1fr;
     }
+    #git-picker-hint {
+        text-style: dim;
+        margin-top: 1;
+    }
     """
 
     def __init__(self, current_worktree: Path) -> None:
@@ -52,6 +60,10 @@ class GitPickerScreen(ModalScreen[str | None]):
         with Vertical(id="git-picker-container"):
             yield Label("Switch Worktree / Branch", id="git-picker-title")
             yield ListView(id="git-picker-list")
+            yield Label(
+                "[bold]enter[/] Select · [bold]d[/] Delete · [bold]shift+d[/] Force Delete · [bold]esc[/] Cancel",
+                id="git-picker-hint",
+            )
 
     def on_mount(self) -> None:
         self._load_entries()
@@ -131,7 +143,7 @@ class GitPickerScreen(ModalScreen[str | None]):
     def _on_selected(self, event: ListView.Selected) -> None:
         self._dismiss_selection(event.item.name)
 
-    def key_enter(self) -> None:
+    def action_select(self) -> None:
         """Dismiss with the currently highlighted item."""
         list_view = self.query_one("#git-picker-list", ListView)
         if list_view.highlighted_child is not None:
@@ -139,3 +151,92 @@ class GitPickerScreen(ModalScreen[str | None]):
 
     def action_cancel(self) -> None:
         self.dismiss(None)
+
+    # ------------------------------------------------------------------
+    # Deletion
+    # ------------------------------------------------------------------
+
+    def _get_highlighted_name(self) -> str | None:
+        list_view = self.query_one("#git-picker-list", ListView)
+        if list_view.highlighted_child is not None:
+            return list_view.highlighted_child.name
+        return None
+
+    def _is_deletable(self, name: str) -> bool:
+        """Return True if the item can be deleted, otherwise notify why not."""
+        if name.startswith(_WORKTREE_PREFIX):
+            path = name.removeprefix(_WORKTREE_PREFIX)
+            if path == str(self._current_worktree):
+                self.app.notify("Cannot delete the current worktree", severity="error")
+                return False
+        elif name.startswith(_BRANCH_PREFIX):
+            from perch.services.git import get_current_branch
+
+            try:
+                current = get_current_branch(self._current_worktree)
+            except RuntimeError:
+                current = None
+            branch = name.removeprefix(_BRANCH_PREFIX)
+            if branch == current:
+                self.app.notify("Cannot delete the current branch", severity="error")
+                return False
+        return True
+
+    def action_delete(self) -> None:
+        """Safe-delete the highlighted worktree or branch."""
+        self._request_delete(force=False)
+
+    def action_force_delete(self) -> None:
+        """Force-delete the highlighted worktree or branch."""
+        self._request_delete(force=True)
+
+    def _request_delete(self, *, force: bool) -> None:
+        name = self._get_highlighted_name()
+        if not name:
+            return
+        if not self._is_deletable(name):
+            return
+
+        from perch.widgets.confirm_screen import ConfirmScreen
+
+        if name.startswith(_WORKTREE_PREFIX):
+            path = name.removeprefix(_WORKTREE_PREFIX)
+            label = f"worktree {path}"
+        else:
+            label = f"branch {name.removeprefix(_BRANCH_PREFIX)}"
+
+        prefix = "FORCE delete" if force else "Delete"
+        self.app.push_screen(
+            ConfirmScreen(f"{prefix} {label}?"),
+            lambda confirmed: self._on_delete_confirmed(confirmed, name, force),
+        )
+
+    def _on_delete_confirmed(
+        self, confirmed: bool | None, name: str, force: bool
+    ) -> None:
+        if not confirmed:
+            return
+        self._run_delete(name, force)
+
+    @work(thread=True)
+    def _run_delete(self, name: str, force: bool) -> None:
+        from perch.services.git import delete_branch, remove_worktree
+
+        try:
+            if name.startswith(_WORKTREE_PREFIX):
+                path = name.removeprefix(_WORKTREE_PREFIX)
+                remove_worktree(self._current_worktree, path, force=force)
+                label = f"Worktree {path}"
+            else:
+                branch = name.removeprefix(_BRANCH_PREFIX)
+                delete_branch(self._current_worktree, branch, force=force)
+                label = f"Branch {branch}"
+        except RuntimeError as e:
+            hint = " (press shift+d to force)" if not force else ""
+            self.app.call_from_thread(
+                self.app.notify, f"{e}{hint}", severity="error", timeout=5
+            )
+            return
+
+        self.app.call_from_thread(self.app.notify, f"Deleted {label}")
+        self.app.call_from_thread(self._load_entries)

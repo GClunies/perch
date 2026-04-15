@@ -128,6 +128,25 @@ def switch_branch(root: Path, branch: str) -> None:
         raise RuntimeError(f"git switch failed: {result.stderr.strip()}")
 
 
+def remove_worktree(root: Path, path: str, *, force: bool = False) -> None:
+    """Remove a git worktree at *path*."""
+    args = ["worktree", "remove"]
+    if force:
+        args.append("--force")
+    args.append(path)
+    result = _run_git(args, cwd=root)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip())
+
+
+def delete_branch(root: Path, branch: str, *, force: bool = False) -> None:
+    """Delete a local branch."""
+    flag = "-D" if force else "-d"
+    result = _run_git(["branch", flag, branch], cwd=root)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip())
+
+
 def get_status(root: Path) -> GitStatusData:
     """Parse ``git status --porcelain=v1`` into categorized file lists."""
     result = _run_git(["status", "--porcelain=v1"], cwd=root)

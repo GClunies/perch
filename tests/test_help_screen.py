@@ -81,7 +81,7 @@ class TestBindingRegistry:
 
     def test_registry_keys_match_expected_panels(self) -> None:
         """BINDING_REGISTRY should have the expected section names."""
-        expected = {"Global", "File Tree", "Viewer", "Git", "GitHub"}
+        expected = {"Global", "File Tree", "Viewer", "Worktree", "GitHub"}
         assert set(PerchApp.BINDING_REGISTRY.keys()) == expected
 
     def test_registry_values_are_binding_lists(self) -> None:
