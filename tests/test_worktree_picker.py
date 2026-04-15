@@ -8,9 +8,11 @@ from unittest.mock import patch
 
 from perch.models import Worktree
 from perch.services.git import (
+    delete_branch,
     get_branches,
     get_worktrees,
     parse_worktree_list,
+    remove_worktree,
     switch_branch,
 )
 
@@ -170,6 +172,95 @@ class TestSwitchBranch:
             switch_branch(git_worktree, "does-not-exist")
 
 
+class TestRemoveWorktree:
+    """Tests for remove_worktree."""
+
+    def test_removes_linked_worktree(self, git_worktree: Path) -> None:
+        linked = git_worktree.parent / "linked-rm"
+        subprocess.run(
+            ["git", "worktree", "add", str(linked), "-b", "rm-branch"],
+            cwd=git_worktree,
+            capture_output=True,
+            check=True,
+        )
+        assert linked.exists()
+        remove_worktree(git_worktree, str(linked))
+        assert not linked.exists()
+
+    def test_raises_on_nonexistent_worktree(self, git_worktree: Path) -> None:
+        import pytest
+
+        with pytest.raises(RuntimeError):
+            remove_worktree(git_worktree, "/nonexistent/path")
+
+    def test_force_removes_dirty_worktree(self, git_worktree: Path) -> None:
+        linked = git_worktree.parent / "linked-dirty"
+        subprocess.run(
+            ["git", "worktree", "add", str(linked), "-b", "dirty-branch"],
+            cwd=git_worktree,
+            capture_output=True,
+            check=True,
+        )
+        (linked / "untracked.txt").write_text("dirty")
+        remove_worktree(git_worktree, str(linked), force=True)
+        assert not linked.exists()
+
+
+class TestDeleteBranch:
+    """Tests for delete_branch."""
+
+    def test_deletes_merged_branch(self, git_worktree: Path) -> None:
+        subprocess.run(
+            ["git", "branch", "to-delete"],
+            cwd=git_worktree,
+            capture_output=True,
+            check=True,
+        )
+        branches = get_branches(git_worktree)
+        assert "to-delete" in branches
+        delete_branch(git_worktree, "to-delete")
+        branches = get_branches(git_worktree)
+        assert "to-delete" not in branches
+
+    def test_raises_on_nonexistent_branch(self, git_worktree: Path) -> None:
+        import pytest
+
+        with pytest.raises(RuntimeError):
+            delete_branch(git_worktree, "no-such-branch")
+
+    def test_force_deletes_unmerged_branch(self, git_worktree: Path) -> None:
+        subprocess.run(
+            ["git", "branch", "unmerged"],
+            cwd=git_worktree,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "checkout", "unmerged"],
+            cwd=git_worktree,
+            capture_output=True,
+            check=True,
+        )
+        (git_worktree / "new.txt").write_text("new")
+        subprocess.run(
+            ["git", "add", "."], cwd=git_worktree, capture_output=True, check=True
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "unmerged commit"],
+            cwd=git_worktree,
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "checkout", "-"],
+            cwd=git_worktree,
+            capture_output=True,
+            check=True,
+        )
+        delete_branch(git_worktree, "unmerged", force=True)
+        assert "unmerged" not in get_branches(git_worktree)
+
+
 class TestGitPickerScreen:
     """Tests for the GitPickerScreen modal."""
 
@@ -319,6 +410,446 @@ class TestGitPickerScreen:
                 await pilot.pause(delay=0.1)
                 # Should dismiss back to main screen
                 assert not isinstance(pilot.app.screen, GitPickerScreen)
+
+    async def test_action_select_with_highlighted(self, tmp_path: Path) -> None:
+        """action_select should dismiss when an item is highlighted."""
+        from textual.widgets import ListView
+
+        from perch.app import PerchApp
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        mock_worktrees = [
+            Worktree(path=str(worktree), head="abc1234", branch="main"),
+        ]
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
+            patch("perch.services.git.get_branches", return_value=["main", "other"]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause(delay=0.15)
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                list_view = screen.query_one("#git-picker-list", ListView)
+                list_view.focus()
+                for i, child in enumerate(list_view.children):
+                    if child.name and "branch:other" in child.name:
+                        list_view.index = i
+                        break
+                await pilot.pause()
+                screen.action_select()
+                await pilot.pause()
+                assert not isinstance(pilot.app.screen, GitPickerScreen)
+
+    async def test_dismiss_selection_with_none_name(self, tmp_path: Path) -> None:
+        """_dismiss_selection(None) should dismiss with None."""
+        from perch.app import PerchApp
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=[]),
+            patch("perch.services.git.get_branches", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause(delay=0.15)
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                screen._dismiss_selection(None)
+                await pilot.pause()
+                assert not isinstance(pilot.app.screen, GitPickerScreen)
+
+
+class TestGitPickerDeletion:
+    """Tests for deletion actions in the git picker."""
+
+    async def test_delete_current_worktree_blocked(self, tmp_path: Path) -> None:
+        """Pressing d on the current worktree should show an error."""
+        from textual.widgets import ListView
+
+        from perch.app import PerchApp
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        mock_worktrees = [
+            Worktree(path=str(worktree), head="abc1234", branch="main"),
+            Worktree(path="/other/wt", head="def5678", branch="dev"),
+        ]
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
+            patch("perch.services.git.get_branches", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40), notifications=True) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause(delay=0.15)
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                list_view = screen.query_one("#git-picker-list", ListView)
+                list_view.focus()
+                list_view.index = 0  # current worktree
+                await pilot.pause()
+                screen.action_delete()
+                await pilot.pause()
+                # Should still be on the picker, not a confirm screen
+                assert isinstance(pilot.app.screen, GitPickerScreen)
+
+    async def test_delete_current_branch_blocked(self, tmp_path: Path) -> None:
+        """Pressing d on the current branch should show an error."""
+        from textual.widgets import ListView
+
+        from perch.app import PerchApp
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        mock_worktrees = [
+            Worktree(path=str(worktree), head="abc1234", branch="main"),
+        ]
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
+            patch("perch.services.git.get_branches", return_value=["main", "feat"]),
+            patch("perch.services.git.get_current_branch", return_value="feat"),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40), notifications=True) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause(delay=0.15)
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                list_view = screen.query_one("#git-picker-list", ListView)
+                list_view.focus()
+                # Navigate to the "feat" branch entry (current branch)
+                for i, child in enumerate(list_view.children):
+                    if child.name and "branch:feat" in child.name:
+                        list_view.index = i
+                        break
+                await pilot.pause()
+                screen.action_delete()
+                await pilot.pause()
+                # Should still be on picker, not confirm
+                assert isinstance(pilot.app.screen, GitPickerScreen)
+
+    async def test_delete_non_current_shows_confirm(self, tmp_path: Path) -> None:
+        """Pressing d on a non-current worktree should show confirm screen."""
+        from textual.widgets import ListView
+
+        from perch.app import PerchApp
+        from perch.widgets.confirm_screen import ConfirmScreen
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        mock_worktrees = [
+            Worktree(path=str(worktree), head="abc1234", branch="main"),
+            Worktree(path="/other/wt", head="def5678", branch="dev"),
+        ]
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
+            patch("perch.services.git.get_branches", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause(delay=0.15)
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                list_view = screen.query_one("#git-picker-list", ListView)
+                list_view.focus()
+                list_view.index = 1  # non-current worktree
+                await pilot.pause()
+                screen.action_delete()
+                await pilot.pause(delay=0.15)
+                assert isinstance(pilot.app.screen, ConfirmScreen)
+
+    async def test_delete_confirm_then_cancel(self, tmp_path: Path) -> None:
+        """Confirming n in the confirm screen should return to picker."""
+        from textual.widgets import ListView
+
+        from perch.app import PerchApp
+        from perch.widgets.confirm_screen import ConfirmScreen
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        mock_worktrees = [
+            Worktree(path=str(worktree), head="abc1234", branch="main"),
+            Worktree(path="/other/wt", head="def5678", branch="dev"),
+        ]
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
+            patch("perch.services.git.get_branches", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause(delay=0.15)
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                list_view = screen.query_one("#git-picker-list", ListView)
+                list_view.focus()
+                list_view.index = 1
+                await pilot.pause()
+                screen.action_delete()
+                await pilot.pause(delay=0.15)
+                assert isinstance(pilot.app.screen, ConfirmScreen)
+                await pilot.press("n")
+                await pilot.pause()
+                # Back to picker
+                assert isinstance(pilot.app.screen, GitPickerScreen)
+
+    async def test_delete_branch_confirm_calls_delete(self, tmp_path: Path) -> None:
+        """Confirming deletion of a branch should call delete_branch."""
+        from textual.widgets import ListView
+
+        from perch.app import PerchApp
+        from perch.widgets.confirm_screen import ConfirmScreen
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        mock_worktrees = [
+            Worktree(path=str(worktree), head="abc1234", branch="main"),
+        ]
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
+            patch("perch.services.git.get_branches", return_value=["main", "old"]),
+            patch("perch.services.git.get_current_branch", return_value="main"),
+            patch("perch.services.git.delete_branch") as mock_del,
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause(delay=0.15)
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                list_view = screen.query_one("#git-picker-list", ListView)
+                list_view.focus()
+                # Navigate to "old" branch
+                for i, child in enumerate(list_view.children):
+                    if child.name and "branch:old" in child.name:
+                        list_view.index = i
+                        break
+                await pilot.pause()
+                screen.action_delete()
+                await pilot.pause(delay=0.15)
+                assert isinstance(pilot.app.screen, ConfirmScreen)
+                await pilot.press("y")
+                await pilot.pause(delay=0.3)
+                mock_del.assert_called_once_with(worktree, "old", force=False)
+
+    async def test_force_delete_uses_force_flag(self, tmp_path: Path) -> None:
+        """shift+d should pass force=True to the delete function."""
+        from textual.widgets import ListView
+
+        from perch.app import PerchApp
+        from perch.widgets.confirm_screen import ConfirmScreen
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        mock_worktrees = [
+            Worktree(path=str(worktree), head="abc1234", branch="main"),
+        ]
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
+            patch("perch.services.git.get_branches", return_value=["main", "old"]),
+            patch("perch.services.git.get_current_branch", return_value="main"),
+            patch("perch.services.git.delete_branch") as mock_del,
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause(delay=0.15)
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                list_view = screen.query_one("#git-picker-list", ListView)
+                list_view.focus()
+                for i, child in enumerate(list_view.children):
+                    if child.name and "branch:old" in child.name:
+                        list_view.index = i
+                        break
+                await pilot.pause()
+                screen.action_force_delete()
+                await pilot.pause(delay=0.15)
+                assert isinstance(pilot.app.screen, ConfirmScreen)
+                await pilot.press("y")
+                await pilot.pause(delay=0.3)
+                mock_del.assert_called_once_with(worktree, "old", force=True)
+
+    async def test_delete_error_shows_notification(self, tmp_path: Path) -> None:
+        """Git errors should show as notification with force hint."""
+        from textual.widgets import ListView
+
+        from perch.app import PerchApp
+        from perch.widgets.confirm_screen import ConfirmScreen
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        mock_worktrees = [
+            Worktree(path=str(worktree), head="abc1234", branch="main"),
+        ]
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
+            patch("perch.services.git.get_branches", return_value=["main", "old"]),
+            patch("perch.services.git.get_current_branch", return_value="main"),
+            patch(
+                "perch.services.git.delete_branch",
+                side_effect=RuntimeError("branch not merged"),
+            ),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40), notifications=True) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause(delay=0.15)
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                list_view = screen.query_one("#git-picker-list", ListView)
+                list_view.focus()
+                for i, child in enumerate(list_view.children):
+                    if child.name and "branch:old" in child.name:
+                        list_view.index = i
+                        break
+                await pilot.pause()
+                screen.action_delete()
+                await pilot.pause(delay=0.15)
+                assert isinstance(pilot.app.screen, ConfirmScreen)
+                await pilot.press("y")
+                await pilot.pause(delay=0.3)
+                # Picker should still be visible (not dismissed)
+                assert isinstance(pilot.app.screen, GitPickerScreen)
+
+    async def test_delete_worktree_confirm_calls_remove(self, tmp_path: Path) -> None:
+        """Confirming deletion of a worktree should call remove_worktree."""
+        from textual.widgets import ListView
+
+        from perch.app import PerchApp
+        from perch.widgets.confirm_screen import ConfirmScreen
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        mock_worktrees = [
+            Worktree(path=str(worktree), head="abc1234", branch="main"),
+            Worktree(path="/other/wt", head="def5678", branch="dev"),
+        ]
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=mock_worktrees),
+            patch("perch.services.git.get_branches", return_value=[]),
+            patch("perch.services.git.remove_worktree") as mock_rm,
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause(delay=0.15)
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                list_view = screen.query_one("#git-picker-list", ListView)
+                list_view.focus()
+                list_view.index = 1  # non-current worktree
+                await pilot.pause()
+                screen.action_delete()
+                await pilot.pause(delay=0.15)
+                assert isinstance(pilot.app.screen, ConfirmScreen)
+                await pilot.press("y")
+                await pilot.pause(delay=0.3)
+                mock_rm.assert_called_once_with(worktree, "/other/wt", force=False)
+
+    async def test_delete_no_highlighted_is_noop(self, tmp_path: Path) -> None:
+        """Pressing d with no items should be a no-op."""
+        from perch.app import PerchApp
+        from perch.widgets.git_picker import GitPickerScreen
+
+        worktree = tmp_path
+        (worktree / "file.py").write_text("x")
+        p1, p2, p3, p4 = _service_patches()
+        with (
+            p1,
+            p2,
+            p3,
+            p4,
+            patch("perch.services.git.get_worktrees", return_value=[]),
+            patch("perch.services.git.get_branches", return_value=[]),
+        ):
+            app = PerchApp(worktree)
+            async with app.run_test(size=(120, 40)) as pilot:
+                await pilot.pause()
+                pilot.app.action_switch_worktree()
+                await pilot.pause(delay=0.15)
+                screen = pilot.app.screen
+                assert isinstance(screen, GitPickerScreen)
+                screen.action_delete()
+                await pilot.pause()
+                # Still on picker — no confirm screen pushed
+                assert isinstance(pilot.app.screen, GitPickerScreen)
 
 
 class TestAppWorktreeSwitching:

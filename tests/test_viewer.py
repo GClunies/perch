@@ -772,6 +772,73 @@ class TestCheckActions:
             assert viewer.check_action("toggle_markdown_preview", ()) is False
 
 
+class TestCheckActionWordWrap:
+    """Tests for word wrap check_action visibility."""
+
+    async def test_word_wrap_requires_file(self, tmp_path: Path) -> None:
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            viewer = pilot.app.query_one(Viewer)
+            assert viewer.check_action("toggle_word_wrap", ()) is False
+            viewer._current_path = tmp_path / "hello.py"
+            assert viewer.check_action("toggle_word_wrap", ()) is True
+
+    async def test_word_wrap_hidden_in_diff_mode(self, tmp_path: Path) -> None:
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            viewer = pilot.app.query_one(Viewer)
+            viewer._current_path = tmp_path / "hello.py"
+            viewer._diff_mode = True
+            assert viewer.check_action("toggle_word_wrap", ()) is False
+
+
+class TestWordWrapToggle:
+    """Tests for word wrap toggle action."""
+
+    async def test_toggle_word_wrap_on_and_off(self, tmp_path: Path) -> None:
+        py_file = tmp_path / "test.py"
+        py_file.write_text("x = 1\n")
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            viewer = pilot.app.query_one(Viewer)
+            viewer.load_file(py_file)
+            await pilot.pause()
+            assert viewer._word_wrap is False
+
+            viewer.action_toggle_word_wrap()
+            await pilot.pause()
+            assert viewer._word_wrap is True
+            assert viewer._content.styles.width is not None
+
+            viewer.action_toggle_word_wrap()
+            await pilot.pause()
+            assert viewer._word_wrap is False
+
+    async def test_toggle_word_wrap_noop_without_file(self, tmp_path: Path) -> None:
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            viewer = pilot.app.query_one(Viewer)
+            viewer.action_toggle_word_wrap()
+            assert viewer._word_wrap is False
+
+    async def test_toggle_word_wrap_noop_in_diff_mode(self, tmp_path: Path) -> None:
+        py_file = tmp_path / "test.py"
+        py_file.write_text("x = 1\n")
+        app = PerchApp(tmp_path)
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            viewer = pilot.app.query_one(Viewer)
+            viewer.load_file(py_file)
+            await pilot.pause()
+            viewer._diff_mode = True
+            viewer.action_toggle_word_wrap()
+            assert viewer._word_wrap is False
+
+
 class TestMarkdownPreview:
     """Tests for the markdown preview toggle."""
 
