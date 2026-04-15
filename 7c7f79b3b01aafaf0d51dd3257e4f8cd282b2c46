@@ -1,0 +1,27 @@
+tests/test_viewer.py
+  f00d6b860241b727 775-841
+tests/test_worktree_picker.py
+  f00d6b860241b727 11,15,175-263,414-479,481-853
+tests/test_confirm_screen.py
+  f00d6b860241b727 1-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "7c7f79b3b01aafaf0d51dd3257e4f8cd282b2c46",
+  "prompts": {
+    "f00d6b860241b727": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fb528329-63f2-4f29-8aab-e00b6da404f8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Gregory Clunies",
+      "messages": [],
+      "total_additions": 683,
+      "total_deletions": 1,
+      "accepted_lines": 682,
+      "overriden_lines": 0
+    }
+  }
+}
