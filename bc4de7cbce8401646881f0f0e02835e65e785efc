@@ -1,0 +1,37 @@
+src/perch/widgets/confirm_screen.py
+  f00d6b860241b727 1-52
+src/perch/services/git.py
+  f00d6b860241b727 131-149
+src/perch/commands.py
+  f00d6b860241b727 22
+src/perch/__init__.py
+  f00d6b860241b727 1
+src/perch/widgets/git_picker.py
+  f00d6b860241b727 9,25-28,49-52,63-66,146,154-242
+tests/test_help_screen.py
+  f00d6b860241b727 84
+src/perch/widgets/viewer.py
+  f00d6b860241b727 409,437,474-475,618,957-969
+src/perch/app.py
+  f00d6b860241b727 48,59,90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "bc4de7cbce8401646881f0f0e02835e65e785efc",
+  "prompts": {
+    "f00d6b860241b727": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fb528329-63f2-4f29-8aab-e00b6da404f8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Gregory Clunies",
+      "messages": [],
+      "total_additions": 213,
+      "total_deletions": 24,
+      "accepted_lines": 198,
+      "overriden_lines": 0
+    }
+  }
+}
