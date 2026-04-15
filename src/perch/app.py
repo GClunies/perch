@@ -45,7 +45,7 @@ class PerchApp(App):
         Binding("o", "open_editor", "Open", show=False),
         Binding("minus", "shrink_pane", "Shrink", show=False, key_display="-"),
         Binding("equals_sign", "grow_pane", "Grow", show=False, key_display="="),
-        Binding("w", "switch_worktree", "Worktree/Branch"),
+        Binding("w", "switch_worktree", "Worktree"),
     ]
 
     BINDING_REGISTRY: ClassVar[dict[str, list[Binding]]] = {
@@ -56,7 +56,7 @@ class PerchApp(App):
                 "left_square_bracket", "prev_tab", "Prev/Next Tab", key_display="[/]"
             ),
             Binding("ctrl+p", "file_search", "File Search", key_display="Ctrl+P"),
-            Binding("w", "switch_worktree", "Worktree/Branch", key_display="w"),
+            Binding("w", "switch_worktree", "Worktree", key_display="w"),
             Binding("c", "copy", "Copy", key_display="c"),
             Binding("question_mark", "show_help", "Help", key_display="?"),
             Binding("f", "toggle_focus_mode", "Focus Mode", key_display="f"),
@@ -87,7 +87,7 @@ class PerchApp(App):
             Binding("shift+drag", "noop", "Select", key_display="\u21e7+Drag"),
             Binding("f20", "noop", "Open URL/File", key_display="\u2318+Click"),
         ],
-        "Git": [
+        "Worktree": [
             Binding("r", "refresh", "Refresh", key_display="r"),
             Binding("l", "select_cursor", "Select", key_display="l"),
             Binding(
