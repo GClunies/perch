@@ -21,7 +21,6 @@ EXCLUDED_NAMES: set[str] = {
     ".venv",
     ".tox",
     ".eggs",
-    ".beads",
 }
 
 

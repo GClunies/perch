@@ -209,8 +209,7 @@ __marimo__/
 # Claude Code local settings
 .claude/settings.local.json
 
-# beads / ralph-tui (removed)
-.beads/
+# ralph-tui (removed)
 .ralph-tui/
 .dolt/
 *.db
