@@ -1,0 +1,23 @@
+.config/wt.toml
+  14189e9d52fa8fd7 1,3-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "6d4d7109282a81ede65265c4835fa206122fdf3f",
+  "prompts": {
+    "14189e9d52fa8fd7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "41fdd06f-97f4-4b55-959d-b3cf99c83da7",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Gregory Clunies",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 45,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
