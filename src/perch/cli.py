@@ -2,11 +2,18 @@ import argparse
 import sys
 from pathlib import Path
 
+from perch import __version__
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="perch",
         description="A vantage point for agentic workflows",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     parser.add_argument(
         "path",

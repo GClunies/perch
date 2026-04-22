@@ -103,6 +103,19 @@ class TestCLIEntryPoint:
                 main()
             assert exc_info.value.code == 1
 
+    def test_version_flag(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """--version should print the version and exit cleanly."""
+        from perch import __version__
+        from perch.cli import main
+
+        with patch("sys.argv", ["perch", "--version"]):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 0
+
+        captured = capsys.readouterr()
+        assert __version__ in captured.out
+
     def test_main_module_entry_point(self) -> None:
         """__main__.py should call main()."""
         with patch("perch.cli.main") as mock_main:
