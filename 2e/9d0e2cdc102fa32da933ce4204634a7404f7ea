@@ -1,0 +1,37 @@
+src/perch/widgets/branch_diff_picker.py
+  90a504acf2bf7477 1-181
+src/perch/app.py
+  90a504acf2bf7477 14,50,62,126,575-611
+src/perch/services/git.py
+  90a504acf2bf7477 220-302
+tests/test_git_service.py
+  90a504acf2bf7477 613-806
+tests/test_branch_diff_picker.py
+  90a504acf2bf7477 1-280
+src/perch/commands.py
+  90a504acf2bf7477 15
+src/perch/widgets/viewer.py
+  90a504acf2bf7477 815-851
+tests/test_commands.py
+  90a504acf2bf7477 48-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "2e9d0e2cdc102fa32da933ce4204634a7404f7ea",
+  "prompts": {
+    "90a504acf2bf7477": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "70b3dcc6-5d7f-42ff-913e-5f279d146a50",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Gregory Clunies",
+      "messages": [],
+      "total_additions": 868,
+      "total_deletions": 51,
+      "accepted_lines": 819,
+      "overriden_lines": 0
+    }
+  }
+}
