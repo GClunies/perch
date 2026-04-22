@@ -217,6 +217,89 @@ def get_commit_diff(root: Path, commit_hash: str) -> str:
     return result.stdout
 
 
+def get_default_branch(root: Path) -> str | None:
+    """Return the name of the repository's default branch, if detectable.
+
+    Tries in order:
+    1. ``origin/HEAD`` symbolic-ref (e.g. ``origin/main``) — most reliable when
+       the remote has been cloned with the HEAD pointer set.
+    2. The local ``init.defaultBranch`` config.
+    3. The first existing local branch from ``main``, ``master``, ``develop``,
+       ``trunk``.
+    """
+    result = _run_git(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], cwd=root)
+    if result.returncode == 0 and result.stdout.strip():
+        # "origin/main" -> "main"
+        _, _, branch = result.stdout.strip().partition("/")
+        if branch:
+            return branch
+
+    config_result = _run_git(["config", "--get", "init.defaultBranch"], cwd=root)
+    configured = config_result.stdout.strip() if config_result.returncode == 0 else ""
+    candidates = [configured] if configured else []
+    candidates.extend(["main", "master", "develop", "trunk"])
+
+    seen: set[str] = set()
+    for name in candidates:
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        verify = _run_git(["rev-parse", "--verify", "--quiet", name], cwd=root)
+        if verify.returncode == 0:
+            return name
+    return None
+
+
+def get_merge_base(root: Path) -> tuple[str, str] | None:
+    """Return ``(base_ref_name, merge_base_sha)`` for HEAD vs the default branch.
+
+    The base ref is detected via :func:`get_default_branch`. Returns None when
+    no default branch can be found or no common ancestor exists.
+    """
+    default = get_default_branch(root)
+    if default is None:
+        return None
+    result = _run_git(["merge-base", "HEAD", default], cwd=root)
+    if result.returncode == 0 and result.stdout.strip():
+        return default, result.stdout.strip()
+    return None
+
+
+def get_full_diff(root: Path, ref: str) -> str:
+    """Return unified diff from *ref* to the current working tree.
+
+    Includes both committed and uncommitted changes (staged + unstaged).
+    Returns an empty string when there are no changes.
+    """
+    result = _run_git(["diff", "--no-color", ref], cwd=root)
+    if result.returncode != 0:
+        raise RuntimeError(f"git diff failed: {result.stderr.strip()}")
+    return result.stdout
+
+
+def get_commits_since(
+    root: Path, base_ref: str | None, limit: int = 50
+) -> list[Commit]:
+    """Return commits between *base_ref* and HEAD, newest first.
+
+    When *base_ref* is None, returns the last *limit* commits on HEAD.
+    """
+    range_spec = f"{base_ref}..HEAD" if base_ref else "HEAD"
+    args = ["log", f"--format={_LOG_FORMAT}", f"-{limit}", range_spec]
+    result = _run_git(args, cwd=root)
+    if result.returncode != 0:
+        return []
+    return parse_log(result.stdout)
+
+
+def resolve_ref(root: Path, ref: str) -> str | None:
+    """Return the full SHA for *ref*, or None if it cannot be resolved."""
+    result = _run_git(["rev-parse", "--verify", "--quiet", ref], cwd=root)
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
 def get_status_dict(root: Path) -> dict[str, str]:
     """Return a flat ``{relative_path: status_label}`` dict for O(1) lookup.
 

@@ -12,6 +12,7 @@ COMMANDS: list[tuple[str, str, str]] = [
     ("Previous Tab", "[", "prev_tab"),
     ("Next Tab", "]", "next_tab"),
     ("Toggle Diff View", "d", "toggle_diff"),
+    ("Branch Diff (vs ref)", "D", "branch_diff"),
     ("Toggle Diff Layout", "s", "toggle_diff_layout"),
     ("Markdown Preview", "p", "toggle_markdown_preview"),
     ("Focus Mode", "f", "toggle_focus_mode"),
