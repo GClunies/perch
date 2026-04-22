@@ -56,7 +56,9 @@ class TestBranchDiffPickerScreen:
             p2,
             p3,
             p4,
-            patch("perch.services.git.get_merge_base", return_value=("main", "base1234")),
+            patch(
+                "perch.services.git.get_merge_base", return_value=("main", "base1234")
+            ),
             patch("perch.services.git.resolve_ref", return_value="head1234"),
             patch("perch.services.git.get_commits_since", return_value=[]),
             patch("perch.services.git.get_full_diff", return_value=""),
@@ -84,7 +86,9 @@ class TestBranchDiffPickerScreen:
             p2,
             p3,
             p4,
-            patch("perch.services.git.get_merge_base", return_value=("main", "base1234")),
+            patch(
+                "perch.services.git.get_merge_base", return_value=("main", "base1234")
+            ),
             patch("perch.services.git.resolve_ref", return_value="head1234"),
             patch("perch.services.git.get_commits_since", return_value=[]),
             patch("perch.services.git.get_full_diff", return_value=""),
@@ -158,7 +162,9 @@ class TestBranchDiffPickerScreen:
             p2,
             p3,
             p4,
-            patch("perch.services.git.get_merge_base", return_value=("main", "base0000")),
+            patch(
+                "perch.services.git.get_merge_base", return_value=("main", "base0000")
+            ),
             patch("perch.services.git.resolve_ref", return_value="head1234"),
             patch("perch.services.git.get_commits_since", return_value=commits),
         ):
@@ -199,7 +205,9 @@ class TestBranchDiffPickerScreen:
             p2,
             p3,
             p4,
-            patch("perch.services.git.get_merge_base", return_value=("main", "base0000")),
+            patch(
+                "perch.services.git.get_merge_base", return_value=("main", "base0000")
+            ),
             patch("perch.services.git.resolve_ref", return_value="head1234"),
             patch("perch.services.git.get_commits_since", return_value=commits),
             patch("perch.services.git.get_full_diff", return_value=""),
