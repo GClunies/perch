@@ -812,6 +812,43 @@ class Viewer(VerticalScroll):
         self.scroll_home(animate=False)
         self._refresh_footer()
 
+    def show_branch_diff(self, ref: str, label: str) -> None:
+        """Render the full diff from *ref* to the worktree (committed + uncommitted)."""
+        from perch.services.git import get_full_diff
+
+        if self.worktree_root is None:
+            return
+
+        self._current_path = None
+        self._commit_file_context = None
+        self._current_summary = None
+        self._diff_mode = True
+        self._update_border_title(f"diff vs {label}")
+
+        try:
+            diff_text = get_full_diff(self.worktree_root, ref)
+        except RuntimeError as e:
+            self._show_content_view()
+            self._content.update(f"Error getting diff: {e}")
+            self._refresh_footer()
+            return
+
+        if not diff_text.strip():
+            self._show_content_view()
+            self._content.update(Text("No changes", style="dim italic"))
+            self.scroll_home(animate=False)
+            self._refresh_footer()
+            return
+
+        if self._diff_layout == "side-by-side":
+            self._show_side_by_side_view(diff_text)
+        else:
+            self._show_content_view()
+            styled = render_diff(diff_text, dark=self._is_dark_theme())
+            self._content.update(styled)
+        self.scroll_home(animate=False)
+        self._refresh_footer()
+
     def show_clean_tree(self) -> None:
         """Show a message indicating the working tree has no changes."""
         self._current_path = None

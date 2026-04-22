@@ -45,8 +45,8 @@ def test_stale_commands_removed():
 
 
 def test_commands_count():
-    """COMMANDS should have exactly 13 entries after adding Switch Worktree."""
-    assert len(COMMANDS) == 13
+    """COMMANDS should have exactly 14 entries after adding Branch Diff."""
+    assert len(COMMANDS) == 14
 
 
 def test_every_command_has_app_action_method():

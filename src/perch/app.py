@@ -11,6 +11,7 @@ from textual.widgets import Footer, Header, ListItem, ListView, TabbedContent, T
 
 from perch.commands import DiscoveryCommandProvider
 from perch.services.editor import open_file
+from perch.widgets.branch_diff_picker import BranchDiffPickerScreen
 from perch.widgets.file_search import FileSearchScreen
 from perch.widgets.file_tree import FileTree
 from perch.widgets.git_picker import GitPickerScreen
@@ -46,6 +47,7 @@ class PerchApp(App):
         Binding("minus", "shrink_pane", "Shrink", show=False, key_display="-"),
         Binding("equals_sign", "grow_pane", "Grow", show=False, key_display="="),
         Binding("w", "switch_worktree", "Worktree"),
+        Binding("D", "branch_diff", "Branch Diff", key_display="D"),
     ]
 
     BINDING_REGISTRY: ClassVar[dict[str, list[Binding]]] = {
@@ -57,6 +59,7 @@ class PerchApp(App):
             ),
             Binding("ctrl+p", "file_search", "File Search", key_display="Ctrl+P"),
             Binding("w", "switch_worktree", "Worktree", key_display="w"),
+            Binding("D", "branch_diff", "Branch Diff", key_display="D"),
             Binding("c", "copy", "Copy", key_display="c"),
             Binding("question_mark", "show_help", "Help", key_display="?"),
             Binding("f", "toggle_focus_mode", "Focus Mode", key_display="f"),
@@ -120,6 +123,7 @@ class PerchApp(App):
         self._auto_select_attempts = 0
         self._mounted = False
         self._tab_click_pending = False
+        self._last_branch_diff_ref: str | None = None
         try:
             from perch.services.git import get_current_branch, get_worktree_root
 
@@ -567,6 +571,43 @@ class PerchApp(App):
         self.push_screen(
             GitPickerScreen(self.worktree_path), self._on_worktree_selected
         )
+
+    # ------------------------------------------------------------------
+    # Branch diff
+    # ------------------------------------------------------------------
+
+    def action_branch_diff(self) -> None:
+        """Open the branch-diff base picker and show the resulting diff."""
+        self.push_screen(
+            BranchDiffPickerScreen(self.worktree_path),
+            self._on_branch_diff_ref_selected,
+        )
+
+    def _on_branch_diff_ref_selected(self, ref: str | None) -> None:
+        if ref is None:
+            return
+        self._last_branch_diff_ref = ref
+        label = self._branch_diff_label(ref)
+        viewer = self.query_one(Viewer)
+        viewer.worktree_root = self.worktree_path
+        viewer.show_branch_diff(ref, label)
+        viewer.focus()
+
+    def _branch_diff_label(self, ref: str) -> str:
+        """Return a short human-readable label for the diff base ref."""
+        from perch.services.git import get_merge_base
+
+        if ref == "HEAD":
+            return "HEAD"
+        try:
+            merge_base = get_merge_base(self.worktree_path)
+        except RuntimeError:
+            merge_base = None
+        if merge_base is not None:
+            base_branch, base_sha = merge_base
+            if ref == base_sha:
+                return f"merge-base with {base_branch} ({ref[:7]})"
+        return ref[:7] if len(ref) >= 7 else ref
 
     def _on_worktree_selected(self, result: str | None) -> None:
         """Handle the result from the worktree/branch picker modal."""

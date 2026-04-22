@@ -610,6 +610,200 @@ class TestCommitFileModel:
         assert cf.old_path is None
 
 
+class TestGetMergeBase:
+    def test_returns_base_branch_and_sha(self, git_worktree: Path) -> None:
+        from perch.services.git import get_merge_base
+
+        subprocess.run(["git", "branch", "-M", "main"], cwd=git_worktree, check=True)
+        base = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        subprocess.run(
+            ["git", "checkout", "-b", "feature"], cwd=git_worktree, check=True
+        )
+        (git_worktree / "feat.py").write_text("x\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "feature commit"], cwd=git_worktree, check=True
+        )
+
+        assert get_merge_base(git_worktree) == ("main", base)
+
+    def test_detects_non_main_default_branch(self, tmp_path: Path) -> None:
+        from perch.services.git import get_merge_base
+
+        subprocess.run(["git", "init", "-b", "develop"], cwd=tmp_path, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "t@t.com"], cwd=tmp_path, check=True
+        )
+        subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+        (tmp_path / "a.txt").write_text("x\n")
+        subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=tmp_path, check=True)
+        base = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        subprocess.run(["git", "checkout", "-b", "feature"], cwd=tmp_path, check=True)
+        (tmp_path / "b.txt").write_text("y\n")
+        subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-m", "feat"], cwd=tmp_path, check=True)
+
+        assert get_merge_base(tmp_path) == ("develop", base)
+
+    def test_returns_none_when_no_default_branch(self, tmp_path: Path) -> None:
+        from perch.services.git import get_merge_base
+
+        subprocess.run(["git", "init", "-b", "zzz"], cwd=tmp_path, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "t@t.com"], cwd=tmp_path, check=True
+        )
+        subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+        subprocess.run(
+            ["git", "config", "--unset", "init.defaultBranch"],
+            cwd=tmp_path,
+            check=False,
+        )
+        (tmp_path / "a.txt").write_text("x\n")
+        subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=tmp_path, check=True)
+        assert get_merge_base(tmp_path) is None
+
+
+class TestGetDefaultBranch:
+    def test_prefers_main(self, git_worktree: Path) -> None:
+        from perch.services.git import get_default_branch
+
+        subprocess.run(["git", "branch", "-M", "main"], cwd=git_worktree, check=True)
+        assert get_default_branch(git_worktree) == "main"
+
+    def test_falls_back_to_master(self, git_worktree: Path) -> None:
+        from perch.services.git import get_default_branch
+
+        subprocess.run(["git", "branch", "-M", "master"], cwd=git_worktree, check=True)
+        assert get_default_branch(git_worktree) == "master"
+
+    def test_uses_configured_default(self, tmp_path: Path) -> None:
+        from perch.services.git import get_default_branch
+
+        subprocess.run(["git", "init", "-b", "trunk"], cwd=tmp_path, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "t@t.com"], cwd=tmp_path, check=True
+        )
+        subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+        (tmp_path / "a.txt").write_text("x\n")
+        subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=tmp_path, check=True)
+        assert get_default_branch(tmp_path) == "trunk"
+
+
+class TestGetFullDiff:
+    def test_includes_committed_and_uncommitted(self, git_worktree: Path) -> None:
+        from perch.services.git import get_full_diff
+
+        base = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        # A committed change on top of base.
+        (git_worktree / "committed.py").write_text("committed\n")
+        subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "add committed"], cwd=git_worktree, check=True
+        )
+        # An uncommitted modification too.
+        (git_worktree / "hello.py").write_text("uncommitted change\n")
+
+        diff = get_full_diff(git_worktree, base)
+        assert "committed.py" in diff
+        assert "uncommitted change" in diff
+
+    def test_empty_when_no_changes(self, git_worktree: Path) -> None:
+        from perch.services.git import get_full_diff
+
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        assert get_full_diff(git_worktree, head) == ""
+
+    @patch("perch.services.git._run_git")
+    def test_raises_on_failure(self, mock_run: object) -> None:
+        from perch.services.git import get_full_diff
+
+        mock_run.return_value = subprocess.CompletedProcess(  # type: ignore[attr-defined]
+            args=["git", "diff"],
+            returncode=128,
+            stdout="",
+            stderr="fatal: bad revision",
+        )
+        with pytest.raises(RuntimeError, match="git diff failed"):
+            get_full_diff(Path("/tmp"), "bogus")
+
+
+class TestGetCommitsSince:
+    def test_returns_commits_after_base(self, git_worktree: Path) -> None:
+        from perch.services.git import get_commits_since
+
+        base = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        for i in range(3):
+            (git_worktree / f"f{i}.txt").write_text(f"{i}\n")
+            subprocess.run(["git", "add", "."], cwd=git_worktree, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", f"c{i}"], cwd=git_worktree, check=True
+            )
+
+        commits = get_commits_since(git_worktree, base)
+        assert len(commits) == 3
+        # Newest first
+        assert commits[0].message == "c2"
+
+    def test_none_base_returns_head_history(self, git_worktree: Path) -> None:
+        from perch.services.git import get_commits_since
+
+        commits = get_commits_since(git_worktree, None, limit=10)
+        assert len(commits) == 1
+        assert commits[0].message == "initial commit"
+
+
+class TestResolveRef:
+    def test_resolves_head(self, git_worktree: Path) -> None:
+        from perch.services.git import resolve_ref
+
+        expected = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=git_worktree,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        assert resolve_ref(git_worktree, "HEAD") == expected
+
+    def test_returns_none_for_unknown_ref(self, git_worktree: Path) -> None:
+        from perch.services.git import resolve_ref
+
+        assert resolve_ref(git_worktree, "definitely-not-a-ref") is None
+
+
 class TestCommitSummaryModel:
     def test_basic_fields(self) -> None:
         cs = CommitSummary(
