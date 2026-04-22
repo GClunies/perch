@@ -1,0 +1,23 @@
+src/perch/__init__.py
+  9f5d678d3f78b607 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "162b28bcfd7935e4e142a152d5c003568862afbb",
+  "prompts": {
+    "9f5d678d3f78b607": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "495cfae3-a2e1-4da5-9eaf-71e1c4227418",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Gregory Clunies",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
